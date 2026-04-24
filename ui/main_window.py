@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QFont
 
+from ui.screens.Reports_screen import ReportsScreen
 from ui.screens.customers_screen import CustomersScreen
 from ui.screens.transaction_form import TransactionScreen
 from ui.styles.theme import COLORS, MAIN_STYLE
@@ -80,7 +81,7 @@ class MainWindow(QMainWindow):
             ("platforms",  "🏧  المنصات",           PlatformsScreen),
             ("customers",  "👥  العملاء",           CustomersScreen),
             ("transaction","➕  إضافة عملية",       TransactionScreen),
-            ("reports",    "📑  التقارير والجرد",   None),   # قادم
+            ("reports",    "📑  التقارير والجرد",   ReportsScreen),   # قادم
         ]
 
         for key, label, ScreenClass in nav_items:
