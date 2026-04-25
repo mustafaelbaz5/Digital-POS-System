@@ -3,9 +3,9 @@ Database Package
 """
 from .schema import initialize_database, get_connection
 from .dal_budget import (
-    get_budget, update_main_budget, adjust_cash,
+    get_budget, update_main_budget, set_cash_vault, adjust_cash,
     get_all_platforms, get_platform_by_id,
-    add_platform, update_platform_balance,
+    add_platform, update_platform_balance, update_wallet_monthly_used,
     deposit_to_platform, reset_wallet_limit_if_needed,
     delete_platform
 )

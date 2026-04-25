@@ -68,6 +68,25 @@ def add_outbound_transaction(
                 (amount_spent, platform_id)
             )
 
+            # 3b. تحديث monthly_used للمحافظ فقط مع تطبيق الليمت
+            platform_row = conn.execute(
+                "SELECT type, monthly_used, monthly_limit FROM platforms WHERE id = ?",
+                (platform_id,)
+            ).fetchone()
+
+            if platform_row["type"] == "wallet":
+                new_used = platform_row["monthly_used"] + amount_spent
+                if new_used > platform_row["monthly_limit"]:
+                    raise ValueError(
+                        f"تجاوز الحد الشهري للمحفظة — "
+                        f"المستخدم: {platform_row['monthly_used']:,.2f} / "
+                        f"الحد: {platform_row['monthly_limit']:,.2f} ج"
+                    )
+                conn.execute(
+                    "UPDATE platforms SET monthly_used = monthly_used + ? WHERE id = ?",
+                    (amount_spent, platform_id)
+                )
+
             # 4. تحديث حسب حالة الدفع
             if payment_status == "cash":
                 # إضافة للخزينة النقدية
@@ -97,13 +116,15 @@ def add_inbound_transaction(
     amount_received:  float,    # المستلم في المحفظة
     amount_delivered: float,    # المسلم كاش للعميل
     reference_no:     str = "",
-    notes:            str = ""
+    notes:            str = "",
+    is_delivered:     bool = False,   # هل تم تسليم المبلغ للعميل؟
 ) -> int:
     """
     عملية استلام وارد (Inbound) - للمحافظ فقط
     ──────────────────────────────────────────
     - يضيف amount_received لرصيد المحفظة
     - يخصم amount_delivered من الخزينة النقدية
+    - لو العميل محدد → يُسجَّل المبلغ في حسابه (له أو عليه حسب is_delivered)
     - الربح = amount_received - amount_delivered
     يرجع ID العملية
     """
@@ -133,20 +154,23 @@ def add_inbound_transaction(
             cursor = conn.execute("""
                 INSERT INTO transactions
                     (operation_type, service_name, platform_id, customer_id,
-                     amount_spent, amount_required, reference_no, payment_status, notes)
-                VALUES ('inbound', ?, ?, ?, ?, ?, ?, 'cash', ?)
+                     amount_spent, amount_required, reference_no, payment_status,
+                     is_delivered, notes)
+                VALUES ('inbound', ?, ?, ?, ?, ?, ?, 'cash', ?, ?)
             """, (
                 service_name, wallet_id, customer_id,
                 amount_delivered,    # amount_spent = ما خرج من الكاش
                 amount_received,     # amount_required = ما استلمناه
-                reference_no, notes
+                reference_no,
+                1 if is_delivered else 0,
+                notes
             ))
             transaction_id = cursor.lastrowid
 
             # 4. تحديث رصيد المحفظة
             conn.execute(
-                "UPDATE platforms SET balance = balance + ?, monthly_used = monthly_used + ? WHERE id = ?",
-                (amount_received, amount_received, wallet_id)
+                "UPDATE platforms SET balance = balance + ? WHERE id = ?",
+                (amount_received, wallet_id)
             )
 
             # 5. خصم من الخزينة النقدية
@@ -155,9 +179,58 @@ def add_inbound_transaction(
                 (amount_delivered,)
             )
 
+            # 6. تسجيل في حساب العميل — المبلغ المسلم (له أو لم يُسلَّم بعد)
+            if customer_id:
+                if is_delivered:
+                    # تم التسليم → ليس له شيء مستحق (صفر مديونية)
+                    pass
+                else:
+                    # لم يُسلَّم بعد → مبلغ مستحق للعميل (نقص من مديونيته أو يصبح له)
+                    conn.execute(
+                        "UPDATE customers SET total_debt = total_debt - ? WHERE id = ?",
+                        (amount_delivered, customer_id)
+                    )
+
             conn.commit()
             return transaction_id
 
+        except Exception:
+            conn.rollback()
+            raise
+
+
+def mark_as_delivered(transaction_id: int) -> None:
+    """
+    تحويل عملية واردة من 'لم يُسلَّم' إلى 'تم التسليم'
+    يُصفّر المبلغ المستحق للعميل
+    """
+    with get_connection() as conn:
+        try:
+            row = conn.execute("""
+                SELECT customer_id, amount_spent, is_delivered, operation_type
+                FROM transactions WHERE id = ?
+            """, (transaction_id,)).fetchone()
+
+            if not row:
+                raise ValueError("العملية غير موجودة")
+            if row["operation_type"] != "inbound":
+                raise ValueError("هذه الوظيفة للعمليات الواردة فقط")
+            if row["is_delivered"]:
+                raise ValueError("تم التسليم مسبقاً")
+
+            conn.execute(
+                "UPDATE transactions SET is_delivered = 1 WHERE id = ?",
+                (transaction_id,)
+            )
+
+            # إلغاء تأثير المبلغ على العميل (كان مسجلاً كـ "له")
+            if row["customer_id"]:
+                conn.execute(
+                    "UPDATE customers SET total_debt = total_debt + ? WHERE id = ?",
+                    (row["amount_spent"], row["customer_id"])
+                )
+
+            conn.commit()
         except Exception:
             conn.rollback()
             raise
@@ -387,11 +460,19 @@ def get_dashboard_stats() -> dict:
             WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now', 'localtime')
         """).fetchone()
 
-        total_balances = (
+        # إجمالي المؤجل
+        pending = conn.execute("""
+            SELECT COALESCE(SUM(amount_required), 0) AS total
+            FROM transactions WHERE payment_status = 'pending'
+        """).fetchone()
+
+        total_assets = (
             (machines["total"] or 0) +
             (wallets["total"]  or 0) +
             (budget["cash_vault"] or 0)
         )
+
+        total_balances = total_assets  # alias for compatibility
 
         return {
             "main_budget":    budget["main_budget"]  or 0,
@@ -402,6 +483,7 @@ def get_dashboard_stats() -> dict:
             "today_profit":   today_profit["total"]  or 0,
             "month_profit":   month_profit["total"]  or 0,
             "total_balances": total_balances,
-            # معادلة المطابقة: (أرصدة + ديون) vs (ميزانية + أرباح كلية)
+            "total_assets":   total_assets,           # كاش + ماكينات + محافظ
             "net_position":   total_balances + (debts["total"] or 0) - (budget["main_budget"] or 0),
+            "total_pending":  pending["total"] or 0,
         }

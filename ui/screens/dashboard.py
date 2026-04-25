@@ -80,6 +80,12 @@ class DashboardScreen(ScreenShell):
         budget_btn.clicked.connect(self._edit_budget)
         self.add_action(budget_btn)
 
+        cash_btn = QPushButton("💵  تعديل الكاش")
+        cash_btn.setObjectName("btn_secondary")
+        cash_btn.setFixedHeight(32)
+        cash_btn.clicked.connect(self._edit_cash)
+        self.add_action(cash_btn)
+
         deposit_btn = QPushButton("💰  إيداع سريع")
         deposit_btn.setObjectName("btn_primary")
         deposit_btn.setFixedHeight(32)
@@ -87,16 +93,20 @@ class DashboardScreen(ScreenShell):
         self.add_action(deposit_btn)
 
     def _build_stat_cards(self):
-        self.card_cash     = StatCard("الخزينة النقدية",   icon="💵", accent_color=COLORS["green"])
-        self.card_machines = StatCard("إجمالي الماكينات",  icon="🏧", accent_color=COLORS["blue_bright"])
-        self.card_wallets  = StatCard("إجمالي المحافظ",    icon="💳", accent_color=COLORS["purple"])
-        self.card_debts    = StatCard("إجمالي المديونيات", icon="📋", accent_color=COLORS["yellow"])
-        self.card_today    = StatCard("أرباح اليوم",       icon="📈", accent_color=COLORS["green"])
-        self.card_month    = StatCard("أرباح الشهر",       icon="🗓️", accent_color=COLORS["blue_primary"])
+        self.card_budget   = StatCard("الميزانية الأصلية",    icon="🏦", accent_color=COLORS["blue_primary"])
+        self.card_assets   = StatCard("إجمالي الأصول",        icon="💰", accent_color=COLORS["cyan"])
+        self.card_cash     = StatCard("الخزينة النقدية",      icon="💵", accent_color=COLORS["green"])
+        self.card_machines = StatCard("إجمالي الماكينات",     icon="🏧", accent_color=COLORS["blue_bright"])
+        self.card_wallets  = StatCard("إجمالي المحافظ",       icon="💳", accent_color=COLORS["purple"])
+        self.card_debts    = StatCard("إجمالي المديونيات",    icon="📋", accent_color=COLORS["yellow"])
+        self.card_today    = StatCard("أرباح اليوم",          icon="📈", accent_color=COLORS["green"])
+        self.card_month    = StatCard("أرباح الشهر",          icon="🗓️", accent_color=COLORS["blue_primary"])
+        self.card_pending  = StatCard("إجمالي المؤجل",       icon="⏳", accent_color=COLORS["yellow"])
 
         cards = [
-            self.card_cash, self.card_machines, self.card_wallets,
-            self.card_debts, self.card_today, self.card_month,
+            self.card_budget,   self.card_assets,   self.card_cash,
+            self.card_machines, self.card_wallets,  self.card_debts,
+            self.card_today,    self.card_month,    self.card_pending,
         ]
         for i, card in enumerate(cards):
             self._stats_grid.addWidget(card, i // 3, i % 3)
@@ -135,12 +145,15 @@ class DashboardScreen(ScreenShell):
     def refresh(self):
         stats = db.get_dashboard_stats()
 
+        self.card_budget.set_value(fmt_currency(stats["main_budget"]))
+        self.card_assets.set_value(fmt_currency(stats["total_assets"]))
         self.card_cash.set_value(fmt_currency(stats["cash_vault"]))
         self.card_machines.set_value(fmt_currency(stats["total_machines"]))
         self.card_wallets.set_value(fmt_currency(stats["total_wallets"]))
         self.card_debts.set_value(fmt_currency(stats["total_debts"]))
         self.card_today.set_value(fmt_currency(stats["today_profit"]))
         self.card_month.set_value(fmt_currency(stats["month_profit"]))
+        self.card_pending.set_value(fmt_currency(stats.get("total_pending", 0)))
 
         # Match formula
         net = stats["net_position"]
@@ -190,6 +203,24 @@ class DashboardScreen(ScreenShell):
                 QMessageBox.information(
                     self, "تم ✅",
                     f"تم إيداع {fmt_currency(amount)} في {platform['name']}"
+                )
+            except Exception as e:
+                QMessageBox.critical(self, "خطأ", str(e))
+
+    def _edit_cash(self):
+        current = db.get_budget()["cash_vault"]
+        amount, ok = QInputDialog.getDouble(
+            self, "تعديل الكاش",
+            f"أدخل المبلغ النقدي الحالي في يدك:\n(الحالي: {fmt_currency(current)})",
+            value=current, min=0, decimals=2
+        )
+        if ok:
+            try:
+                db.set_cash_vault(amount)
+                self.refresh()
+                QMessageBox.information(
+                    self, "تم ✅",
+                    f"تم تحديث الكاش إلى {fmt_currency(amount)}"
                 )
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))

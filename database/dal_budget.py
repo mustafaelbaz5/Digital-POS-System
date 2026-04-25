@@ -1,6 +1,11 @@
 """
 Data Access Layer - Budget & Platforms
 طبقة الوصول للبيانات - الميزانية والمنصات
+
+منطق الميزانية:
+  main_budget = cash_vault + أرصدة الماكينات + أرصدة المحافظ
+  الإيداع لمنصة: يخصم من cash_vault ويزيد رصيد المنصة (الميزانية ثابتة)
+  تعديل الكاش يدوياً: يغير cash_vault ويعدّل main_budget بالفرق
 """
 
 from database.schema import get_connection
@@ -13,21 +18,63 @@ from database.schema import get_connection
 def get_budget() -> dict:
     """جلب الميزانية الرئيسية والخزينة النقدية"""
     with get_connection() as conn:
-        row = conn.execute("SELECT main_budget, cash_vault FROM budget WHERE id = 1").fetchone()
+        row = conn.execute(
+            "SELECT main_budget, cash_vault FROM budget WHERE id = 1"
+        ).fetchone()
         return dict(row)
 
 
 def update_main_budget(amount: float) -> None:
-    """تعديل الميزانية الرئيسية يدوياً"""
+    """تعديل الميزانية الرئيسية يدوياً (تعيين قيمة جديدة)"""
     with get_connection() as conn:
-        conn.execute("UPDATE budget SET main_budget = ? WHERE id = 1", (amount,))
+        conn.execute(
+            "UPDATE budget SET main_budget = ? WHERE id = 1", (amount,)
+        )
         conn.commit()
 
 
-def adjust_cash(delta: float) -> None:
-    """زيادة أو خصم من الخزينة النقدية (delta يمكن أن يكون سالب)"""
+def set_cash_vault(new_amount: float) -> None:
+    """
+    تعيين قيمة الكاش يدوياً
+    ────────────────────────────────────────────────
+    - الكاش الجديد يُخصم من الميزانية الرئيسية بالفرق
+    - مثال: كان الكاش 0 → أدخل 50,000 → main_budget تنقص 50,000
+    - مثال: كان الكاش 50,000 → أدخل 30,000 → main_budget تزيد 20,000 (إرجاع)
+    """
+    if new_amount < 0:
+        raise ValueError("قيمة الكاش لا يمكن أن تكون سالبة")
+
     with get_connection() as conn:
-        conn.execute("UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1", (delta,))
+        try:
+            current = conn.execute(
+                "SELECT cash_vault FROM budget WHERE id = 1"
+            ).fetchone()["cash_vault"]
+
+            delta = new_amount - (current or 0)  # موجب = زيادة كاش = خصم من الميزانية
+
+            conn.execute(
+                """UPDATE budget
+                   SET cash_vault  = ?,
+                       main_budget = main_budget - ?
+                   WHERE id = 1""",
+                (new_amount, delta)
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+
+def adjust_cash(delta: float) -> None:
+    """زيادة أو خصم من الخزينة النقدية (للاستخدام الداخلي من العمليات)"""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1", (delta,)
+        )
         conn.commit()
 
 
@@ -35,7 +82,7 @@ def adjust_cash(delta: float) -> None:
 #  المنصات  (Platforms)
 # ══════════════════════════════════════════
 
-def get_all_platforms(platform_type: str = None) -> list[dict]: # pyright: ignore[reportArgumentType]
+def get_all_platforms(platform_type: str = None) -> list[dict]:
     """
     جلب كل المنصات النشطة
     platform_type: 'machine' | 'wallet' | None (الكل)
@@ -70,7 +117,7 @@ def add_platform(name: str, platform_type: str) -> int:
             (name, platform_type)
         )
         conn.commit()
-        return cursor.lastrowid # pyright: ignore[reportReturnType]
+        return cursor.lastrowid  # pyright: ignore[reportReturnType]
 
 
 def update_platform_balance(platform_id: int, delta: float, conn=None) -> None:
@@ -109,18 +156,57 @@ def update_wallet_monthly_used(wallet_id: int, delta: float, conn=None) -> None:
 
 
 def deposit_to_platform(platform_id: int, amount: float, notes: str = "") -> None:
-    """إيداع مبلغ لماكينة وتسجيله في سجل الإيداعات"""
+    """
+    إيداع مبلغ لمنصة (ماكينة أو محفظة)
+    ──────────────────────────────────────
+    - يخصم amount من main_budget (الميزانية الرئيسية)
+    - يزيد رصيد المنصة بنفس المبلغ
+    - إذا الميزانية غير كافية → ValueError
+    """
+    if amount <= 0:
+        raise ValueError("مبلغ الإيداع يجب أن يكون أكبر من الصفر")
+
     with get_connection() as conn:
         try:
+            # 1. التحقق من الميزانية المتاحة
+            budget = conn.execute(
+                "SELECT main_budget FROM budget WHERE id = 1"
+            ).fetchone()
+
+            if budget["main_budget"] < amount:
+                raise ValueError(
+                    f"الميزانية غير كافية — المتاح: {budget['main_budget']:,.2f} ج  |  "
+                    f"المطلوب: {amount:,.2f} ج"
+                )
+
+            # 2. التحقق من وجود المنصة
+            platform = conn.execute(
+                "SELECT id FROM platforms WHERE id = ? AND is_active = 1",
+                (platform_id,)
+            ).fetchone()
+            if not platform:
+                raise ValueError("المنصة غير موجودة أو محذوفة")
+
+            # 3. خصم من الميزانية الرئيسية
+            conn.execute(
+                "UPDATE budget SET main_budget = main_budget - ? WHERE id = 1",
+                (amount,)
+            )
+
+            # 4. إضافة لرصيد المنصة
             conn.execute(
                 "UPDATE platforms SET balance = balance + ? WHERE id = ?",
                 (amount, platform_id)
             )
+
+            # 5. تسجيل في سجل الإيداعات
             conn.execute(
                 "INSERT INTO machine_deposits (platform_id, amount, notes) VALUES (?, ?, ?)",
                 (platform_id, amount, notes)
             )
+
             conn.commit()
+
         except Exception:
             conn.rollback()
             raise

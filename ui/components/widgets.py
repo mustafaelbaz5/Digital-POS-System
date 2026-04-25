@@ -217,15 +217,16 @@ class PlatformCard(QWidget):
         balance_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
         layout.addWidget(balance_lbl)
 
-        # Monthly limit bar (wallets only)
+        # Monthly limit (wallets only) — يظهر المتبقي كرقم
         if p["type"] == "wallet":
-            used  = p.get("monthly_used", 0)
-            limit = p.get("monthly_limit", 200000)
-            pct   = min(100, int(used / limit * 100)) if limit else 0
+            used      = p.get("monthly_used", 0)
+            limit     = p.get("monthly_limit", 200000)
+            remaining = limit - used
+            pct       = min(100, int(used / limit * 100)) if limit else 0
             limit_color = COLORS["red"] if pct >= 90 else (
                 COLORS["yellow"] if pct >= 70 else COLORS["text_muted"]
             )
-            limit_lbl = QLabel(f"{pct}% من الحد الشهري")
+            limit_lbl = QLabel(f"متبقي: {remaining:,.0f} ج / {limit:,.0f} ج")
             limit_lbl.setStyleSheet(f"color: {limit_color}; font-size: 11px;")
             limit_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
             layout.addWidget(limit_lbl)

@@ -100,12 +100,13 @@ class CustomersTab(QWidget):
 
         # Table
         columns = [
-            ("الاسم",      200),
-            ("التليفون",   130),
-            ("المجموعة",   140),
-            ("المديونية",  130),
-            ("ملاحظات",     -1),
-            ("إجراءات",    120),
+            ("الاسم",       200),
+            ("التليفون",    130),
+            ("المجموعة",    130),
+            ("عليه 🔴",     115),
+            ("له 🟢",       115),
+            ("ملاحظات",      -1),
+            ("إجراءات",     115),
         ]
         self.table = DataTable(columns)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -142,43 +143,68 @@ class CustomersTab(QWidget):
         else:
             customers = db.get_all_customers()
 
+        # ترتيب: الأعلى مديونية أولاً، ثم اللي له رصيد، ثم الصفر
+        customers = sorted(
+            customers,
+            key=lambda c: (-(c.get("total_debt") or 0))
+        )
         self._customers = customers
         self.table.clear_rows()
         self.table.setRowCount(len(customers))
 
-        total_debt = 0
+        total_owed = 0   # إجمالي ما عليهم
+        total_due  = 0   # إجمالي ما لهم
+
         for row, c in enumerate(customers):
             self.table.set_cell(row, 0, c["name"], bold=True)
             self.table.set_cell(row, 1, c.get("phone") or "—",
                                 color=COLORS["text_secondary"])
             self.table.set_cell(row, 2, c.get("group_name") or "—",
                                 color=COLORS["text_muted"])
+
             debt = c.get("total_debt") or 0
-            total_debt += debt
-            self.table.set_cell(
-                row, 3, fmt_currency(debt),
-                color=COLORS["red"] if debt > 0 else COLORS["text_muted"],
-                bold=debt > 0
-            )
-            self.table.set_cell(row, 4, c.get("notes") or "—",
+            if debt > 0:
+                # عليه (مدين)
+                self.table.set_cell(row, 3, fmt_currency(debt),
+                                    color=COLORS["red"], bold=True)
+                self.table.set_cell(row, 4, "—", color=COLORS["text_muted"])
+                total_owed += debt
+            elif debt < 0:
+                # له (دائن) — القيمة سالبة يعني احنا بندين له
+                self.table.set_cell(row, 3, "—", color=COLORS["text_muted"])
+                self.table.set_cell(row, 4, fmt_currency(abs(debt)),
+                                    color=COLORS["green"], bold=True)
+                total_due += abs(debt)
+            else:
+                self.table.set_cell(row, 3, "—", color=COLORS["text_muted"])
+                self.table.set_cell(row, 4, "—", color=COLORS["text_muted"])
+
+            self.table.set_cell(row, 5, c.get("notes") or "—",
                                 color=COLORS["text_muted"])
 
             stmt_btn = QPushButton("كشف")
             stmt_btn.setObjectName("btn_ghost")
             stmt_btn.setFixedHeight(26)
             stmt_btn.clicked.connect(
-                lambda _, cid=c["id"]: self.open_statement.emit(cid)
+                lambda _, cid=c["id"]: self._open_statement(cid)
             )
-            self.table.setCellWidget(row, 5, stmt_btn)
+            self.table.setCellWidget(row, 6, stmt_btn)
 
-        self.total_label.setText(
-            f"إجمالي العملاء: {len(customers)}  ·  "
-            f"إجمالي المديونيات: {fmt_currency(total_debt)}"
-        )
+        summary_parts = [f"إجمالي العملاء: {len(customers)}"]
+        if total_owed > 0:
+            summary_parts.append(f"عليهم: {fmt_currency(total_owed)}")
+        if total_due > 0:
+            summary_parts.append(f"لهم: {fmt_currency(total_due)}")
+        self.total_label.setText("  ·  ".join(summary_parts))
 
     def _add_customer(self):
         if CustomerDialog(self).exec():
             self.load_data()
+
+    def _open_statement(self, customer_id: int):
+        from ui.screens.statement_screen import CustomerStatementDialog
+        dialog = CustomerStatementDialog(customer_id, self)
+        dialog.exec()
 
     def _context_menu(self, pos):
         row = self.table.rowAt(pos.y())
@@ -277,6 +303,12 @@ class GroupsTab(QWidget):
             edit_btn.clicked.connect(lambda _, grp=g: self._edit_group(grp))
             row_btns.addWidget(edit_btn)
 
+            report_btn = QPushButton("تقرير")
+            report_btn.setObjectName("btn_ghost")
+            report_btn.setFixedHeight(26)
+            report_btn.clicked.connect(lambda _, grp=g: self._show_group_report(grp["id"]))
+            row_btns.addWidget(report_btn)
+
             container = QWidget()
             container.setLayout(row_btns)
             self.table.setCellWidget(row, 3, container)
@@ -288,6 +320,10 @@ class GroupsTab(QWidget):
     def _edit_group(self, group: dict):
         if GroupDialog(self, group).exec():
             self.load_data()
+
+    def _show_group_report(self, group_id: int):
+        from ui.screens.statement_screen import GroupReportDialog
+        GroupReportDialog(group_id, self).exec()
 
     def _context_menu(self, pos):
         row = self.table.rowAt(pos.y())

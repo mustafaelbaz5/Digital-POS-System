@@ -122,6 +122,9 @@ CREATE TABLE IF NOT EXISTS transactions (
     payment_status  TEXT    NOT NULL DEFAULT 'pending'   -- 'cash' | 'pending' | 'paid'
                     CHECK (payment_status IN ('cash', 'pending', 'paid')),
 
+    -- حالة التسليم (للعمليات الواردة فقط)
+    is_delivered    INTEGER NOT NULL DEFAULT 0,          -- 1 = تم تسليم المبلغ للعميل
+
     notes           TEXT
 );
 
@@ -149,5 +152,10 @@ def initialize_database() -> None:
     """تهيئة قاعدة البيانات وإنشاء الجداول"""
     with get_connection() as conn:
         conn.executescript(SCHEMA_SQL)
-        conn.commit()
+        # Migration: إضافة عمود is_delivered لو مش موجود
+        try:
+            conn.execute("ALTER TABLE transactions ADD COLUMN is_delivered INTEGER NOT NULL DEFAULT 0")
+            conn.commit()
+        except Exception:
+            pass  # العمود موجود بالفعل
     print(f"[DB] قاعدة البيانات جاهزة: {DB_PATH}")
