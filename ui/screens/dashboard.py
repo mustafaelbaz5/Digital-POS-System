@@ -1,111 +1,94 @@
 """
-Dashboard Screen — الشاشة الرئيسية
+dashboard.py — الداشبورد الرئيسي
+Refactored: ScreenShell, responsive grid, clean layout
 """
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QScrollArea, QPushButton, QGridLayout, QFrame,
-    QSpacerItem, QSizePolicy, QInputDialog, QMessageBox
+    QPushButton, QGridLayout, QFrame, QInputDialog, QMessageBox,
+    QSizePolicy
 )
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont
+from datetime import datetime
 
 from ui.styles.theme import COLORS
-from ui.components.widgets import StatCard, PlatformCard, SectionTitle
-from utils.formatters import fmt_currency, fmt_number
+from ui.components.widgets import (
+    StatCard, PlatformsRow, SectionTitle, ScreenShell, InfoRow, make_divider
+)
+from utils.formatters import fmt_currency
 
 import database as db
 
 
-class DashboardScreen(QWidget):
-    """الداشبورد الرئيسي"""
+class DashboardScreen(ScreenShell):
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        self._build_ui()
-        self.refresh()
+        super().__init__("لوحة التحكم", self._today_str())
+        self._build_content()
 
-        # تحديث تلقائي كل 30 ثانية
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.refresh)
         self._timer.start(30_000)
 
-    # ─── بناء الواجهة ──────────────────────────────────────────────
+    @staticmethod
+    def _today_str() -> str:
+        days_ar = ["الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت","الأحد"]
+        now = datetime.now()
+        day = days_ar[now.weekday()]
+        return f"{day}  ·  {now.strftime('%Y-%m-%d')}"
 
-    def _build_ui(self):
-        root = QVBoxLayout(self)
-        root.setContentsMargins(24, 20, 24, 20)
-        root.setSpacing(20)
+    # ─── Build Content ────────────────────────────────────────────
 
-        # ── العنوان
-        header = self._make_header()
-        root.addLayout(header)
+    def _build_content(self):
+        c = self.content()
 
-        # ── كروت الإحصائيات
-        root.addWidget(SectionTitle("نظرة عامة", "إجماليات اليوم"))
-        self.stats_grid = QGridLayout()
-        self.stats_grid.setSpacing(12)
-        root.addLayout(self.stats_grid)
+        # Quick actions in header
+        self._add_header_actions()
+
+        # ── Stat Cards Grid
+        self._stats_grid = QGridLayout()
+        self._stats_grid.setSpacing(12)
+        c.addLayout(self._stats_grid)
         self._build_stat_cards()
 
-        # ── معادلة المطابقة
-        self.match_bar = self._make_match_bar()
-        root.addWidget(self.match_bar)
+        # ── Match bar
+        self._match_bar = self._make_match_bar()
+        c.addWidget(self._match_bar)
 
-        # ── المنصات
-        root.addWidget(SectionTitle("المنصات", "الماكينات والمحافظ الإلكترونية"))
+        # ── Platforms
+        platforms_header = QHBoxLayout()
+        sec = SectionTitle("المنصات", "الماكينات والمحافظ الإلكترونية")
+        platforms_header.addWidget(sec)
+        platforms_header.addStretch()
+        add_btn = QPushButton("+ إضافة منصة")
+        add_btn.setObjectName("btn_secondary")
+        add_btn.setFixedHeight(32)
+        add_btn.clicked.connect(self._add_platform)
+        platforms_header.addWidget(add_btn)
+        c.addLayout(platforms_header)
 
-        platforms_scroll = QScrollArea()
-        platforms_scroll.setWidgetResizable(True)
-        platforms_scroll.setFixedHeight(200)
-        platforms_scroll.setStyleSheet("border: none; background: transparent;")
-        platforms_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        platforms_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._platforms_row = PlatformsRow()
+        self._platforms_row.deposit_clicked.connect(self._on_deposit_clicked)
+        c.addWidget(self._platforms_row)
 
-        self.platforms_container = QWidget()
-        self.platforms_layout    = QHBoxLayout(self.platforms_container)
-        self.platforms_layout.setContentsMargins(0, 0, 0, 0)
-        self.platforms_layout.setSpacing(12)
-        self.platforms_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
+        c.addStretch()
 
-        platforms_scroll.setWidget(self.platforms_container)
-        root.addWidget(platforms_scroll)
+    def _add_header_actions(self):
+        budget_btn = QPushButton("⚙️  الميزانية")
+        budget_btn.setObjectName("btn_secondary")
+        budget_btn.setFixedHeight(32)
+        budget_btn.clicked.connect(self._edit_budget)
+        self.add_action(budget_btn)
 
-        # ── أزرار سريعة
-        root.addWidget(SectionTitle("إجراءات سريعة"))
-        root.addLayout(self._make_quick_actions())
-
-        root.addStretch()
-
-    def _make_header(self) -> QHBoxLayout:
-        layout = QHBoxLayout()
-
-        # التاريخ والوقت
-        from datetime import datetime
-        now = datetime.now()
-        date_str = now.strftime("%A  |  %Y-%m-%d")
-
-        date_lbl = QLabel(date_str)
-        date_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 13px;")
-        layout.addWidget(date_lbl)
-
-        layout.addStretch()
-
-        # العنوان
-        title = QLabel("📊  لوحة التحكم")
-        title.setStyleSheet(
-            f"color: {COLORS['text_primary']}; font-size: 22px; font-weight: bold;"
-        )
-        title.setAlignment(Qt.AlignmentFlag.AlignRight)
-        layout.addWidget(title)
-
-        return layout
+        deposit_btn = QPushButton("💰  إيداع سريع")
+        deposit_btn.setObjectName("btn_primary")
+        deposit_btn.setFixedHeight(32)
+        deposit_btn.clicked.connect(self._deposit_quick)
+        self.add_action(deposit_btn)
 
     def _build_stat_cards(self):
-        """إنشاء كروت الإحصائيات"""
         self.card_cash     = StatCard("الخزينة النقدية",   icon="💵", accent_color=COLORS["green"])
-        self.card_machines = StatCard("إجمالي الماكينات",  icon="🏧", accent_color=COLORS["blue_light"])
+        self.card_machines = StatCard("إجمالي الماكينات",  icon="🏧", accent_color=COLORS["blue_bright"])
         self.card_wallets  = StatCard("إجمالي المحافظ",    icon="💳", accent_color=COLORS["purple"])
         self.card_debts    = StatCard("إجمالي المديونيات", icon="📋", accent_color=COLORS["yellow"])
         self.card_today    = StatCard("أرباح اليوم",       icon="📈", accent_color=COLORS["green"])
@@ -113,75 +96,43 @@ class DashboardScreen(QWidget):
 
         cards = [
             self.card_cash, self.card_machines, self.card_wallets,
-            self.card_debts, self.card_today, self.card_month
+            self.card_debts, self.card_today, self.card_month,
         ]
-
         for i, card in enumerate(cards):
-            row, col = divmod(i, 3)
-            self.stats_grid.addWidget(card, row, col)
+            self._stats_grid.addWidget(card, i // 3, i % 3)
 
     def _make_match_bar(self) -> QFrame:
-        """شريط معادلة المطابقة"""
         frame = QFrame()
-        frame.setObjectName("card")
-        frame.setFixedHeight(64)
+        frame.setObjectName("card_highlight")
+        frame.setFixedHeight(60)
 
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(20, 12, 20, 12)
+        layout.setContentsMargins(20, 0, 20, 0)
+        layout.setSpacing(16)
 
-        self.match_icon  = QLabel("✅")
-        self.match_icon.setFont(QFont("Segoe UI Emoji", 18))
-        layout.addWidget(self.match_icon)
+        self._match_icon  = QLabel("⚖️")
+        self._match_icon.setStyleSheet("font-size: 20px;")
+        layout.addWidget(self._match_icon)
+
+        self._match_detail = QLabel("معادلة المطابقة")
+        self._match_detail.setStyleSheet(
+            f"color: {COLORS['text_secondary']}; font-size: 12px;"
+        )
+        layout.addWidget(self._match_detail)
 
         layout.addStretch()
 
-        self.match_label = QLabel("معادلة المطابقة")
-        self.match_label.setStyleSheet(
-            f"color: {COLORS['text_secondary']}; font-size: 13px;"
+        self._match_value = QLabel("—")
+        self._match_value.setStyleSheet(
+            f"color: {COLORS['text_primary']}; font-size: 14px; font-weight: bold;"
         )
-        layout.addWidget(self.match_label)
-
-        self.match_value = QLabel("")
-        self.match_value.setStyleSheet(
-            f"color: {COLORS['text_primary']}; font-size: 15px; font-weight: bold;"
-        )
-        layout.addWidget(self.match_value)
-
-        # زرار تعديل الميزانية
-        budget_btn = QPushButton("⚙️  تعديل الميزانية")
-        budget_btn.setObjectName("btn_secondary")
-        budget_btn.setFixedHeight(36)
-        budget_btn.clicked.connect(self._edit_budget)
-        layout.addWidget(budget_btn)
+        layout.addWidget(self._match_value)
 
         return frame
 
-    def _make_quick_actions(self) -> QHBoxLayout:
-        """أزرار الإجراءات السريعة"""
-        layout = QHBoxLayout()
-        layout.setSpacing(12)
-        layout.setAlignment(Qt.AlignmentFlag.AlignRight)
-
-        actions = [
-            ("➕  إضافة منصة",      "btn_secondary", self._add_platform_quick),
-            ("💰  إيداع للماكينة",  "btn_secondary", self._deposit_quick),
-        ]
-
-        for text, obj_name, handler in actions:
-            btn = QPushButton(text)
-            btn.setObjectName(obj_name)
-            btn.setFixedHeight(40)
-            btn.setMinimumWidth(160)
-            btn.clicked.connect(handler)
-            layout.addWidget(btn)
-
-        layout.addStretch()
-        return layout
-
-    # ─── تحديث البيانات ────────────────────────────────────────────
+    # ─── Refresh ──────────────────────────────────────────────────
 
     def refresh(self):
-        """تحديث كل بيانات الداشبورد"""
         stats = db.get_dashboard_stats()
 
         self.card_cash.set_value(fmt_currency(stats["cash_vault"]))
@@ -191,65 +142,45 @@ class DashboardScreen(QWidget):
         self.card_today.set_value(fmt_currency(stats["today_profit"]))
         self.card_month.set_value(fmt_currency(stats["month_profit"]))
 
-        # معادلة المطابقة
+        # Match formula
         net = stats["net_position"]
         if abs(net) < 0.01:
-            self.match_icon.setText("✅")
-            self.match_value.setText("الحسابات متطابقة")
-            self.match_value.setStyleSheet(f"color: {COLORS['green']}; font-size: 15px; font-weight: bold;")
+            self._match_icon.setText("✅")
+            self._match_value.setText("الحسابات متطابقة")
+            self._match_value.setStyleSheet(
+                f"color: {COLORS['green']}; font-size: 14px; font-weight: bold;"
+            )
         elif net > 0:
-            self.match_icon.setText("📈")
-            self.match_value.setText(f"فائض  {fmt_currency(net)}")
-            self.match_value.setStyleSheet(f"color: {COLORS['blue_light']}; font-size: 15px; font-weight: bold;")
+            self._match_icon.setText("📈")
+            self._match_value.setText(f"فائض  {fmt_currency(net)}")
+            self._match_value.setStyleSheet(
+                f"color: {COLORS['blue_bright']}; font-size: 14px; font-weight: bold;"
+            )
         else:
-            self.match_icon.setText("⚠️")
-            self.match_value.setText(f"عجز  {fmt_currency(abs(net))}")
-            self.match_value.setStyleSheet(f"color: {COLORS['red']}; font-size: 15px; font-weight: bold;")
+            self._match_icon.setText("⚠️")
+            self._match_value.setText(f"عجز  {fmt_currency(abs(net))}")
+            self._match_value.setStyleSheet(
+                f"color: {COLORS['red']}; font-size: 14px; font-weight: bold;"
+            )
 
-        self.match_label.setText(
-            f"ميزانية: {fmt_currency(stats['main_budget'])}   |   "
-            f"إجمالي الأرصدة: {fmt_currency(stats['total_balances'])}   |   "
-            f"الديون: {fmt_currency(stats['total_debts'])}"
+        self._match_detail.setText(
+            f"ميزانية: {fmt_currency(stats['main_budget'])}  ·  "
+            f"أرصدة: {fmt_currency(stats['total_balances'])}  ·  "
+            f"ديون: {fmt_currency(stats['total_debts'])}"
         )
 
-        # تحديث كروت المنصات
-        self._refresh_platforms()
+        # Platforms
+        self._platforms_row.load(db.get_all_platforms())
 
-    def _refresh_platforms(self):
-        """تحديث كروت المنصات"""
-        # مسح القديم
-        for i in reversed(range(self.platforms_layout.count())):
-            w = self.platforms_layout.itemAt(i).widget()
-            if w:
-                w.deleteLater()
-
-        platforms = db.get_all_platforms()
-
-        if not platforms:
-            empty = QLabel("لا توجد منصات مضافة بعد")
-            empty.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 14px;")
-            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.platforms_layout.addWidget(empty)
-            return
-
-        for p in platforms:
-            card = PlatformCard(p)
-            card.deposit_clicked.connect(self._on_deposit_clicked)
-            self.platforms_layout.addWidget(card)
-
-        self.platforms_layout.addStretch()
-
-    # ─── الإجراءات ──────────────────────────────────────────────────
+    # ─── Actions ──────────────────────────────────────────────────
 
     def _on_deposit_clicked(self, platform_id: int):
-        """إيداع لمنصة من كارتها"""
         platform = db.get_platform_by_id(platform_id)
         if not platform:
             return
-
         amount, ok = QInputDialog.getDouble(
             self, "إيداع",
-            f"أدخل المبلغ المراد إيداعه في [{platform['name']}]:",
+            f"المبلغ المراد إيداعه في [{platform['name']}]:",
             min=0.01, decimals=2
         )
         if ok and amount > 0:
@@ -257,14 +188,13 @@ class DashboardScreen(QWidget):
                 db.deposit_to_platform(platform_id, amount)
                 self.refresh()
                 QMessageBox.information(
-                    self, "تم",
-                    f"تم إيداع {fmt_currency(amount)} في {platform['name']} ✅"
+                    self, "تم ✅",
+                    f"تم إيداع {fmt_currency(amount)} في {platform['name']}"
                 )
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
     def _edit_budget(self):
-        """تعديل الميزانية الرئيسية"""
         current = db.get_budget()["main_budget"]
         amount, ok = QInputDialog.getDouble(
             self, "تعديل الميزانية الرئيسية",
@@ -276,26 +206,23 @@ class DashboardScreen(QWidget):
                 db.update_main_budget(amount)
                 self.refresh()
                 QMessageBox.information(
-                    self, "تم",
-                    f"تم تحديث الميزانية إلى {fmt_currency(amount)} ✅"
+                    self, "تم ✅",
+                    f"تم تحديث الميزانية إلى {fmt_currency(amount)}"
                 )
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
-    def _add_platform_quick(self):
-        """إضافة منصة سريعة"""
+    def _add_platform(self):
         from ui.screens.platforms_screen import AddPlatformDialog
         dialog = AddPlatformDialog(self)
         if dialog.exec():
             self.refresh()
 
     def _deposit_quick(self):
-        """إيداع سريع — يختار المستخدم المنصة"""
         platforms = db.get_all_platforms("machine")
         if not platforms:
             QMessageBox.information(self, "تنبيه", "لا توجد ماكينات مضافة")
             return
-
         names = [p["name"] for p in platforms]
         name, ok = QInputDialog.getItem(
             self, "إيداع للماكينة", "اختر الماكينة:", names, editable=False

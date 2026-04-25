@@ -1,109 +1,76 @@
 """
-Platforms Screen — شاشة إدارة المنصات
+platforms_screen.py — شاشة إدارة المنصات
+Refactored: ScreenShell, grouped display, improved dialog
 """
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QDialog, QFormLayout, QLineEdit,
-    QComboBox, QMessageBox, QScrollArea, QGridLayout,
-    QDoubleSpinBox, QTextEdit, QFrame
+    QComboBox, QMessageBox, QDoubleSpinBox, QFrame,
+    QScrollArea, QSizePolicy, QInputDialog
 )
 from PyQt6.QtCore import Qt
 
 from ui.styles.theme import COLORS
-from ui.components.widgets import SectionTitle, PlatformCard
+from ui.components.widgets import ScreenShell, SectionTitle, PlatformCard, make_divider
 from utils.formatters import fmt_currency
 
 import database as db
 
 
-# ══════════════════════════════════════════
-#  شاشة المنصات
-# ══════════════════════════════════════════
-
-class PlatformsScreen(QWidget):
+class PlatformsScreen(ScreenShell):
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        self._build_ui()
-        self.refresh()
+        super().__init__("المنصات", "الماكينات والمحافظ الإلكترونية")
+        self._build_content()
 
-    def _build_ui(self):
-        root = QVBoxLayout(self)
-        root.setContentsMargins(24, 20, 24, 20)
-        root.setSpacing(16)
-
-        # العنوان + زرار الإضافة
-        header = QHBoxLayout()
+    def _build_content(self):
+        # Header actions
         add_btn = QPushButton("＋  إضافة منصة")
         add_btn.setObjectName("btn_primary")
-        add_btn.setFixedHeight(40)
         add_btn.clicked.connect(self._add_platform)
-        header.addWidget(add_btn)
-        header.addStretch()
-        header.addWidget(SectionTitle("إدارة المنصات"))
-        root.addLayout(header)
+        self.add_action(add_btn)
 
-        # ── الماكينات
-        root.addWidget(QLabel("🏧  الماكينات", styleSheet=f"color:{COLORS['blue_light']}; font-size:15px; font-weight:bold;"))
-        self.machines_layout = QHBoxLayout()
-        self.machines_layout.setSpacing(12)
-        self.machines_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
-        root.addLayout(self.machines_layout)
+        c = self.content()
 
-        line = QFrame()
-        line.setFrameShape(QFrame.Shape.HLine)
-        line.setStyleSheet(f"color: {COLORS['border']};")
-        root.addWidget(line)
+        # ── Machines section
+        machines_hdr = QHBoxLayout()
+        machines_lbl = QLabel("🏧  الماكينات")
+        machines_lbl.setStyleSheet(
+            f"color: {COLORS['blue_bright']}; font-size: 13px; font-weight: bold;"
+        )
+        machines_hdr.addWidget(machines_lbl)
+        machines_hdr.addStretch()
+        c.addLayout(machines_hdr)
 
-        # ── المحافظ
-        root.addWidget(QLabel("💳  المحافظ الإلكترونية", styleSheet=f"color:{COLORS['purple']}; font-size:15px; font-weight:bold;"))
-        self.wallets_layout = QHBoxLayout()
-        self.wallets_layout.setSpacing(12)
-        self.wallets_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
-        root.addLayout(self.wallets_layout)
+        self._machines_scroll = _CardScrollRow()
+        self._machines_scroll.deposit_clicked.connect(self._deposit_to_platform)
+        c.addWidget(self._machines_scroll)
 
-        root.addStretch()
+        c.addWidget(make_divider())
+
+        # ── Wallets section
+        wallets_hdr = QHBoxLayout()
+        wallets_lbl = QLabel("💳  المحافظ الإلكترونية")
+        wallets_lbl.setStyleSheet(
+            f"color: {COLORS['purple']}; font-size: 13px; font-weight: bold;"
+        )
+        wallets_hdr.addWidget(wallets_lbl)
+        wallets_hdr.addStretch()
+        c.addLayout(wallets_hdr)
+
+        self._wallets_scroll = _CardScrollRow()
+        self._wallets_scroll.deposit_clicked.connect(self._deposit_to_platform)
+        c.addWidget(self._wallets_scroll)
+
+        c.addStretch()
 
     def refresh(self):
-        """تحديث عرض المنصات"""
-        self._clear_layout(self.machines_layout)
-        self._clear_layout(self.wallets_layout)
-
         platforms = db.get_all_platforms()
-
         machines = [p for p in platforms if p["type"] == "machine"]
         wallets  = [p for p in platforms if p["type"] == "wallet"]
-
-        for p in machines:
-            card = PlatformCard(p)
-            card.deposit_clicked.connect(self._deposit_to_platform)
-            self.machines_layout.addWidget(card)
-
-        for p in wallets:
-            card = PlatformCard(p)
-            card.deposit_clicked.connect(self._deposit_to_platform)
-            self.wallets_layout.addWidget(card)
-
-        if not machines:
-            self.machines_layout.addWidget(self._empty_label())
-        if not wallets:
-            self.wallets_layout.addWidget(self._empty_label())
-
-        self.machines_layout.addStretch()
-        self.wallets_layout.addStretch()
-
-    def _clear_layout(self, layout):
-        for i in reversed(range(layout.count())):
-            w = layout.itemAt(i).widget()
-            if w:
-                w.deleteLater()
-
-    def _empty_label(self) -> QLabel:
-        lbl = QLabel("لا توجد منصات")
-        lbl.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 13px;")
-        return lbl
+        self._machines_scroll.load(machines)
+        self._wallets_scroll.load(wallets)
 
     def _add_platform(self):
         dialog = AddPlatformDialog(self)
@@ -111,7 +78,6 @@ class PlatformsScreen(QWidget):
             self.refresh()
 
     def _deposit_to_platform(self, platform_id: int):
-        from PyQt6.QtWidgets import QInputDialog
         platform = db.get_platform_by_id(platform_id)
         if not platform:
             return
@@ -124,13 +90,64 @@ class PlatformsScreen(QWidget):
             try:
                 db.deposit_to_platform(platform_id, amount)
                 self.refresh()
-                QMessageBox.information(self, "تم", f"تم الإيداع ✅  {fmt_currency(amount)}")
+                QMessageBox.information(
+                    self, "تم ✅", f"تم الإيداع  {fmt_currency(amount)}"
+                )
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
 
 # ══════════════════════════════════════════
-#  ديالوج إضافة منصة
+#  Internal: Horizontal card scroll row
+# ══════════════════════════════════════════
+
+from PyQt6.QtCore import pyqtSignal
+
+class _CardScrollRow(QWidget):
+    deposit_clicked = pyqtSignal(int)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFixedHeight(180)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        self._container = QWidget()
+        self._layout = QHBoxLayout(self._container)
+        self._layout.setContentsMargins(0, 4, 0, 4)
+        self._layout.setSpacing(12)
+        self._layout.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        scroll.setWidget(self._container)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.addWidget(scroll)
+
+    def load(self, platforms: list):
+        for i in reversed(range(self._layout.count())):
+            w = self._layout.itemAt(i).widget()
+            if w:
+                w.deleteLater()
+
+        if not platforms:
+            lbl = QLabel("لا توجد منصات في هذه الفئة")
+            lbl.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 12px;")
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._layout.addWidget(lbl)
+            return
+
+        for p in platforms:
+            card = PlatformCard(p)
+            card.deposit_clicked.connect(self.deposit_clicked.emit)
+            self._layout.addWidget(card)
+        self._layout.addStretch()
+
+
+# ══════════════════════════════════════════
+#  Add Platform Dialog
 # ══════════════════════════════════════════
 
 class AddPlatformDialog(QDialog):
@@ -139,7 +156,8 @@ class AddPlatformDialog(QDialog):
         super().__init__(parent)
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.setWindowTitle("إضافة منصة جديدة")
-        self.setFixedWidth(380)
+        self.setMinimumWidth(380)
+        self.setMinimumHeight(280)
         self._build_ui()
 
     def _build_ui(self):
@@ -147,18 +165,23 @@ class AddPlatformDialog(QDialog):
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(16)
 
-        layout.addWidget(QLabel("➕  إضافة منصة جديدة", styleSheet=f"color:{COLORS['text_primary']}; font-size:16px; font-weight:bold;"))
+        title = QLabel("➕  إضافة منصة جديدة")
+        title.setObjectName("label_title")
+        title.setStyleSheet(f"font-size: 15px; color: {COLORS['text_primary']};")
+        layout.addWidget(title)
 
         form = QFormLayout()
         form.setSpacing(12)
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setFormAlignment(Qt.AlignmentFlag.AlignRight)
 
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("مثال: فوري، أمان، فودافون كاش")
-        form.addRow("اسم المنصة:", self.name_input)
+        form.addRow("اسم المنصة *:", self.name_input)
 
         self.type_combo = QComboBox()
-        self.type_combo.addItems(["ماكينة", "محفظة إلكترونية"])
+        self.type_combo.addItem("🏧  ماكينة", "machine")
+        self.type_combo.addItem("💳  محفظة إلكترونية", "wallet")
         form.addRow("النوع:", self.type_combo)
 
         self.balance_input = QDoubleSpinBox()
@@ -168,19 +191,22 @@ class AddPlatformDialog(QDialog):
         form.addRow("الرصيد الابتدائي:", self.balance_input)
 
         layout.addLayout(form)
+        layout.addStretch()
 
-        # الأزرار
+        # Buttons
         btns = QHBoxLayout()
+        btns.setSpacing(8)
+
         cancel = QPushButton("إلغاء")
         cancel.setObjectName("btn_secondary")
         cancel.clicked.connect(self.reject)
+        btns.addWidget(cancel)
 
         save = QPushButton("حفظ")
         save.setObjectName("btn_primary")
         save.clicked.connect(self._save)
-
-        btns.addWidget(cancel)
         btns.addWidget(save)
+
         layout.addLayout(btns)
 
     def _save(self):
@@ -189,14 +215,14 @@ class AddPlatformDialog(QDialog):
             QMessageBox.warning(self, "تنبيه", "أدخل اسم المنصة")
             return
 
-        p_type   = "machine" if self.type_combo.currentIndex() == 0 else "wallet"
-        balance  = self.balance_input.value()
+        p_type  = self.type_combo.currentData()
+        balance = self.balance_input.value()
 
         try:
             pid = db.add_platform(name, p_type)
             if balance > 0:
                 db.deposit_to_platform(pid, balance, "رصيد ابتدائي")
-            QMessageBox.information(self, "تم", f"تم إضافة [{name}] بنجاح ✅")
+            QMessageBox.information(self, "تم ✅", f"تم إضافة [{name}] بنجاح")
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "خطأ", str(e))
