@@ -106,20 +106,20 @@ class InventoryTab(QWidget):
         self._cards_grid.setSpacing(10)
         layout.addLayout(self._cards_grid)
 
-        self.card_cash     = MiniStatCard("الخزينة النقدية",        color=COLORS["green"])
-        self.card_machines = MiniStatCard("إجمالي الماكينات",       color=COLORS["blue"])
-        self.card_wallets  = MiniStatCard("إجمالي المحافظ",         color=COLORS["purple"])
-        self.card_debts    = MiniStatCard("إجمالي الديون",          color=COLORS["yellow"])
-        self.card_profit   = MiniStatCard("أرباح الفترة",           color=COLORS["green"])
-        self.card_budget   = MiniStatCard("الميزانية الرئيسية",     color=COLORS["text_primary"])
-        self.card_pending  = MiniStatCard("إجمالي المؤجل",          color=COLORS["yellow"])
+        self.card_cash     = MiniStatCard("الخزينة النقدية",    color=COLORS["green"])
+        self.card_machines = MiniStatCard("إجمالي الماكينات",  color=COLORS["blue"])
+        self.card_wallets  = MiniStatCard("إجمالي المحافظ",    color=COLORS["purple"])
+        self.card_instapay = MiniStatCard("إجمالي انستا باي",  color=COLORS["cyan"])
+        self.card_debts    = MiniStatCard("إجمالي الديون",     color=COLORS["yellow"])
+        self.card_profit   = MiniStatCard("أرباح الفترة",      color=COLORS["green"])
+        self.card_budget   = MiniStatCard("الميزانية الرئيسية",color=COLORS["text_primary"])
+        self.card_pending  = MiniStatCard("إجمالي المؤجل",     color=COLORS["yellow"])
 
         for i, card in enumerate([
-            self.card_cash, self.card_machines, self.card_wallets,
-            self.card_debts, self.card_profit, self.card_budget,
-            self.card_pending,
+            self.card_cash, self.card_machines, self.card_wallets, self.card_instapay,
+            self.card_debts, self.card_profit, self.card_budget, self.card_pending,
         ]):
-            self._cards_grid.addWidget(card, i // 3, i % 3)
+            self._cards_grid.addWidget(card, i // 4, i % 4)
 
         # ── Match equation bar
         layout.addWidget(self._make_match_bar())
@@ -236,6 +236,7 @@ class InventoryTab(QWidget):
         self.card_cash.set_value(fmt_currency(stats["cash_vault"]))
         self.card_machines.set_value(fmt_currency(stats["total_machines"]))
         self.card_wallets.set_value(fmt_currency(stats["total_wallets"]))
+        self.card_instapay.set_value(fmt_currency(stats.get("total_instapay", 0)))
         self.card_debts.set_value(
             fmt_currency(stats["total_debts"]),
             color=COLORS["yellow"] if stats["total_debts"] > 0 else COLORS["green"]
@@ -296,9 +297,14 @@ class InventoryTab(QWidget):
         self.platforms_table.setRowCount(len(platforms))
 
         for row, p in enumerate(platforms):
-            is_machine = p["type"] == "machine"
-            type_text  = "🏧 ماكينة" if is_machine else "💳 محفظة"
-            type_color = COLORS["blue"] if is_machine else COLORS["purple"]
+            p_type = p["type"]
+            if p_type == "machine":
+                type_text, type_color = "🏧 ماكينة", COLORS["blue"]
+            elif p_type == "wallet":
+                type_text, type_color = "💳 محفظة", COLORS["purple"]
+            else:
+                type_text, type_color = "🔷 انستا باي", COLORS["cyan"]
+            is_machine = (p_type == "machine")
 
             self.platforms_table.set_cell(row, 0, p["name"], bold=True)
             self.platforms_table.set_cell(row, 1, type_text, color=type_color)
@@ -390,18 +396,20 @@ class TransactionsLogTab(QWidget):
 
         # ── Table
         columns = [
-            ("التاريخ",    120),
-            ("النوع",       75),
-            ("الخدمة",     150),
-            ("المنصة",     110),
-            ("العميل",     120),
-            ("المصروف",    100),
-            ("المطلوب",    100),
-            ("الربح",       85),
-            ("المرجع",     105),
-            ("الحالة",      85),
+            ("التاريخ والوقت", 150),
+            ("النوع",           75),
+            ("الخدمة",         150),
+            ("المنصة",         110),
+            ("العميل",         120),
+            ("المصروف",        100),
+            ("المطلوب",        100),
+            ("الربح",           85),
+            ("المرجع",         105),
+            ("الحالة",          85),
+            ("إجراءات",        120),
         ]
         self.table = DataTable(columns)
+        self.table.verticalHeader().setDefaultSectionSize(52)
         layout.addWidget(self.table)
 
         # Summary
@@ -443,55 +451,64 @@ class TransactionsLogTab(QWidget):
         self._render(txns)
 
     def _render(self, transactions: list):
+        from ui.screens.statement_screen import make_txn_actions
         self.table.clear_rows()
         self.table.setRowCount(len(transactions))
-
         total_profit = total_spent = total_required = 0
-
         for row, t in enumerate(transactions):
-            dt = (t.get("created_at") or "")[:16].replace("T", "  ")
+            dt = (t.get("created_at") or "")[:16]
             self.table.set_cell(row, 0, dt, color=COLORS["text_muted"])
-
             op = t.get("operation_type", "")
-            self.table.set_cell(
-                row, 1,
-                "📤 صادر" if op == "outbound" else "📥 وارد",
-                color=COLORS["blue"] if op == "outbound" else COLORS["purple"]
-            )
-
+            self.table.set_cell(row, 1, "📤 صادر" if op == "outbound" else "📥 وارد",
+                color=COLORS["blue"] if op == "outbound" else COLORS["purple"])
             self.table.set_cell(row, 2, t.get("service_name") or "—")
-            self.table.set_cell(row, 3, t.get("platform_name") or "—",
-                                color=COLORS["text_secondary"])
-            self.table.set_cell(row, 4, t.get("customer_name") or "—",
-                                color=COLORS["text_secondary"])
-
+            self.table.set_cell(row, 3, t.get("platform_name") or "—", color=COLORS["text_secondary"])
+            self.table.set_cell(row, 4, t.get("customer_name") or "—", color=COLORS["text_secondary"])
             spent    = t.get("amount_spent", 0) or 0
             required = t.get("amount_required", 0) or 0
             profit   = t.get("profit", 0) or 0
-
             self.table.set_cell(row, 5, fmt_currency(spent))
             self.table.set_cell(row, 6, fmt_currency(required), bold=True)
             self.table.set_cell(row, 7, fmt_currency(profit),
-                                color=COLORS["green"] if profit >= 0 else COLORS["red"])
-
+                color=COLORS["green"] if profit >= 0 else COLORS["red"])
             ref = "🃏 كارت" if t.get("is_card") else (t.get("reference_no") or "—")
             self.table.set_cell(row, 8, ref, color=COLORS["text_muted"])
             self.table.add_status_badge(row, 9, t.get("payment_status", ""))
-
+            actions = make_txn_actions(t, self._on_status_change, self._on_delete)
+            self.table.setCellWidget(row, 10, actions)
             total_profit   += profit
             total_spent    += spent
             total_required += required
-
-        p_color = COLORS["green"] if total_profit > 0 else (
-            COLORS["red"] if total_profit < 0 else COLORS["text_muted"]
-        )
+        p_color = COLORS["green"] if total_profit > 0 else (COLORS["red"] if total_profit < 0 else COLORS["text_muted"])
         self.summary_lbl.setText(
-            f"العمليات: {len(transactions)}  ·  "
-            f"مصروف: {fmt_currency(total_spent)}  ·  "
-            f"مطلوب: {fmt_currency(total_required)}  ·  "
-            f"ربح: {fmt_currency(total_profit)}"
+            f"العمليات: {len(transactions)}  ·  مصروف: {fmt_currency(total_spent)}  ·  "
+            f"مطلوب: {fmt_currency(total_required)}  ·  ربح: {fmt_currency(total_profit)}"
         )
         self.summary_lbl.setStyleSheet(f"color: {p_color}; font-size: 11px;")
+
+    def _on_status_change(self, tid: int, new_status: str):
+        label_map = {"paid": "تم السداد", "pending": "مؤجل", "delivered": "تم التسليم", "not_delivered": "لم يُسلَّم"}
+        if QMessageBox.question(self, "تأكيد",
+            f"تغيير الحالة إلى '{label_map.get(new_status, new_status)}'؟",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        ) == QMessageBox.StandardButton.Yes:
+            try:
+                db.update_transaction_status(tid, new_status)
+                self.load_data()
+            except Exception as e:
+                QMessageBox.critical(self, "خطأ", str(e))
+
+    def _on_delete(self, tid: int):
+        if QMessageBox.question(self, "تأكيد الحذف",
+            "⚠️ حذف العملية وعكس تأثيرها المالي؟ لا يمكن التراجع.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        ) == QMessageBox.StandardButton.Yes:
+            try:
+                db.delete_transaction(tid)
+                self.load_data()
+                QMessageBox.information(self, "تم ✅", "تم حذف العملية")
+            except Exception as e:
+                QMessageBox.critical(self, "خطأ", str(e))
 
 
 # ══════════════════════════════════════════

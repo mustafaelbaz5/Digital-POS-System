@@ -1,5 +1,6 @@
 """
 transaction_form.py — شاشة إضافة العمليات
+tasks: 11 (spacing), 12 (remove profit frame), instapay support, RTL
 """
 
 from PyQt6.QtWidgets import (
@@ -10,7 +11,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from ui.styles.theme import COLORS
+from ui.styles.theme import COLORS, FONT
 from ui.components.widgets import ScreenShell, make_divider
 from utils.formatters import fmt_currency
 
@@ -22,7 +23,7 @@ def field(label_text: str, widget: QWidget) -> QVBoxLayout:
     lbl.setObjectName("label_field")
     lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
     box = QVBoxLayout()
-    box.setSpacing(5)
+    box.setSpacing(6)
     box.addWidget(lbl)
     box.addWidget(widget)
     return box
@@ -82,11 +83,8 @@ class PaymentStatusSelector(QFrame):
         )
         self.status_changed.emit(val)
 
-    def value(self) -> str:
-        return self._current
-
-    def set_value(self, val: str):
-        self._apply(val)
+    def value(self) -> str: return self._current
+    def set_value(self, val: str): self._apply(val)
 
 
 # ══════════════════════════════════════════
@@ -107,7 +105,6 @@ class DeliveryStatusSelector(QFrame):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(6, 4, 6, 4)
         layout.setSpacing(6)
-
         title = QLabel("تسليم الكاش للعميل:")
         title.setObjectName("label_field")
         title.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -117,8 +114,6 @@ class DeliveryStatusSelector(QFrame):
         self._btn_yes = self._make_btn("✅  تم التسليم",    True)
         layout.addWidget(self._btn_no)
         layout.addWidget(self._btn_yes)
-        
-
         self._apply(False)
 
     def _make_btn(self, text, val):
@@ -148,18 +143,16 @@ class DeliveryStatusSelector(QFrame):
             f"border:1px solid {COLORS['border']};border-radius:8px;"
             f"font-size:12px;padding:2px 10px;"
         )
-        if delivered:
-            self._effect_lbl.setText("✅ لا يُضاف للعميل أي دين")
-            self._effect_lbl.setStyleSheet(f"color:{COLORS['green']};font-size:11px;")
-        else:
-            self._effect_lbl.setText("⏳ المبلغ المسلم يُسجَّل كمستحق للعميل (يُخصم من مديونيته)")
-            self._effect_lbl.setStyleSheet(f"color:{COLORS['yellow']};font-size:11px;")
+        if self._effect_lbl:
+            if delivered:
+                self._effect_lbl.setText("✅ المبلغ تم تسليمه للعميل")
+                self._effect_lbl.setStyleSheet(f"color:{COLORS['green']};font-size:11px;")
+            else:
+                self._effect_lbl.setText("⏳ المبلغ المسلم يُسجَّل كمستحق للعميل (يُخصم من مديونيته)")
+                self._effect_lbl.setStyleSheet(f"color:{COLORS['yellow']};font-size:11px;")
 
-    def value(self) -> bool:
-        return self._delivered
-
-    def reset(self):
-        self._apply(True)
+    def value(self) -> bool: return self._delivered
+    def reset(self): self._apply(True)
 
 
 # ══════════════════════════════════════════
@@ -177,11 +170,11 @@ class OutboundTab(QWidget):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 16, 20, 16)
-        layout.setSpacing(14)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(18)  # task 11: better spacing
 
         # Row 1: Platform + Service
-        row1 = QHBoxLayout(); row1.setSpacing(12)
+        row1 = QHBoxLayout(); row1.setSpacing(16)
         self.platform_combo = QComboBox()
         self.platform_combo.setMinimumWidth(200)
         self.platform_combo.currentIndexChanged.connect(self._update_balance)
@@ -192,12 +185,15 @@ class OutboundTab(QWidget):
         layout.addLayout(row1)
 
         self.balance_lbl = QLabel("")
-        self.balance_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:11px;")
+        self.balance_lbl.setStyleSheet(
+            f"color:{COLORS['teal_bright']};font-size:12px;"
+            f"background:{COLORS['bg_input']};border-radius:6px;padding:4px 10px;"
+        )
         self.balance_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
         layout.addWidget(self.balance_lbl)
 
         # Row 2: Amounts
-        row2 = QHBoxLayout(); row2.setSpacing(12)
+        row2 = QHBoxLayout(); row2.setSpacing(16)
         self.amount_spent = QDoubleSpinBox()
         self.amount_spent.setRange(0.01, 9_999_999); self.amount_spent.setDecimals(2)
         self.amount_spent.setSuffix(" ج"); self.amount_spent.valueChanged.connect(self._calc_profit)
@@ -208,33 +204,46 @@ class OutboundTab(QWidget):
         row2.addLayout(field("المبلغ المطلوب (من العميل) *", self.amount_required))
         layout.addLayout(row2)
 
-        layout.addWidget(self._make_profit_bar())
+        # task 12: plain text profit label (no frame/box)
+        profit_row = QHBoxLayout()
+        profit_lbl_title = QLabel("الربح المتوقع:")
+        profit_lbl_title.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:12px;")
+        profit_row.addWidget(profit_lbl_title)
+        profit_row.addStretch()
+        self.profit_label = QLabel("0.00 ج")
+        self.profit_label.setStyleSheet(f"color:{COLORS['green']};font-size:16px;font-weight:bold;")
+        profit_row.addWidget(self.profit_label)
+        layout.addLayout(profit_row)
 
-        # Row 3: Customer + Status
-        row3 = QHBoxLayout(); row3.setSpacing(12)
+        layout.addWidget(make_divider())
 
-        cust_box = QVBoxLayout(); cust_box.setSpacing(5)
+        # Row 3: Customer search — task 11: clean consistent styling
         cust_lbl = QLabel("العميل *"); cust_lbl.setObjectName("label_field")
-        cust_lbl.setAlignment(Qt.AlignmentFlag.AlignRight); cust_box.addWidget(cust_lbl)
+        cust_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(cust_lbl)
+
+        cust_search_row = QHBoxLayout(); cust_search_row.setSpacing(8)
         self.customer_search = QLineEdit()
         self.customer_search.setPlaceholderText("🔍 ابحث باسم أو تليفون...")
-        self.customer_search.setFixedHeight(34)
+        self.customer_search.setFixedHeight(38)
         self.customer_search.textChanged.connect(self._filter_customers)
-        cust_box.addWidget(self.customer_search)
-        self.customer_combo = QComboBox(); cust_box.addWidget(self.customer_combo)
-        row3.addLayout(cust_box)
+        cust_search_row.addWidget(self.customer_search, 1)
+        self.customer_combo = QComboBox()
+        self.customer_combo.setMinimumWidth(200)
+        cust_search_row.addWidget(self.customer_combo, 2)
+        layout.addLayout(cust_search_row)
 
-        status_box = QVBoxLayout(); status_box.setSpacing(5)
+        # Row 4: Payment status
         status_lbl = QLabel("حالة الدفع *"); status_lbl.setObjectName("label_field")
-        status_lbl.setAlignment(Qt.AlignmentFlag.AlignRight); status_box.addWidget(status_lbl)
+        status_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(status_lbl)
         self.status_selector = PaymentStatusSelector()
-        status_box.addWidget(self.status_selector)
-        status_box.addStretch()
-        row3.addLayout(status_box)
-        layout.addLayout(row3)
+        layout.addWidget(self.status_selector)
 
-        # Row 4: Reference + Card
-        row4 = QHBoxLayout(); row4.setSpacing(12)
+        layout.addWidget(make_divider())
+
+        # Row 5: Reference + Card
+        row4 = QHBoxLayout(); row4.setSpacing(16)
         self.ref_input = QLineEdit(); self.ref_input.setPlaceholderText("رقم المرجع / العملية")
         row4.addLayout(field("رقم المرجع", self.ref_input))
         card_col = QVBoxLayout(); card_col.setSpacing(5)
@@ -246,32 +255,25 @@ class OutboundTab(QWidget):
         layout.addLayout(row4)
 
         self.notes_input = QTextEdit()
-        self.notes_input.setMaximumHeight(64)
+        self.notes_input.setMaximumHeight(80)
         self.notes_input.setPlaceholderText("ملاحظات (اختياري)")
         layout.addLayout(field("ملاحظات", self.notes_input))
         layout.addStretch()
 
         save_btn = QPushButton("✅  حفظ العملية الصادرة")
-        save_btn.setObjectName("btn_primary"); save_btn.setFixedHeight(44)
+        save_btn.setObjectName("btn_primary"); save_btn.setFixedHeight(46)
         save_btn.clicked.connect(self._save)
         layout.addWidget(save_btn)
-
-    def _make_profit_bar(self) -> QFrame:
-        frame = QFrame(); frame.setObjectName("card"); frame.setFixedHeight(48)
-        layout = QHBoxLayout(frame); layout.setContentsMargins(16, 0, 16, 0)
-        lbl = QLabel("الربح المتوقع:")
-        lbl.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:12px;")
-        layout.addWidget(lbl); layout.addStretch()
-        self.profit_label = QLabel("0.00 ج")
-        self.profit_label.setStyleSheet(f"color:{COLORS['green']};font-size:15px;font-weight:bold;")
-        layout.addWidget(self.profit_label)
-        return frame
 
     def load_data(self):
         self.platform_combo.clear()
         for p in db.get_all_platforms():
-            icon = "🏧" if p["type"] == "machine" else "💳"
-            self.platform_combo.addItem(f"{icon} {p['name']}  ({fmt_currency(p['balance'])})", p["id"])
+            if p["type"] == "machine":   icon = "🏧"
+            elif p["type"] == "wallet":  icon = "💳"
+            else:                         icon = "🔷"
+            self.platform_combo.addItem(
+                f"{icon} {p['name']}  ({fmt_currency(p['balance'])})", p["id"]
+            )
         self._all_customers = db.get_all_customers()
         self._fill_customers(self._all_customers)
         self._update_balance()
@@ -293,13 +295,13 @@ class OutboundTab(QWidget):
         if pid:
             p = db.get_platform_by_id(pid)
             if p:
-                self.balance_lbl.setText(f"الرصيد الحالي: {fmt_currency(p['balance'])}")
+                self.balance_lbl.setText(f"الرصيد الحالي:  {fmt_currency(p['balance'])}")
 
     def _calc_profit(self):
         profit = self.amount_required.value() - self.amount_spent.value()
         color  = COLORS["green"] if profit >= 0 else COLORS["red"]
         self.profit_label.setText(f"{profit:,.2f} ج")
-        self.profit_label.setStyleSheet(f"color:{color};font-size:15px;font-weight:bold;")
+        self.profit_label.setStyleSheet(f"color:{color};font-size:16px;font-weight:bold;")
 
     def _save(self):
         pid = self.platform_combo.currentData(); cid = self.customer_combo.currentData()
@@ -351,22 +353,21 @@ class InboundTab(QWidget):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 16, 20, 16)
-        layout.setSpacing(14)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(18)
 
-        note = QLabel("📌  عملية الاستلام متاحة للمحافظ الإلكترونية فقط")
+        note = QLabel("📌  عملية الاستلام متاحة للمحافظ الإلكترونية وانستا باي فقط")
         note.setStyleSheet(
-            f"color:{COLORS['blue']};background:{COLORS['blue_bg']};"
+            f"color:{COLORS['cyan']};background:{COLORS['cyan_bg']};"
             f"border:1px solid {COLORS['border_light']};"
             f"border-radius:8px;padding:8px 14px;font-size:12px;")
         note.setAlignment(Qt.AlignmentFlag.AlignRight)
         layout.addWidget(note)
 
-        # Row 1: Wallet + Service
-        row1 = QHBoxLayout(); row1.setSpacing(12)
+        row1 = QHBoxLayout(); row1.setSpacing(16)
         self.wallet_combo = QComboBox(); self.wallet_combo.setMinimumWidth(200)
         self.wallet_combo.currentIndexChanged.connect(self._update_wallet_info)
-        row1.addLayout(field("المحفظة *", self.wallet_combo))
+        row1.addLayout(field("المحفظة / انستا باي *", self.wallet_combo))
         self.service_input = QLineEdit()
         self.service_input.setPlaceholderText("مثال: استلام تحويل فودافون")
         row1.addLayout(field("اسم الخدمة *", self.service_input))
@@ -374,8 +375,7 @@ class InboundTab(QWidget):
 
         layout.addWidget(self._make_info_bar())
 
-        # Row 2: Amounts
-        row2 = QHBoxLayout(); row2.setSpacing(12)
+        row2 = QHBoxLayout(); row2.setSpacing(16)
         self.amount_received = QDoubleSpinBox()
         self.amount_received.setRange(0.01, 9_999_999); self.amount_received.setDecimals(2)
         self.amount_received.setSuffix(" ج"); self.amount_received.valueChanged.connect(self._calc_profit)
@@ -386,25 +386,36 @@ class InboundTab(QWidget):
         row2.addLayout(field("المبلغ المسلم كاش *", self.amount_delivered))
         layout.addLayout(row2)
 
-        layout.addWidget(self._make_profit_bar())
+        # task 12: plain text profit
+        profit_row = QHBoxLayout()
+        p_title = QLabel("الربح المتوقع:")
+        p_title.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:12px;")
+        profit_row.addWidget(p_title); profit_row.addStretch()
+        self.profit_label = QLabel("0.00 ج")
+        self.profit_label.setStyleSheet(f"color:{COLORS['green']};font-size:16px;font-weight:bold;")
+        profit_row.addWidget(self.profit_label)
+        layout.addLayout(profit_row)
 
-        # Row 3: Customer + Reference
-        row3 = QHBoxLayout(); row3.setSpacing(12)
-        cust_col = QVBoxLayout(); cust_col.setSpacing(5)
+        layout.addWidget(make_divider())
+
+        # Customer search
         cust_lbl = QLabel("العميل (مُحوِّل المبلغ)"); cust_lbl.setObjectName("label_field")
-        cust_lbl.setAlignment(Qt.AlignmentFlag.AlignRight); cust_col.addWidget(cust_lbl)
+        cust_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(cust_lbl)
+
+        cust_row = QHBoxLayout(); cust_row.setSpacing(8)
         self.customer_search = QLineEdit()
         self.customer_search.setPlaceholderText("🔍 ابحث باسم أو تليفون...")
-        self.customer_search.setFixedHeight(34)
+        self.customer_search.setFixedHeight(38)
         self.customer_search.textChanged.connect(self._filter_customers)
-        cust_col.addWidget(self.customer_search)
-        self.customer_combo = QComboBox(); cust_col.addWidget(self.customer_combo)
-        row3.addLayout(cust_col)
-        self.ref_input = QLineEdit(); self.ref_input.setPlaceholderText("رقم المرجع")
-        row3.addLayout(field("رقم المرجع", self.ref_input))
-        layout.addLayout(row3)
+        cust_row.addWidget(self.customer_search, 1)
+        self.customer_combo = QComboBox(); self.customer_combo.setMinimumWidth(200)
+        cust_row.addWidget(self.customer_combo, 2)
+        layout.addLayout(cust_row)
 
-        # Delivery status selector + effect label
+        self.ref_input = QLineEdit(); self.ref_input.setPlaceholderText("رقم المرجع")
+        layout.addLayout(field("رقم المرجع", self.ref_input))
+
         self._effect_lbl = QLabel("")
         self._effect_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.delivery_selector = DeliveryStatusSelector(self._effect_lbl)
@@ -418,7 +429,7 @@ class InboundTab(QWidget):
         layout.addStretch()
 
         save_btn = QPushButton("✅  حفظ العملية الواردة")
-        save_btn.setObjectName("btn_success"); save_btn.setFixedHeight(44)
+        save_btn.setObjectName("btn_success"); save_btn.setFixedHeight(46)
         save_btn.clicked.connect(self._save)
         layout.addWidget(save_btn)
 
@@ -433,23 +444,13 @@ class InboundTab(QWidget):
         layout.addWidget(self.limit_lbl)
         return frame
 
-    def _make_profit_bar(self) -> QFrame:
-        frame = QFrame(); frame.setObjectName("card"); frame.setFixedHeight(48)
-        layout = QHBoxLayout(frame); layout.setContentsMargins(16, 0, 16, 0)
-        lbl = QLabel("الربح المتوقع:")
-        lbl.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:12px;")
-        layout.addWidget(lbl); layout.addStretch()
-        self.profit_label = QLabel("0.00 ج")
-        self.profit_label.setStyleSheet(f"color:{COLORS['green']};font-size:15px;font-weight:bold;")
-        layout.addWidget(self.profit_label)
-        return frame
-
     def load_data(self):
         self.wallet_combo.clear()
         for w in db.get_all_platforms():
-            if w["type"] != "wallet": continue
-            pct = int(w.get("monthly_used", 0) / max(w.get("monthly_limit", 200000), 1) * 100)
-            self.wallet_combo.addItem(f"💳 {w['name']}  ({fmt_currency(w['balance'])})  — {pct}%", w["id"])
+            if w["type"] not in ("wallet", "instapay"): continue
+            icon = "💳" if w["type"] == "wallet" else "🔷"
+            pct = int(w.get("monthly_used", 0) / max(w.get("monthly_limit", 1), 1) * 100)
+            self.wallet_combo.addItem(f"{icon} {w['name']}  ({fmt_currency(w['balance'])})  — {pct}%", w["id"])
         self._all_customers = db.get_all_customers()
         self._fill_customers(self._all_customers)
         self._update_wallet_info()
@@ -483,7 +484,7 @@ class InboundTab(QWidget):
         profit = self.amount_received.value() - self.amount_delivered.value()
         color  = COLORS["green"] if profit >= 0 else COLORS["red"]
         self.profit_label.setText(f"{profit:,.2f} ج")
-        self.profit_label.setStyleSheet(f"color:{color};font-size:15px;font-weight:bold;")
+        self.profit_label.setStyleSheet(f"color:{color};font-size:16px;font-weight:bold;")
 
     def _save(self):
         wid = self.wallet_combo.currentData(); cid = self.customer_combo.currentData()
@@ -493,7 +494,7 @@ class InboundTab(QWidget):
         if not wid:       QMessageBox.warning(self, "تنبيه", "اختر المحفظة");         return
         if not service:   QMessageBox.warning(self, "تنبيه", "أدخل اسم الخدمة");     return
         if received <= 0: QMessageBox.warning(self, "تنبيه", "أدخل المبلغ المستلم"); return
-        if delivered <= 0: QMessageBox.warning(self, "تنبيه", "أدخل المبلغ المسلم");  return
+        if delivered <= 0: QMessageBox.warning(self, "تنبيه", "أدخل المبلغ المسلم"); return
         try:
             db.add_inbound_transaction(
                 wallet_id=wid, customer_id=cid, service_name=service,

@@ -18,133 +18,61 @@ def get_connection() -> sqlite3.Connection:
     DB_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA journal_mode = WAL")   # أداء أفضل
-    conn.row_factory = sqlite3.Row              # النتائج كـ dict
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.row_factory = sqlite3.Row
     return conn
 
 
-# ─── Schema Creation ──────────────────────────────────────────────
 SCHEMA_SQL = """
-
--- ══════════════════════════════════════════
---  1. الإعدادات العامة  (Settings)
--- ══════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS settings (
     key     TEXT PRIMARY KEY,
     value   TEXT NOT NULL
 );
 
--- ══════════════════════════════════════════
---  2. الميزانية الرئيسية  (Main Budget)
--- ══════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS budget (
-    id              INTEGER PRIMARY KEY CHECK (id = 1),  -- صف واحد فقط
-    main_budget     REAL    NOT NULL DEFAULT 0,          -- رأس المال
-    cash_vault      REAL    NOT NULL DEFAULT 0           -- الخزينة النقدية
+    id              INTEGER PRIMARY KEY CHECK (id = 1),
+    main_budget     REAL    NOT NULL DEFAULT 0,
+    cash_vault      REAL    NOT NULL DEFAULT 0
 );
 
--- إدراج صف الميزانية إذا لم يكن موجوداً
 INSERT OR IGNORE INTO budget (id, main_budget, cash_vault) VALUES (1, 0, 0);
 
--- ══════════════════════════════════════════
---  3. المنصات الرقمية  (Platforms)
--- ══════════════════════════════════════════
-CREATE TABLE IF NOT EXISTS platforms (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    name            TEXT    NOT NULL UNIQUE,             -- اسم المنصة
-    type            TEXT    NOT NULL                     -- 'machine' | 'wallet'
-                    CHECK (type IN ('machine', 'wallet')),
-    balance         REAL    NOT NULL DEFAULT 0,          -- الرصيد الحالي
-    monthly_limit   REAL    NOT NULL DEFAULT 200000,     -- حد المحفظة الشهري
-    monthly_used    REAL    NOT NULL DEFAULT 0,          -- المستخدم من الحد
-    last_reset_date TEXT    NOT NULL DEFAULT (strftime('%Y-%m', 'now')), -- آخر تصفير
-    is_active       INTEGER NOT NULL DEFAULT 1           -- 0 = محذوف
-);
-
--- ══════════════════════════════════════════
---  4. المجموعات  (Groups)
--- ══════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS groups (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    name            TEXT    NOT NULL UNIQUE,             -- اسم المجموعة
-    leader_id       INTEGER,                             -- قائد المجموعة (customer.id)
+    name            TEXT    NOT NULL UNIQUE,
+    leader_id       INTEGER,
     notes           TEXT,
     created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
--- ══════════════════════════════════════════
---  5. العملاء  (Customers)
--- ══════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS customers (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     name            TEXT    NOT NULL,
     phone           TEXT,
     group_id        INTEGER REFERENCES groups(id) ON DELETE SET NULL,
-    total_debt      REAL    NOT NULL DEFAULT 0,          -- إجمالي المديونية
+    total_debt      REAL    NOT NULL DEFAULT 0,
     notes           TEXT,
     is_active       INTEGER NOT NULL DEFAULT 1,
     created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
--- تحديث leader_id في groups بعد إنشاء جدول customers
--- (العلاقة الدائرية تُحل بعد الإنشاء)
 CREATE INDEX IF NOT EXISTS idx_customers_group ON customers(group_id);
 
--- ══════════════════════════════════════════
---  6. سجل العمليات  (Transactions)
--- ══════════════════════════════════════════
-CREATE TABLE IF NOT EXISTS transactions (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-
-    -- التوقيت
-    created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
-
-    -- تصنيف العملية
-    operation_type  TEXT    NOT NULL                     -- 'outbound' | 'inbound'
-                    CHECK (operation_type IN ('outbound', 'inbound')),
-    service_name    TEXT    NOT NULL,                    -- اسم الخدمة
-
-    -- الأطراف
-    platform_id     INTEGER NOT NULL REFERENCES platforms(id),
-    customer_id     INTEGER REFERENCES customers(id) ON DELETE SET NULL,
-
-    -- المبالغ
-    amount_spent    REAL    NOT NULL DEFAULT 0,          -- المصروف من الرصيد
-    amount_required REAL    NOT NULL DEFAULT 0,          -- المطلوب من العميل
-    profit          REAL    GENERATED ALWAYS AS           -- الربح (محسوب تلقائياً)
-                    (amount_required - amount_spent) VIRTUAL,
-
-    -- التوثيق
-    reference_no    TEXT,                                -- رقم العملية
-    is_card         INTEGER NOT NULL DEFAULT 0,          -- 1 = كارت (بدون رقم)
-
-    -- حالة الدفع
-    payment_status  TEXT    NOT NULL DEFAULT 'pending'   -- 'cash' | 'pending' | 'paid'
-                    CHECK (payment_status IN ('cash', 'pending', 'paid')),
-
-    -- حالة التسليم (للعمليات الواردة فقط)
-    is_delivered    INTEGER NOT NULL DEFAULT 0,          -- 1 = تم تسليم المبلغ للعميل
-
-    notes           TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_transactions_customer  ON transactions(customer_id);
-CREATE INDEX IF NOT EXISTS idx_transactions_platform  ON transactions(platform_id);
-CREATE INDEX IF NOT EXISTS idx_transactions_status    ON transactions(payment_status);
-CREATE INDEX IF NOT EXISTS idx_transactions_created   ON transactions(created_at);
-CREATE INDEX IF NOT EXISTS idx_transactions_reference ON transactions(reference_no);
-
--- ══════════════════════════════════════════
---  7. سجل إيداعات الماكينات  (Machine Deposits)
--- ══════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS machine_deposits (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    platform_id     INTEGER NOT NULL REFERENCES platforms(id),
+    platform_id     INTEGER NOT NULL,
     amount          REAL    NOT NULL,
     notes           TEXT,
     created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
+CREATE TABLE IF NOT EXISTS daily_commissions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform_id     INTEGER NOT NULL,
+    amount          REAL    NOT NULL,
+    notes           TEXT,
+    created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
 """
 
 
@@ -152,10 +80,99 @@ def initialize_database() -> None:
     """تهيئة قاعدة البيانات وإنشاء الجداول"""
     with get_connection() as conn:
         conn.executescript(SCHEMA_SQL)
-        # Migration: إضافة عمود is_delivered لو مش موجود
+
+        # Migrate platforms — recreate to allow instapay type
         try:
-            conn.execute("ALTER TABLE transactions ADD COLUMN is_delivered INTEGER NOT NULL DEFAULT 0")
+            # Check if platforms table exists with old constraint
+            info = conn.execute("PRAGMA table_info(platforms)").fetchall()
+            if not info:
+                # Create fresh
+                conn.executescript("""
+                    CREATE TABLE platforms (
+                        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name            TEXT    NOT NULL UNIQUE,
+                        type            TEXT    NOT NULL
+                                        CHECK (type IN ('machine', 'wallet', 'instapay')),
+                        balance         REAL    NOT NULL DEFAULT 0,
+                        monthly_limit   REAL    NOT NULL DEFAULT 200000,
+                        monthly_used    REAL    NOT NULL DEFAULT 0,
+                        last_reset_date TEXT    NOT NULL DEFAULT (strftime('%Y-%m', 'now')),
+                        is_active       INTEGER NOT NULL DEFAULT 1
+                    );
+                """)
+            else:
+                # Try inserting instapay to check constraint
+                try:
+                    conn.execute("INSERT OR IGNORE INTO platforms (name, type) VALUES ('__ip_test__', 'instapay')")
+                    conn.execute("DELETE FROM platforms WHERE name = '__ip_test__'")
+                    conn.commit()
+                except Exception:
+                    # Old constraint — recreate table
+                    conn.executescript("""
+                        PRAGMA foreign_keys = OFF;
+                        CREATE TABLE platforms_v2 (
+                            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name            TEXT    NOT NULL UNIQUE,
+                            type            TEXT    NOT NULL
+                                            CHECK (type IN ('machine', 'wallet', 'instapay')),
+                            balance         REAL    NOT NULL DEFAULT 0,
+                            monthly_limit   REAL    NOT NULL DEFAULT 200000,
+                            monthly_used    REAL    NOT NULL DEFAULT 0,
+                            last_reset_date TEXT    NOT NULL DEFAULT (strftime('%Y-%m', 'now')),
+                            is_active       INTEGER NOT NULL DEFAULT 1
+                        );
+                        INSERT OR IGNORE INTO platforms_v2
+                            SELECT id, name, type, balance, monthly_limit, monthly_used, last_reset_date,
+                                   COALESCE(is_active, 1)
+                            FROM platforms;
+                        DROP TABLE platforms;
+                        ALTER TABLE platforms_v2 RENAME TO platforms;
+                        PRAGMA foreign_keys = ON;
+                    """)
+                    conn.commit()
+        except Exception as e:
+            print(f"[DB] Platform migration note: {e}")
+
+        # Transactions table migrations
+        try:
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS transactions (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+                    operation_type  TEXT    NOT NULL
+                                    CHECK (operation_type IN ('outbound', 'inbound')),
+                    service_name    TEXT    NOT NULL,
+                    platform_id     INTEGER NOT NULL REFERENCES platforms(id),
+                    customer_id     INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+                    amount_spent    REAL    NOT NULL DEFAULT 0,
+                    amount_required REAL    NOT NULL DEFAULT 0,
+                    profit          REAL    GENERATED ALWAYS AS (amount_required - amount_spent) VIRTUAL,
+                    reference_no    TEXT,
+                    is_card         INTEGER NOT NULL DEFAULT 0,
+                    payment_status  TEXT    NOT NULL DEFAULT 'pending'
+                                    CHECK (payment_status IN ('cash', 'pending', 'paid')),
+                    is_delivered    INTEGER NOT NULL DEFAULT 0,
+                    notes           TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_transactions_customer  ON transactions(customer_id);
+                CREATE INDEX IF NOT EXISTS idx_transactions_platform  ON transactions(platform_id);
+                CREATE INDEX IF NOT EXISTS idx_transactions_status    ON transactions(payment_status);
+                CREATE INDEX IF NOT EXISTS idx_transactions_created   ON transactions(created_at);
+                CREATE INDEX IF NOT EXISTS idx_transactions_reference ON transactions(reference_no);
+            """)
             conn.commit()
         except Exception:
-            pass  # العمود موجود بالفعل
+            pass
+
+        # Column migrations
+        for sql in [
+            "ALTER TABLE transactions ADD COLUMN is_delivered INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE platforms ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1",
+        ]:
+            try:
+                conn.execute(sql)
+                conn.commit()
+            except Exception:
+                pass
+
     print(f"[DB] Database ready: {DB_PATH}")
