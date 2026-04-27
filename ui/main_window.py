@@ -127,10 +127,10 @@ class MainWindow(QMainWindow):
                 screen = ScreenClass()
                 self._screens[key] = screen
                 self.stack.addWidget(screen)
-                print(f"✅ تم إنشاء شاشة: {key}")
+                print(f"[OK] Screen created: {key}")
             except Exception as e:
                 import traceback
-                print(f"❌ خطأ في إنشاء شاشة {key}: {e}")
+                print(f"[ERR] Failed to create screen {key}: {e}")
                 traceback.print_exc()
                 self._show_placeholder(key)
                 return
@@ -152,7 +152,7 @@ class MainWindow(QMainWindow):
             try:
                 screen.refresh()
             except Exception as e:
-                print(f"⚠️ Refresh error in {key}: {e}")
+                print(f"[WARN] Refresh error in {key}: {e}")
 
     def _show_placeholder(self, key: str):
         # ... (نفس الكود السابق أو يمكن تبسيطه)

@@ -107,7 +107,7 @@ class InventoryTab(QWidget):
         layout.addLayout(self._cards_grid)
 
         self.card_cash     = MiniStatCard("الخزينة النقدية",        color=COLORS["green"])
-        self.card_machines = MiniStatCard("إجمالي الماكينات",       color=COLORS["blue_bright"])
+        self.card_machines = MiniStatCard("إجمالي الماكينات",       color=COLORS["blue"])
         self.card_wallets  = MiniStatCard("إجمالي المحافظ",         color=COLORS["purple"])
         self.card_debts    = MiniStatCard("إجمالي الديون",          color=COLORS["yellow"])
         self.card_profit   = MiniStatCard("أرباح الفترة",           color=COLORS["green"])
@@ -280,7 +280,7 @@ class InventoryTab(QWidget):
             self._match_result.setText(f"📈 فائض\n{fmt_currency(diff)}")
             self._match_result.setStyleSheet(
                 f"border-radius: 8px; padding: 6px 10px;"
-                f"background: {COLORS['blue_subtle']}; color: {COLORS['blue_bright']};"
+                f"background: {COLORS['blue_bg']}; color: {COLORS['blue']};"
                 f"font-size: 12px; font-weight: bold;"
             )
         else:
@@ -298,7 +298,7 @@ class InventoryTab(QWidget):
         for row, p in enumerate(platforms):
             is_machine = p["type"] == "machine"
             type_text  = "🏧 ماكينة" if is_machine else "💳 محفظة"
-            type_color = COLORS["blue_bright"] if is_machine else COLORS["purple"]
+            type_color = COLORS["blue"] if is_machine else COLORS["purple"]
 
             self.platforms_table.set_cell(row, 0, p["name"], bold=True)
             self.platforms_table.set_cell(row, 1, type_text, color=type_color)
@@ -456,7 +456,7 @@ class TransactionsLogTab(QWidget):
             self.table.set_cell(
                 row, 1,
                 "📤 صادر" if op == "outbound" else "📥 وارد",
-                color=COLORS["blue_bright"] if op == "outbound" else COLORS["purple"]
+                color=COLORS["blue"] if op == "outbound" else COLORS["purple"]
             )
 
             self.table.set_cell(row, 2, t.get("service_name") or "—")

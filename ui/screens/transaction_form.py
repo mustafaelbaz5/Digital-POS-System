@@ -356,7 +356,7 @@ class InboundTab(QWidget):
 
         note = QLabel("📌  عملية الاستلام متاحة للمحافظ الإلكترونية فقط")
         note.setStyleSheet(
-            f"color:{COLORS['blue_bright']};background:{COLORS['blue_subtle']};"
+            f"color:{COLORS['blue']};background:{COLORS['blue_bg']};"
             f"border:1px solid {COLORS['border_light']};"
             f"border-radius:8px;padding:8px 14px;font-size:12px;")
         note.setAlignment(Qt.AlignmentFlag.AlignRight)

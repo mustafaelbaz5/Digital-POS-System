@@ -158,4 +158,4 @@ def initialize_database() -> None:
             conn.commit()
         except Exception:
             pass  # العمود موجود بالفعل
-    print(f"[DB] قاعدة البيانات جاهزة: {DB_PATH}")
+    print(f"[DB] Database ready: {DB_PATH}")

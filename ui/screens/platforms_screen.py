@@ -26,7 +26,7 @@ class PlatformsScreen(ScreenShell):
 
     def _build_content(self):
         # Header actions
-        add_btn = QPushButton("＋  إضافة منصة")
+        add_btn = QPushButton("+ إضافة منصة")
         add_btn.setObjectName("btn_primary")
         add_btn.clicked.connect(self._add_platform)
         self.add_action(add_btn)
@@ -35,9 +35,9 @@ class PlatformsScreen(ScreenShell):
 
         # ── Machines section
         machines_hdr = QHBoxLayout()
-        machines_lbl = QLabel("🏧  الماكينات")
+        machines_lbl = QLabel("الماكينات")
         machines_lbl.setStyleSheet(
-            f"color: {COLORS['blue_bright']}; font-size: 13px; font-weight: bold;"
+            f"color: {COLORS['blue']}; font-size: 13px; font-weight: bold;"
         )
         machines_hdr.addWidget(machines_lbl)
         machines_hdr.addStretch()
@@ -51,7 +51,7 @@ class PlatformsScreen(ScreenShell):
 
         # ── Wallets section
         wallets_hdr = QHBoxLayout()
-        wallets_lbl = QLabel("💳  المحافظ الإلكترونية")
+        wallets_lbl = QLabel("المحافظ الإلكترونية")
         wallets_lbl.setStyleSheet(
             f"color: {COLORS['purple']}; font-size: 13px; font-weight: bold;"
         )
@@ -180,8 +180,8 @@ class AddPlatformDialog(QDialog):
         form.addRow("اسم المنصة *:", self.name_input)
 
         self.type_combo = QComboBox()
-        self.type_combo.addItem("🏧  ماكينة", "machine")
-        self.type_combo.addItem("💳  محفظة إلكترونية", "wallet")
+        self.type_combo.addItem("ماكينة", "machine")
+        self.type_combo.addItem("محفظة إلكترونية", "wallet")
         form.addRow("النوع:", self.type_combo)
 
         self.balance_input = QDoubleSpinBox()

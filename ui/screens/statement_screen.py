@@ -126,7 +126,7 @@ class CustomerStatementDialog(QDialog):
             sub_row.addWidget(ph)
         if c.get("group_name"):
             gr = QLabel(f"👥  {c['group_name']}")
-            gr.setStyleSheet(f"color:{COLORS['blue_bright']};font-size:13px;")
+            gr.setStyleSheet(f"color:{COLORS['blue']};font-size:13px;")
             sub_row.addWidget(gr)
         info.addLayout(sub_row)
 
@@ -166,7 +166,7 @@ class CustomerStatementDialog(QDialog):
             ("المديونية الحالية",  debt,                              debt_color),
             ("إجمالي المؤجل",    t.get("total_pending", 0) or 0,    COLORS["yellow"]),
             ("إجمالي المسدد",    t.get("total_paid",    0) or 0,    COLORS["green"]),
-            ("إجمالي النقدي",    t.get("total_cash",    0) or 0,    COLORS["blue_bright"]),
+            ("إجمالي النقدي",    t.get("total_cash",    0) or 0,    COLORS["blue"]),
             ("صافي الأرباح",     t.get("total_profit",  0) or 0,    COLORS["purple"]),
         ]:
             row.addWidget(info_pill(label, fmt_currency(value), color))
@@ -183,7 +183,7 @@ class CustomerStatementDialog(QDialog):
             ("all",     "الكل 📋",   COLORS["text_secondary"]),
             ("pending", "مؤجل ⏳",   COLORS["yellow"]),
             ("paid",    "مسدد ✅",   COLORS["green"]),
-            ("cash",    "نقدي 💵",   COLORS["blue_bright"]),
+            ("cash",    "نقدي 💵",   COLORS["blue"]),
             ("inbound", "وارد 📥",   COLORS["purple"]),
         ]
         for key, label, color in filters:
@@ -258,7 +258,7 @@ class CustomerStatementDialog(QDialog):
             op = t.get("operation_type", "")
             self.table.set_cell(row, 1,
                 "📤 صادر" if op == "outbound" else "📥 وارد",
-                color=COLORS["blue_bright"] if op == "outbound" else COLORS["purple"])
+                color=COLORS["blue"] if op == "outbound" else COLORS["purple"])
 
             self.table.set_cell(row, 2, t.get("service_name") or "—")
             self.table.set_cell(row, 3, t.get("platform_name") or "—",
@@ -413,11 +413,6 @@ class GroupReportDialog(QDialog):
             f"font-size:16px;font-weight:bold;")
         tl.addStretch(); tl.addWidget(total_lbl)
         layout.addWidget(total_frame)
-
-    def _open_customer_facing(self):
-        """فتح كشف الحساب المخصص للعميل (بدون أرباح)"""
-        dlg = CustomerFacingStatementDialog(self.customer_id, self)
-        dlg.exec()
 
     def _export_image(self):
         path, _ = QFileDialog.getSaveFileName(
