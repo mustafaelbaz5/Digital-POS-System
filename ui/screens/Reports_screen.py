@@ -34,14 +34,14 @@ class MiniStatCard(QFrame):
         layout.setSpacing(4)
 
         self._val_lbl = QLabel(value)
-        self._val_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self._val_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self._val_lbl.setStyleSheet(
             f"color: {color or COLORS['text_primary']}; font-size: 18px; font-weight: bold;"
         )
         layout.addWidget(self._val_lbl)
 
         title_lbl = QLabel(title)
-        title_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        title_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         title_lbl.setObjectName("label_muted")
         layout.addWidget(title_lbl)
 
@@ -135,11 +135,11 @@ class InventoryTab(QWidget):
 
         columns = [
             ("المنصة",       180),
-            ("النوع",          90),
-            ("الرصيد",        130),
+            ("النوع",          120),
+            ("الرصيد",        -1),
             ("الحد الشهري",   130),
-            ("المستخدم",      120),
-            ("المتبقي",       120),
+            ("المستخدم",      -1),
+            ("المتبقي",       -1),
         ]
         self.platforms_table = DataTable(columns)
         self.platforms_table.setMaximumHeight(200)
@@ -349,7 +349,7 @@ class TransactionsLogTab(QWidget):
 
         search_btn = QPushButton("🔍  بحث")
         search_btn.setObjectName("btn_primary")
-        search_btn.setFixedHeight(34)
+        search_btn.setFixedHeight(32)
         search_btn.clicked.connect(self.load_data)
         fl.addWidget(search_btn)
 
@@ -357,7 +357,7 @@ class TransactionsLogTab(QWidget):
 
         # Status
         self.status_filter = QComboBox()
-        self.status_filter.setFixedHeight(34)
+        self.status_filter.setFixedHeight(100)
         self.status_filter.setMinimumWidth(110)
         self.status_filter.addItem("كل الحالات", None)
         self.status_filter.addItem("💵 نقدي",    "cash")
@@ -367,7 +367,7 @@ class TransactionsLogTab(QWidget):
 
         # Type
         self.type_filter = QComboBox()
-        self.type_filter.setFixedHeight(34)
+        self.type_filter.setFixedHeight(100)
         self.type_filter.setMinimumWidth(120)
         self.type_filter.addItem("كل الأنواع",  None)
         self.type_filter.addItem("📤 صادر",     "outbound")
@@ -376,7 +376,7 @@ class TransactionsLogTab(QWidget):
 
         # Platform
         self.platform_filter = QComboBox()
-        self.platform_filter.setFixedHeight(34)
+        self.platform_filter.setFixedHeight(100)
         self.platform_filter.setMinimumWidth(130)
         fl.addWidget(self.platform_filter)
 
@@ -387,7 +387,7 @@ class TransactionsLogTab(QWidget):
             fl.addWidget(lbl)
             de = QDateEdit(QDate.currentDate().addDays(days))
             de.setCalendarPopup(True)
-            de.setFixedHeight(34)
+            de.setFixedHeight(100)
             de.setFixedWidth(115)
             setattr(self, attr, de)
             fl.addWidget(de)
@@ -400,16 +400,16 @@ class TransactionsLogTab(QWidget):
             ("النوع",           75),
             ("الخدمة",         150),
             ("المنصة",         110),
-            ("العميل",         120),
+            ("العميل",         -1),
             ("المصروف",        100),
             ("المطلوب",        100),
-            ("الربح",           85),
+            ("الربح",           -1),
             ("المرجع",         105),
-            ("الحالة",          85),
-            ("إجراءات",        120),
+            ("الحالة",          -1),
+            ("إجراءات",       200),
         ]
         self.table = DataTable(columns)
-        self.table.verticalHeader().setDefaultSectionSize(52)
+        self.table.verticalHeader().setDefaultSectionSize(80)
         layout.addWidget(self.table)
 
         # Summary
@@ -472,7 +472,7 @@ class TransactionsLogTab(QWidget):
             self.table.set_cell(row, 7, fmt_currency(profit),
                 color=COLORS["green"] if profit >= 0 else COLORS["red"])
             ref = "🃏 كارت" if t.get("is_card") else (t.get("reference_no") or "—")
-            self.table.set_cell(row, 8, ref, color=COLORS["text_muted"])
+            self.table.set_cell(row, 8, ref, color=COLORS["bg_dark"])
             self.table.add_status_badge(row, 9, t.get("payment_status", ""))
             actions = make_txn_actions(t, self._on_status_change, self._on_delete)
             self.table.setCellWidget(row, 10, actions)
@@ -511,10 +511,6 @@ class TransactionsLogTab(QWidget):
                 QMessageBox.critical(self, "خطأ", str(e))
 
 
-# ══════════════════════════════════════════
-#  Tab 3: تنظيف البيانات
-# ══════════════════════════════════════════
-
 class CleanupTab(QWidget):
 
     def __init__(self, parent=None):
@@ -542,7 +538,7 @@ class CleanupTab(QWidget):
 
         self.stat_label = QLabel("اضغط تحديث لعرض عدد العمليات المسددة")
         self.stat_label.setObjectName("label_muted")
-        self.stat_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.stat_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         stat_layout.addWidget(self.stat_label)
         layout.addWidget(stat_frame)
 
@@ -564,7 +560,7 @@ class CleanupTab(QWidget):
 
         s_desc = QLabel("حذف العمليات المسددة (paid) لعميل محدد فقط. العمليات المؤجلة لا تُمس.")
         s_desc.setObjectName("label_muted")
-        s_desc.setAlignment(Qt.AlignmentFlag.AlignRight)
+        s_desc.setAlignment(Qt.AlignmentFlag.AlignLeft)
         sl.addWidget(s_desc)
 
         s_row = QHBoxLayout()
@@ -601,7 +597,7 @@ class CleanupTab(QWidget):
         a_title.setStyleSheet(
             f"color: {COLORS['red']}; font-size: 13px; font-weight: bold;"
         )
-        a_title.setAlignment(Qt.AlignmentFlag.AlignRight)
+        a_title.setAlignment(Qt.AlignmentFlag.AlignLeft)
         al.addWidget(a_title)
 
         a_desc = QLabel(
@@ -609,7 +605,7 @@ class CleanupTab(QWidget):
             "⚠️  لا يمكن التراجع عن هذا الإجراء."
         )
         a_desc.setObjectName("label_muted")
-        a_desc.setAlignment(Qt.AlignmentFlag.AlignRight)
+        a_desc.setAlignment(Qt.AlignmentFlag.AlignLeft)
         al.addWidget(a_desc)
 
         a_row = QHBoxLayout()

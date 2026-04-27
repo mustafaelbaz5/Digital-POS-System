@@ -28,11 +28,11 @@ def info_pill(label: str, value: str, color: str = None) -> QFrame:
     layout.setContentsMargins(14, 10, 14, 10)
     layout.setSpacing(3)
     val_lbl = QLabel(value)
-    val_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+    val_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
     val_lbl.setStyleSheet(f"color:{color or COLORS['text_primary']};font-size:17px;font-weight:bold;")
     layout.addWidget(val_lbl)
     lbl = QLabel(label)
-    lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+    lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
     lbl.setStyleSheet(f"color:{COLORS['text_muted']};font-size:11px;")
     layout.addWidget(lbl)
     return frame
@@ -158,7 +158,7 @@ class CustomerStatementDialog(QDialog):
         c = self._data["customer"]
         title = QLabel(f"📋  كشف حساب  —  {c['name']}")
         title.setStyleSheet(f"color:{COLORS['text_primary']};font-size:16px;font-weight:bold;")
-        title.setAlignment(Qt.AlignmentFlag.AlignRight)
+        title.setAlignment(Qt.AlignmentFlag.AlignLeft)
         row.addWidget(title)
         return row
 
@@ -177,7 +177,7 @@ class CustomerStatementDialog(QDialog):
         name_lbl.setStyleSheet(
             f"color:{COLORS['text_primary']};font-size:20px;font-weight:bold;"
         )
-        name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        name_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(name_lbl)
 
         # Divider
@@ -191,12 +191,12 @@ class CustomerStatementDialog(QDialog):
         def add_field(row, lbl_text, val_text, val_color=None):
             lbl = QLabel(lbl_text)
             lbl.setStyleSheet(f"color:{COLORS['text_muted']};font-size:12px;")
-            lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
             val = QLabel(val_text or "—")
             val.setStyleSheet(
                 f"color:{val_color or COLORS['text_primary']};font-size:13px;font-weight:bold;"
             )
-            val.setAlignment(Qt.AlignmentFlag.AlignRight)
+            val.setAlignment(Qt.AlignmentFlag.AlignLeft)
             grid.addWidget(lbl, row, 0)
             grid.addWidget(val, row, 1)
 
@@ -265,7 +265,7 @@ class CustomerStatementDialog(QDialog):
         for k, (btn, color) in self._filter_btns.items():
             if k == key:
                 btn.setStyleSheet(
-                    f"background:{COLORS['bg_selected']};color:{color};"
+                    f"background:{COLORS['teal_subtle']};color:{color};"
                     f"border:1.5px solid {color};border-radius:7px;"
                     f"font-weight:bold;font-size:12px;padding:2px 10px;"
                 )
@@ -343,7 +343,7 @@ class CustomerStatementDialog(QDialog):
         layout = QHBoxLayout(frame); layout.setContentsMargins(14, 0, 14, 0)
         self._summary_lbl = QLabel("")
         self._summary_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:11px;")
-        self._summary_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self._summary_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addStretch(); layout.addWidget(self._summary_lbl)
         self._fill_table()
         return frame
@@ -446,12 +446,12 @@ class CustomerFacingStatementDialog(QDialog):
         name_col = QVBoxLayout(); name_col.setSpacing(4)
         name_lbl = QLabel(c.get("name", "—"))
         name_lbl.setStyleSheet(f"color:{COLORS['text_primary']};font-size:20px;font-weight:bold;")
-        name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        name_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         name_col.addWidget(name_lbl)
         if c.get("phone"):
             ph = QLabel(f"📞  {c['phone']}")
             ph.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:13px;")
-            ph.setAlignment(Qt.AlignmentFlag.AlignRight)
+            ph.setAlignment(Qt.AlignmentFlag.AlignLeft)
             name_col.addWidget(ph)
         id_layout.addLayout(name_col)
         id_layout.addStretch()
@@ -471,14 +471,14 @@ class CustomerFacingStatementDialog(QDialog):
         if pending_txns:
             sec = QLabel("🔴  مبالغ مستحقة عليك")
             sec.setStyleSheet(f"color:{COLORS['red']};font-size:13px;font-weight:bold;border-right:3px solid {COLORS['red']};padding-right:8px;")
-            sec.setAlignment(Qt.AlignmentFlag.AlignRight)
+            sec.setAlignment(Qt.AlignmentFlag.AlignLeft)
             layout.addWidget(sec)
             layout.addWidget(self._make_txn_table(pending_txns, "owed"))
 
         if due_txns:
             sec = QLabel("🟢  مبالغ مستحقة لك")
             sec.setStyleSheet(f"color:{COLORS['green']};font-size:13px;font-weight:bold;border-right:3px solid {COLORS['green']};padding-right:8px;")
-            sec.setAlignment(Qt.AlignmentFlag.AlignRight)
+            sec.setAlignment(Qt.AlignmentFlag.AlignLeft)
             layout.addWidget(sec)
             layout.addWidget(self._make_txn_table(due_txns, "due"))
 
@@ -501,7 +501,7 @@ class CustomerFacingStatementDialog(QDialog):
         nl.addStretch()
         net_lbl = QLabel(f"{label}:  {fmt_currency(abs(net))}")
         net_lbl.setStyleSheet(f"color:{color};font-size:18px;font-weight:bold;")
-        net_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        net_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         nl.addWidget(net_lbl)
         layout.addWidget(net_frame)
 
@@ -512,7 +512,7 @@ class CustomerFacingStatementDialog(QDialog):
         for text, width in [("التاريخ", 120), ("البيان", 0), ("المبلغ", 110)]:
             lbl = QLabel(text)
             lbl.setStyleSheet(f"color:{COLORS['text_muted']};font-size:11px;font-weight:bold;border-bottom:1px solid {COLORS['border']};padding-bottom:4px;")
-            lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
             if width: lbl.setFixedWidth(width)
             else: lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
             header.addWidget(lbl)
@@ -522,11 +522,11 @@ class CustomerFacingStatementDialog(QDialog):
             row = QHBoxLayout(); row.setContentsMargins(0, 6, 0, 6)
             date_lbl = QLabel((t.get("created_at") or "")[:10])
             date_lbl.setStyleSheet(f"color:{COLORS['text_muted']};font-size:12px;")
-            date_lbl.setAlignment(Qt.AlignmentFlag.AlignRight); date_lbl.setFixedWidth(120)
+            date_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft); date_lbl.setFixedWidth(120)
             row.addWidget(date_lbl)
             svc_lbl = QLabel(t.get("service_name") or "—")
             svc_lbl.setStyleSheet(f"color:{COLORS['text_primary']};font-size:13px;")
-            svc_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+            svc_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
             svc_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
             row.addWidget(svc_lbl)
             amount = (t.get("amount_required", 0) if mode == "owed" else t.get("amount_spent", 0)) or 0
@@ -542,7 +542,7 @@ class CustomerFacingStatementDialog(QDialog):
         total_row = QHBoxLayout()
         total_lbl = QLabel("الإجمالي:")
         total_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:12px;font-weight:bold;")
-        total_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        total_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         total_row.addStretch(); total_row.addWidget(total_lbl)
         color = COLORS["red"] if mode == "owed" else COLORS["green"]
         total_val = QLabel(fmt_currency(total))
@@ -590,7 +590,7 @@ class GroupReportDialog(QDialog):
         group  = next((g for g in groups if g["id"] == self.group_id), {})
         title  = QLabel(f"تقرير مجموعة — {group.get('name', '—')}")
         title.setStyleSheet(f"color:{COLORS['text_primary']};font-size:16px;font-weight:bold;")
-        title.setAlignment(Qt.AlignmentFlag.AlignRight)
+        title.setAlignment(Qt.AlignmentFlag.AlignLeft)
         header.addWidget(title)
         layout.addLayout(header)
 
@@ -615,7 +615,7 @@ class GroupReportDialog(QDialog):
         total_lbl.setStyleSheet(
             f"color:{COLORS['red'] if total_debt > 0 else COLORS['green']};"
             f"font-size:16px;font-weight:bold;")
-        total_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        total_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         tl.addStretch(); tl.addWidget(total_lbl)
         layout.addWidget(total_frame)
 

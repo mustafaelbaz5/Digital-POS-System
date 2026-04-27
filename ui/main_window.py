@@ -80,7 +80,7 @@ class MainWindow(QMainWindow):
         # Brand Block
         brand = QLabel("نظام المدفوعات")
         brand.setObjectName("sidebar_brand")
-        brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        brand.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(brand)
 
         # Divider

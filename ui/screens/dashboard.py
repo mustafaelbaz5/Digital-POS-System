@@ -107,7 +107,7 @@ class DashboardScreen(ScreenShell):
         tbl.horizontalHeader().setHighlightSections(False)
         tbl.horizontalHeader().setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         header = tbl.horizontalHeader()
-        widths = [150, 120, -1, 100, 100, 85, 70]
+        widths = [200, 150, 150, 150, 100, 85,-1]
         for i, w in enumerate(widths):
             if w == -1:
                 header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
@@ -118,8 +118,8 @@ class DashboardScreen(ScreenShell):
         tbl.setStyleSheet(
             f"QTableWidget {{ background: {COLORS['bg_card']}; border: 1px solid {COLORS['border']};"
             f"border-radius: {CARD_RADIUS}; gridline-color: transparent; }}"
-            f"QTableWidget::item {{ padding: 8px 16px; border-bottom: 1px solid {COLORS['border']}; }}"
-            f"QTableWidget::item:selected {{ background: {COLORS['bg_selected']}; }}"
+            f"QTableWidget::item {{background: {COLORS['bg_elevated']}; padding: 8px 16px; border-bottom: 1px solid {COLORS['border']}; }}"
+            f"QTableWidget::item:selected {{ background: {COLORS['teal_subtle']}; }}"
             f"QHeaderView::section {{ background: {COLORS['bg_dark']}; color: {COLORS['text_secondary']};"
             f"border: none; border-bottom: 2px solid {COLORS['border']};"
             f"padding: 10px 16px; font-weight: bold; font-size: {FONT['sm']}; }}"
@@ -136,7 +136,7 @@ class DashboardScreen(ScreenShell):
             def cell(col, text, color=None, bold=False):
                 item = QTableWidgetItem(str(text) if text else "—")
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
                 if color: item.setForeground(QColor(color))
                 if bold:  f = item.font(); f.setBold(True); item.setFont(f)
                 self._ops_table.setItem(row, col, item)

@@ -1,13 +1,8 @@
 """
-widgets.py — RTL-Corrected Components v2.1
-==========================================
-All layouts corrected for Arabic RTL direction:
-- StatCard: accent bar on RIGHT (leading edge in RTL)
-- ScreenShell: title on right, actions on left
-- GroupLabel: dot on LEFT of text (trailing in RTL)
-- PlatformCard: name right, badge left
-- InfoRow: label right, value left
-- All alignments and stretch positions corrected
+widgets.py — Component Library v3 (Clean Professional Dark)
+===========================================================
+RTL-correct layouts. All text starts from right.
+Minimal, consistent, professional.
 """
 
 from PyQt6.QtWidgets import (
@@ -15,178 +10,198 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView,
     QPushButton, QFrame, QSizePolicy, QScrollArea,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
-from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QColor
 
-from ui.styles.theme import COLORS, FONT, CARD_RADIUS, BORDER_RADIUS, get_status_style, get_status_text
+from ui.styles.theme import (
+    COLORS, FONT, CARD_RADIUS, BORDER_RADIUS,
+    get_status_style, get_status_text,
+    BTN_HEIGHT, INPUT_HEIGHT
+)
+
+RTL = Qt.LayoutDirection.RightToLeft
+AlignLeft  = Qt.AlignmentFlag.AlignLeft  | Qt.AlignmentFlag.AlignVCenter
+AlignLeft   = Qt.AlignmentFlag.AlignLeft   | Qt.AlignmentFlag.AlignVCenter
+AlignCenter = Qt.AlignmentFlag.AlignCenter
 
 
-# ══════════════════════════════════════════
-#  Screen Shell
-# ══════════════════════════════════════════
+# ══════════════════════════════════════════════════════
+#  ScreenShell
+# ══════════════════════════════════════════════════════
 
 class ScreenShell(QWidget):
     """
-    Unified screen wrapper with RTL-correct header:
-    - Right: Title + subtitle
-    - Left:  Action buttons
+    Base screen wrapper.
+    Header: [Title + subtitle] ←stretch→ [Action buttons]
+    In RTL: title appears on right, buttons on left.
     """
 
     def __init__(self, title: str, subtitle: str = "", parent=None):
         super().__init__(parent)
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        self._build_shell(title, subtitle)
+        self.setLayoutDirection(RTL)
+        self._build(title, subtitle)
 
-    def _build_shell(self, title: str, subtitle: str):
+    def _build(self, title: str, subtitle: str):
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # ── Header
-        self._header_bar = QWidget()
-        self._header_bar.setObjectName("screen_header")
-        self._header_bar.setFixedHeight(60)
-        header_layout = QHBoxLayout(self._header_bar)
-        header_layout.setContentsMargins(28, 0, 28, 0)
-        header_layout.setSpacing(10)
-        header_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        # ─── Header bar
+        self._header = QWidget()
+        self._header.setObjectName("screen_header")
+        self._header.setLayoutDirection(RTL)
+        hl = QHBoxLayout(self._header)
+        hl.setContentsMargins(24, 0, 24, 0)
+        hl.setSpacing(12)
 
-        # RIGHT side: Title + subtitle (Arabic → right is the natural start)
-        title_col = QVBoxLayout()
-        title_col.setSpacing(1)
-        title_col.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        # Title block (right side in RTL)
+        title_block = QVBoxLayout()
+        title_block.setSpacing(2)
 
         self._title_lbl = QLabel(title)
         self._title_lbl.setObjectName("screen_title")
-        self._title_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        title_col.addWidget(self._title_lbl)
+        self._title_lbl.setAlignment(AlignLeft)
+        title_block.addWidget(self._title_lbl)
 
         if subtitle:
             self._sub_lbl = QLabel(subtitle)
             self._sub_lbl.setObjectName("screen_subtitle")
-            self._sub_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            title_col.addWidget(self._sub_lbl)
+            self._sub_lbl.setAlignment(AlignLeft)
+            title_block.addWidget(self._sub_lbl)
 
-        header_layout.addLayout(title_col)
+        hl.addLayout(title_block)
+        hl.addStretch()
 
-        # STRETCH pushes actions to the left
-        header_layout.addStretch()
+        # Actions (left side in RTL)
+        self._actions = QHBoxLayout()
+        self._actions.setSpacing(8)
+        hl.addLayout(self._actions)
 
-        # LEFT side: Action buttons (in RTL, addWidget adds right-to-left,
-        # so we use a sub-layout and reverse order naturally)
-        self._actions_layout = QHBoxLayout()
-        self._actions_layout.setSpacing(8)
-        self._actions_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
-        header_layout.addLayout(self._actions_layout)
+        root.addWidget(self._header)
 
-        root.addWidget(self._header_bar)
-
-        # ── Content
+        # ─── Scrollable content
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
-        self._content_widget = QWidget()
-        self._content_widget.setObjectName("screen_content")
-        self._content_layout = QVBoxLayout(self._content_widget)
-        self._content_layout.setContentsMargins(28, 24, 28, 24)
-        self._content_layout.setSpacing(20)
+        self._content_w = QWidget()
+        self._content_w.setLayoutDirection(RTL)
+        self._content_l = QVBoxLayout(self._content_w)
+        self._content_l.setContentsMargins(24, 20, 24, 20)
+        self._content_l.setSpacing(16)
+        scroll.setWidget(self._content_w)
 
-        scroll.setWidget(self._content_widget)
         root.addWidget(scroll)
 
     def add_action(self, widget: QWidget):
-        self._actions_layout.addWidget(widget)
+        self._actions.addWidget(widget)
 
     def content(self) -> QVBoxLayout:
-        return self._content_layout
+        return self._content_l
 
     def set_subtitle(self, text: str):
-        if hasattr(self, '_sub_lbl'):
+        if hasattr(self, "_sub_lbl"):
             self._sub_lbl.setText(text)
 
 
-# ══════════════════════════════════════════
-#  Stat Card — RTL Corrected
-# ══════════════════════════════════════════
+# ══════════════════════════════════════════════════════
+#  StatCard
+# ══════════════════════════════════════════════════════
 
 class StatCard(QWidget):
     """
-    RTL layout:
-    - Accent bar on the RIGHT (the reading-start edge in Arabic)
-    - Icon badge top-LEFT (trailing edge)
-    - Label top-right, value bottom-right
+    Compact stat card — centered layout.
+    Accent bar on right edge (RTL leading).
     """
 
     def __init__(self, title: str, value: str = "—",
-                 accent_color: str = None, parent=None):
+                 accent_color: str = None, icon: str = "", parent=None):
         super().__init__(parent)
-        self.accent = accent_color or COLORS["teal_primary"]
-        self._build_ui(title, value)
+        self._accent = accent_color or COLORS["accent"]
+        self._build(title, value, icon)
 
-    def _build_ui(self, title: str, value: str):
+    def _build(self, title: str, value: str, icon: str):
         self.setObjectName("stat_card")
-        self.setMinimumHeight(120)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.setMinimumHeight(110)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setLayoutDirection(RTL)
 
         outer = QHBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        # Accent bar
-        accent_bar = QFrame()
-        accent_bar.setFixedWidth(5)
-        accent_bar.setStyleSheet(
-            f"background-color: {self.accent}; border-top-right-radius: 12px; border-bottom-right-radius: 12px;"
+        # Accent bar — RIGHT in RTL (leading edge)
+        self._bar = QFrame()
+        self._bar.setFixedWidth(4)
+        self._bar.setStyleSheet(
+            f"background:{self._accent};"
+            f"border-top-right-radius:{CARD_RADIUS};"
+            f"border-bottom-right-radius:{CARD_RADIUS};"
         )
-        outer.addWidget(accent_bar)
+        outer.addWidget(self._bar)
 
-        # Content area
-        content = QWidget()
-        content_layout = QVBoxLayout(content)
-        content_layout.setContentsMargins(20, 24, 20, 24)
-        content_layout.setSpacing(12)
-        content_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Content
+        inner = QVBoxLayout()
+        inner.setContentsMargins(16, 18, 16, 18)
+        inner.setSpacing(8)
+        inner.setAlignment(AlignCenter)
 
-        # Title
-        self.title_lbl = QLabel(title)
-        self.title_lbl.setObjectName("stat_label")
-        self.title_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        content_layout.addWidget(self.title_lbl)
+        # Icon + title row
+        if icon:
+            top = QHBoxLayout()
+            top.setSpacing(6)
+
+            icon_lbl = QLabel(icon)
+            icon_lbl.setFixedSize(28, 28)
+            icon_lbl.setAlignment(AlignCenter)
+            icon_lbl.setStyleSheet(
+                f"background:{self._accent}20; border-radius:8px; font-size:14px;"
+            )
+            top.addWidget(icon_lbl)
+            top.addStretch()
+
+            title_lbl = QLabel(title)
+            title_lbl.setObjectName("stat_label")
+            title_lbl.setAlignment(AlignLeft)
+            top.addWidget(title_lbl)
+
+            inner.addLayout(top)
+        else:
+            title_lbl = QLabel(title)
+            title_lbl.setObjectName("stat_label")
+            title_lbl.setAlignment(AlignCenter)
+            inner.addWidget(title_lbl)
 
         # Value
-        self.value_lbl = QLabel(value)
-        self.value_lbl.setObjectName("stat_value")
-        self.value_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.value_lbl.setStyleSheet(
-            f"color: {self.accent}; font-size: {FONT['3xl']}; font-weight: bold;"
-            f"font-family: {FONT['family']};"
+        self._value = QLabel(value)
+        self._value.setObjectName("stat_value")
+        self._value.setAlignment(AlignCenter)
+        self._value.setStyleSheet(
+            f"color:{self._accent}; font-size:{FONT['2xl']}; font-weight:bold;"
         )
-        content_layout.addWidget(self.value_lbl)
+        inner.addWidget(self._value)
 
-        outer.addWidget(content)
-        self._accent_bar = accent_bar
+        outer.addLayout(inner)
 
     def set_value(self, value: str):
-        self.value_lbl.setText(value)
+        self._value.setText(value)
 
     def set_accent(self, color: str):
-        self.accent = color
-        self.value_lbl.setStyleSheet(
-            f"color: {color}; font-size: {FONT['3xl']}; font-weight: bold;"
-            f"font-family: {FONT['family']};"
+        self._accent = color
+        self._bar.setStyleSheet(
+            f"background:{color};"
+            f"border-top-right-radius:{CARD_RADIUS};"
+            f"border-bottom-right-radius:{CARD_RADIUS};"
         )
-        self._accent_bar.setStyleSheet(
-            f"background-color: {color}; border-top-right-radius: 12px;"
-            f"border-bottom-right-radius: 12px;"
+        self._value.setStyleSheet(
+            f"color:{color}; font-size:{FONT['2xl']}; font-weight:bold;"
         )
 
 
-# ══════════════════════════════════════════
-#  Platform Card — RTL Corrected
-# ══════════════════════════════════════════
+# ══════════════════════════════════════════════════════
+#  PlatformCard
+# ══════════════════════════════════════════════════════
 
 class PlatformCard(QWidget):
     deposit_clicked = pyqtSignal(int)
@@ -194,113 +209,110 @@ class PlatformCard(QWidget):
     def __init__(self, platform: dict, parent=None):
         super().__init__(parent)
         self.platform_id = platform["id"]
-        self._build_ui(platform)
+        self._build(platform)
 
-    def _build_ui(self, p: dict):
+    def _build(self, p: dict):
         self.setObjectName("card")
-        self.setMinimumWidth(200)
-        self.setMaximumWidth(250)
-        self.setMinimumHeight(160)
+        self.setFixedWidth(220)
+        self.setMinimumHeight(155)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.setLayoutDirection(RTL)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 14, 16, 14)
-        layout.setSpacing(10)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(8)
 
-        is_machine = p["type"] == "machine"
-        type_color = COLORS["blue"] if is_machine else COLORS["purple"]
-        type_text  = "ماكينة" if is_machine else "محفظة"
+        ptype = p.get("type", "machine")
+        type_color, type_text = {
+            "machine":  (COLORS["accent"],  "ماكينة"),
+            "wallet":   (COLORS["purple"],  "محفظة"),
+            "instapay": (COLORS["cyan"],    "انستا باي"),
+        }.get(ptype, (COLORS["text_muted"], ptype))
 
-        # Header: name RIGHT, badge LEFT
-        header = QHBoxLayout()
+        # ─ Header row
+        hrow = QHBoxLayout()
+        hrow.setSpacing(6)
 
-        name_lbl = QLabel(p["name"])
-        name_lbl.setStyleSheet(
-            f"color: {COLORS['text_primary']}; font-size: {FONT['lg']};"
-            f"font-weight: bold; font-family: {FONT['family']};"
+        name = QLabel(p["name"])
+        name.setStyleSheet(
+            f"color:{COLORS['text_primary']}; font-size:{FONT['md']}; font-weight:bold;"
         )
-        name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        header.addWidget(name_lbl)
+        name.setAlignment(AlignLeft)
+        hrow.addWidget(name)
+        hrow.addStretch()
 
-        header.addStretch()
-
-        badge = QLabel(f"  {type_text}  ")
+        badge = QLabel(f" {type_text} ")
         badge.setStyleSheet(
-            f"color: {type_color}; background: {type_color}22;"
-            f"border: 1px solid {type_color}55; border-radius: 5px;"
-            f"font-size: {FONT['xs']}; font-weight: bold;"
-            f"font-family: {FONT['family']}; padding: 2px 0;"
+            f"color:{type_color}; background:{type_color}18;"
+            f"border:1px solid {type_color}40; border-radius:5px;"
+            f"font-size:{FONT['xs']}; font-weight:bold; padding:1px 4px;"
         )
-        header.addWidget(badge)
+        hrow.addWidget(badge)
+        layout.addLayout(hrow)
 
-        layout.addLayout(header)
-
-        # Divider
+        # ─ Divider
         div = QFrame()
         div.setFrameShape(QFrame.Shape.HLine)
+        div.setStyleSheet(f"color:{COLORS['border']}; background:{COLORS['border']}; max-height:1px;")
         layout.addWidget(div)
 
-        # Balance — right aligned
-        balance = p.get("balance", 0)
-        bal_color = COLORS["green"] if balance > 0 else COLORS["text_muted"]
-        balance_lbl = QLabel(f"{balance:,.2f} ج")
-        balance_lbl.setStyleSheet(
-            f"color: {bal_color}; font-size: {FONT['2xl']};"
-            f"font-weight: bold; font-family: {FONT['family']};"
+        # ─ Balance
+        bal = p.get("balance", 0)
+        bal_color = COLORS["green"] if bal > 0 else COLORS["text_secondary"]
+        bal_lbl = QLabel(f"{bal:,.0f} ج")
+        bal_lbl.setStyleSheet(
+            f"color:{bal_color}; font-size:{FONT['xl']}; font-weight:bold;"
         )
-        balance_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-        layout.addWidget(balance_lbl)
+        bal_lbl.setAlignment(AlignLeft)
+        layout.addWidget(bal_lbl)
 
-        # Wallet monthly limit
-        if p["type"] == "wallet":
+        # ─ Limit (wallets + instapay)
+        if ptype in ("wallet", "instapay"):
             used      = p.get("monthly_used", 0)
-            limit     = p.get("monthly_limit", 200000)
-            remaining = limit - used
+            limit     = p.get("monthly_limit", 200_000)
+            remaining = max(0, limit - used)
             pct       = min(100, int(used / limit * 100)) if limit else 0
-            limit_color = (COLORS["red"] if pct >= 90 else
-                           COLORS["yellow"] if pct >= 70 else COLORS["text_muted"])
-            limit_lbl = QLabel(f"متبقي: {remaining:,.0f} / {limit:,.0f} ج")
-            limit_lbl.setStyleSheet(
-                f"color: {limit_color}; font-size: {FONT['xs']};"
-                f"font-family: {FONT['family']};"
+            lim_color = (COLORS["red"]    if pct >= 90 else
+                         COLORS["yellow"] if pct >= 70 else
+                         COLORS["text_muted"])
+            lim_lbl = QLabel(f"متبقي {remaining:,.0f} / {limit:,.0f} ج")
+            lim_lbl.setStyleSheet(
+                f"color:{lim_color}; font-size:{FONT['xs']};"
             )
-            limit_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-            layout.addWidget(limit_lbl)
+            lim_lbl.setAlignment(AlignLeft)
+            layout.addWidget(lim_lbl)
 
-        # Deposit button — full width
-        dep_btn = QPushButton("إيداع +")
-        dep_btn.setObjectName("btn_ghost")
-        dep_btn.setFixedHeight(28)
-        dep_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        dep_btn.clicked.connect(lambda: self.deposit_clicked.emit(self.platform_id))
-        layout.addWidget(dep_btn)
+        # ─ Deposit button
+        dep = QPushButton("+ إيداع")
+        dep.setObjectName("btn_ghost")
+        dep.setFixedHeight(28)
+        dep.setCursor(Qt.CursorShape.PointingHandCursor)
+        dep.clicked.connect(lambda: self.deposit_clicked.emit(self.platform_id))
+        layout.addWidget(dep)
 
 
-# ══════════════════════════════════════════
-#  Data Table — RTL Corrected
-# ══════════════════════════════════════════
+# ══════════════════════════════════════════════════════
+#  DataTable
+# ══════════════════════════════════════════════════════
 
 class DataTable(QTableWidget):
 
     def __init__(self, columns: list, parent=None):
         super().__init__(parent)
-        self._setup(columns)
+        self._init(columns)
 
-    def _setup(self, columns: list):
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+    def _init(self, columns: list):
+        self.setLayoutDirection(RTL)
         self.setColumnCount(len(columns))
         self.setHorizontalHeaderLabels([c[0] for c in columns])
 
         for i, col in enumerate(columns):
-            width = col[1] if len(col) > 1 else -1
-            if width == -1:
-                self.horizontalHeader().setSectionResizeMode(
-                    i, QHeaderView.ResizeMode.Stretch)
+            w = col[1] if len(col) > 1 else -1
+            if w == -1:
+                self.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
             else:
-                self.setColumnWidth(i, width)
-                self.horizontalHeader().setSectionResizeMode(
-                    i, QHeaderView.ResizeMode.Fixed)
+                self.setColumnWidth(i, w)
+                self.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeMode.Fixed)
 
         self.setAlternatingRowColors(True)
         self.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -309,11 +321,11 @@ class DataTable(QTableWidget):
         self.setShowGrid(False)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.horizontalHeader().setHighlightSections(False)
-        self.horizontalHeader().setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.horizontalHeader().setLayoutDirection(RTL)
         self.setStyleSheet(
             f"alternate-background-color: {COLORS['bg_elevated']};"
         )
-        self.verticalHeader().setDefaultSectionSize(46)
+        self.verticalHeader().setDefaultSectionSize(48)
 
     def set_cell(self, row: int, col: int, text: str,
                  color: str = None, bold: bool = False, align=None):
@@ -322,181 +334,175 @@ class DataTable(QTableWidget):
         if color:
             item.setForeground(QColor(color))
         if bold:
-            f = item.font(); f.setBold(True); item.setFont(f)
-        item.setTextAlignment(
-            align if align else
-            (Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        )
+            f = item.font()
+            f.setBold(True)
+            item.setFont(f)
+        item.setTextAlignment(align if align else AlignCenter)
         self.setItem(row, col, item)
 
     def add_status_badge(self, row: int, col: int, status: str):
-        text = get_status_text(status)
         color_map = {
             "cash":    COLORS["green"],
             "pending": COLORS["yellow"],
             "paid":    COLORS["text_muted"],
         }
-        self.set_cell(row, col, text, color=color_map.get(status, COLORS["text_secondary"]))
+        self.set_cell(
+            row, col,
+            get_status_text(status),
+            color=color_map.get(status, COLORS["text_secondary"])
+        )
 
     def clear_rows(self):
         self.setRowCount(0)
 
 
-# ══════════════════════════════════════════
-#  Section Title
-# ══════════════════════════════════════════
+# ══════════════════════════════════════════════════════
+#  SectionTitle
+# ══════════════════════════════════════════════════════
 
 class SectionTitle(QWidget):
 
     def __init__(self, title: str, subtitle: str = "", parent=None):
         super().__init__(parent)
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.setLayoutDirection(RTL)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 4, 0, 2)
+        layout.setContentsMargins(0, 2, 0, 2)
         layout.setSpacing(2)
 
-        title_lbl = QLabel(title)
-        title_lbl.setObjectName("label_title")
-        title_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-        layout.addWidget(title_lbl)
+        t = QLabel(title)
+        t.setObjectName("label_title")
+        t.setAlignment(AlignLeft)
+        layout.addWidget(t)
 
         if subtitle:
-            sub_lbl = QLabel(subtitle)
-            sub_lbl.setObjectName("label_subtitle")
-            sub_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-            layout.addWidget(sub_lbl)
+            s = QLabel(subtitle)
+            s.setObjectName("label_subtitle")
+            s.setAlignment(AlignLeft)
+            layout.addWidget(s)
 
 
-# ══════════════════════════════════════════
-#  Group Label — RTL Corrected
-#  Layout: [text] [dot•]  — right to left
-# ══════════════════════════════════════════
+# ══════════════════════════════════════════════════════
+#  GroupLabel  (section divider)
+# ══════════════════════════════════════════════════════
 
 class GroupLabel(QWidget):
-    """Section separator. RTL: dot on right of text (leading indicator)."""
+    """RTL section divider: ● Title ─────────────"""
 
     def __init__(self, text: str, color: str = None, parent=None):
         super().__init__(parent)
-        color = color or COLORS["teal_primary"]
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        color = color or COLORS["accent"]
+        self.setLayoutDirection(RTL)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 8, 0, 4)
+        layout.setContentsMargins(0, 6, 0, 2)
         layout.setSpacing(8)
 
-        # Dot — rightmost (leading in RTL)
         dot = QFrame()
-        dot.setFixedSize(8, 8)
-        dot.setStyleSheet(f"background-color: {color}; border-radius: 4px;")
+        dot.setFixedSize(7, 7)
+        dot.setStyleSheet(
+            f"background:{color}; border-radius:4px; border:none;"
+        )
         layout.addWidget(dot)
 
-        # Label text — right after dot
         lbl = QLabel(text)
         lbl.setStyleSheet(
-            f"color: {color}; font-size: {FONT['sm']}; font-weight: bold;"
-            f"font-family: {FONT['family']}; letter-spacing: 0.5px;"
+            f"color:{color}; font-size:{FONT['xs']}; font-weight:bold;"
+            f"letter-spacing:0.8px; background:transparent;"
         )
-        lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        lbl.setAlignment(AlignLeft)
         layout.addWidget(lbl)
 
-        # Separator line to the left
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
-        line.setStyleSheet(f"color: {COLORS['border']};")
+        line.setStyleSheet(
+            f"color:{COLORS['border']}; background:{COLORS['border']}; max-height:1px; border:none;"
+        )
         layout.addWidget(line)
 
 
-# ══════════════════════════════════════════
-#  Info Row — RTL Corrected
-#  [value (left)] [stretch] [label (right)]
-# ══════════════════════════════════════════
+# ══════════════════════════════════════════════════════
+#  InfoRow
+# ══════════════════════════════════════════════════════
 
 class InfoRow(QWidget):
+    """Label: ─────── Value   (RTL: label right, value left)"""
 
     def __init__(self, label: str, value: str = "—",
                  value_color: str = None, parent=None):
         super().__init__(parent)
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.setLayoutDirection(RTL)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 2, 0, 2)
+        layout.setContentsMargins(0, 3, 0, 3)
         layout.setSpacing(8)
 
-        # Label on right (natural reading position)
-        lbl = QLabel(label)
-        lbl.setObjectName("label_muted")
-        lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        layout.addWidget(lbl)
+        self._lbl = QLabel(label)
+        self._lbl.setObjectName("label_muted")
+        self._lbl.setAlignment(AlignLeft)
+        layout.addWidget(self._lbl)
 
         layout.addStretch()
 
-        # Value on left (number/result on trailing side)
-        val_lbl = QLabel(value)
-        val_lbl.setObjectName("label_value")
+        self._val = QLabel(value)
+        self._val.setObjectName("label_value")
         if value_color:
-            val_lbl.setStyleSheet(
-                f"color: {value_color}; font-size: {FONT['md']};"
-                f"font-weight: bold; font-family: {FONT['family']};"
+            self._val.setStyleSheet(
+                f"color:{value_color}; font-size:{FONT['md']}; font-weight:bold;"
             )
-        val_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        layout.addWidget(val_lbl)
-
-        self.value_lbl = val_lbl
+        self._val.setAlignment(AlignLeft)
+        layout.addWidget(self._val)
 
     def set_value(self, value: str, color: str = None):
-        self.value_lbl.setText(value)
+        self._val.setText(value)
         if color:
-            self.value_lbl.setStyleSheet(
-                f"color: {color}; font-size: {FONT['md']};"
-                f"font-weight: bold; font-family: {FONT['family']};"
+            self._val.setStyleSheet(
+                f"color:{color}; font-size:{FONT['md']}; font-weight:bold;"
             )
 
 
-# ══════════════════════════════════════════
-#  Platforms Scroll Row — RTL Corrected
-# ══════════════════════════════════════════
+# ══════════════════════════════════════════════════════
+#  PlatformsRow  (horizontal scroll of PlatformCards)
+# ══════════════════════════════════════════════════════
 
 class PlatformsRow(QWidget):
     deposit_clicked = pyqtSignal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.setLayoutDirection(RTL)
 
-        scroll = QScrollArea(self)
+        scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setFixedHeight(186)
+        scroll.setFixedHeight(180)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setLayoutDirection(RTL)
 
-        self._container = QWidget()
-        self._container.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        self._layout = QHBoxLayout(self._container)
+        self._inner = QWidget()
+        self._inner.setLayoutDirection(RTL)
+        self._layout = QHBoxLayout(self._inner)
         self._layout.setContentsMargins(0, 4, 0, 4)
-        self._layout.setSpacing(14)
-        # Cards start from the right in RTL
-        self._layout.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self._layout.setSpacing(12)
+        self._layout.setAlignment(AlignLeft)
 
-        scroll.setWidget(self._container)
+        scroll.setWidget(self._inner)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
 
     def load(self, platforms: list):
-        for i in reversed(range(self._layout.count())):
-            w = self._layout.itemAt(i).widget()
-            if w:
-                w.deleteLater()
+        # Clear
+        while self._layout.count():
+            item = self._layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
 
         if not platforms:
             empty = QLabel("لا توجد منصات مضافة")
-            empty.setStyleSheet(
-                f"color: {COLORS['text_muted']}; font-size: {FONT['md']};"
-                f"font-family: {FONT['family']};"
-            )
-            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            empty.setStyleSheet(f"color:{COLORS['text_muted']}; font-size:{FONT['md']};")
+            empty.setAlignment(AlignCenter)
             self._layout.addWidget(empty)
             return
 
@@ -508,11 +514,39 @@ class PlatformsRow(QWidget):
         self._layout.addStretch()
 
 
-# ══════════════════════════════════════════
-#  Divider
-# ══════════════════════════════════════════
+# ══════════════════════════════════════════════════════
+#  Utilities
+# ══════════════════════════════════════════════════════
 
 def make_divider() -> QFrame:
     line = QFrame()
     line.setFrameShape(QFrame.Shape.HLine)
+    line.setStyleSheet(
+        f"color:{COLORS['border']}; background:{COLORS['border']}; max-height:1px; border:none;"
+    )
     return line
+
+
+def make_section_header(title: str, btn_text: str = None,
+                        btn_callback=None) -> QWidget:
+    """Section header row with optional action button."""
+    w = QWidget()
+    w.setLayoutDirection(RTL)
+    row = QHBoxLayout(w)
+    row.setContentsMargins(0, 4, 0, 4)
+    row.setSpacing(12)
+
+    lbl = QLabel(title)
+    lbl.setObjectName("label_title")
+    lbl.setAlignment(AlignLeft)
+    row.addWidget(lbl)
+    row.addStretch()
+
+    if btn_text and btn_callback:
+        btn = QPushButton(btn_text)
+        btn.setObjectName("btn_secondary")
+        btn.setFixedHeight(34)
+        btn.clicked.connect(btn_callback)
+        row.addWidget(btn)
+
+    return w

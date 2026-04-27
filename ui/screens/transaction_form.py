@@ -21,7 +21,7 @@ import database as db
 def field(label_text: str, widget: QWidget) -> QVBoxLayout:
     lbl = QLabel(label_text)
     lbl.setObjectName("label_field")
-    lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+    lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
     box = QVBoxLayout()
     box.setSpacing(6)
     box.addWidget(lbl)
@@ -107,7 +107,7 @@ class DeliveryStatusSelector(QFrame):
         layout.setSpacing(6)
         title = QLabel("تسليم الكاش للعميل:")
         title.setObjectName("label_field")
-        title.setAlignment(Qt.AlignmentFlag.AlignRight)
+        title.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(title)
         layout.addStretch()
         self._btn_no  = self._make_btn("⏳  لم يُسلَّم بعد", False)
@@ -189,7 +189,7 @@ class OutboundTab(QWidget):
             f"color:{COLORS['teal_bright']};font-size:12px;"
             f"background:{COLORS['bg_input']};border-radius:6px;padding:4px 10px;"
         )
-        self.balance_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.balance_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(self.balance_lbl)
 
         # Row 2: Amounts
@@ -219,7 +219,7 @@ class OutboundTab(QWidget):
 
         # Row 3: Customer search — task 11: clean consistent styling
         cust_lbl = QLabel("العميل *"); cust_lbl.setObjectName("label_field")
-        cust_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        cust_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(cust_lbl)
 
         cust_search_row = QHBoxLayout(); cust_search_row.setSpacing(8)
@@ -235,7 +235,7 @@ class OutboundTab(QWidget):
 
         # Row 4: Payment status
         status_lbl = QLabel("حالة الدفع *"); status_lbl.setObjectName("label_field")
-        status_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        status_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(status_lbl)
         self.status_selector = PaymentStatusSelector()
         layout.addWidget(self.status_selector)
@@ -361,7 +361,7 @@ class InboundTab(QWidget):
             f"color:{COLORS['cyan']};background:{COLORS['cyan_bg']};"
             f"border:1px solid {COLORS['border_light']};"
             f"border-radius:8px;padding:8px 14px;font-size:12px;")
-        note.setAlignment(Qt.AlignmentFlag.AlignRight)
+        note.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(note)
 
         row1 = QHBoxLayout(); row1.setSpacing(16)
@@ -400,7 +400,7 @@ class InboundTab(QWidget):
 
         # Customer search
         cust_lbl = QLabel("العميل (مُحوِّل المبلغ)"); cust_lbl.setObjectName("label_field")
-        cust_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        cust_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(cust_lbl)
 
         cust_row = QHBoxLayout(); cust_row.setSpacing(8)
@@ -417,7 +417,7 @@ class InboundTab(QWidget):
         layout.addLayout(field("رقم المرجع", self.ref_input))
 
         self._effect_lbl = QLabel("")
-        self._effect_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self._effect_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.delivery_selector = DeliveryStatusSelector(self._effect_lbl)
         layout.addWidget(self.delivery_selector)
         layout.addWidget(self._effect_lbl)

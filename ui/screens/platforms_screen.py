@@ -62,7 +62,7 @@ class PlatformCard(QWidget):
             f"color: {COLORS['text_primary']}; font-size: {FONT['lg']};"
             f"font-weight: bold; font-family: {FONT['family']};"
         )
-        name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        name_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         header.addWidget(name_lbl)
         header.addStretch()
 
@@ -99,7 +99,7 @@ class PlatformCard(QWidget):
             f"color: {bal_color}; font-size: {FONT['2xl']};"
             f"font-weight: bold; font-family: {FONT['family']};"
         )
-        balance_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        balance_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(balance_lbl)
 
         # Monthly limit for wallet / instapay
@@ -112,7 +112,7 @@ class PlatformCard(QWidget):
                            COLORS["yellow"] if pct >= 70 else COLORS["text_muted"])
             limit_lbl = QLabel(f"متبقي: {remaining:,.0f} / {limit:,.0f} ج")
             limit_lbl.setStyleSheet(f"color: {limit_color}; font-size: {FONT['xs']}; font-family: {FONT['family']};")
-            limit_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+            limit_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
             layout.addWidget(limit_lbl)
 
         layout.addStretch()
@@ -164,7 +164,7 @@ class _CardScrollRow(QWidget):
         self._layout = QHBoxLayout(self._container)
         self._layout.setContentsMargins(0, 4, 0, 4)
         self._layout.setSpacing(12)
-        self._layout.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self._layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         scroll.setWidget(self._container)
 
         root = QVBoxLayout(self)
@@ -231,7 +231,7 @@ class PlatformsScreen(ScreenShell):
         wallets_lbl.setStyleSheet(
             f"color: {COLORS['purple']}; font-size: 13px; font-weight: bold;"
         )
-        wallets_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        wallets_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         c.addWidget(wallets_lbl)
 
         self._wallets_scroll = _CardScrollRow()
@@ -246,7 +246,7 @@ class PlatformsScreen(ScreenShell):
         instapay_lbl.setStyleSheet(
             f"color: {COLORS['cyan']}; font-size: 13px; font-weight: bold;"
         )
-        instapay_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        instapay_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         c.addWidget(instapay_lbl)
 
         self._instapay_scroll = _CardScrollRow()
@@ -344,13 +344,13 @@ class AddPlatformDialog(QDialog):
         title = QLabel("➕  إضافة منصة جديدة")
         title.setObjectName("label_title")
         title.setStyleSheet(f"font-size: 15px; color: {COLORS['text_primary']};")
-        title.setAlignment(Qt.AlignmentFlag.AlignRight)
+        title.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(title)
 
         form = QFormLayout()
         form.setSpacing(12)
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
-        form.setFormAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        form.setFormAlignment(Qt.AlignmentFlag.AlignLeft)
 
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("مثال: فوري، أمان، فودافون كاش")

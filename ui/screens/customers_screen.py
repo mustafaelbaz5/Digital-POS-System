@@ -115,7 +115,7 @@ class CustomersTab(QWidget):
 
         self.total_label = QLabel("")
         self.total_label.setObjectName("label_muted")
-        self.total_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.total_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(self.total_label)
 
     def load_data(self):
@@ -374,12 +374,12 @@ class CustomerDialog(QDialog):
         title = QLabel("تعديل عميل" if self.customer else "➕  إضافة عميل جديد")
         title.setObjectName("label_title")
         title.setStyleSheet(f"font-size: 15px; color: {COLORS['text_primary']};")
-        title.setAlignment(Qt.AlignmentFlag.AlignRight)
+        title.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(title)
 
         form = QFormLayout()
         form.setSpacing(10)
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
 
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("اسم العميل *")
@@ -466,12 +466,12 @@ class GroupDialog(QDialog):
         title = QLabel("تعديل مجموعة" if self.group else "➕  إضافة مجموعة جديدة")
         title.setObjectName("label_title")
         title.setStyleSheet(f"font-size: 15px; color: {COLORS['text_primary']};")
-        title.setAlignment(Qt.AlignmentFlag.AlignRight)
+        title.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(title)
 
         form = QFormLayout()
         form.setSpacing(10)
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
 
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("اسم المجموعة *")
