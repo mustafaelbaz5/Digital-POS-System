@@ -1,195 +1,447 @@
 """
-platforms_screen.py — شاشة إدارة المنصات
-tasks: 4 (instapay), 5 (delete), 6 (daily commission), RTL fixes
+platforms_screen.py — شاشة إدارة المنصات (UI جديد)
+تابات (ماكينات / محافظ / انستا باي) + صفوف جدول بدل كروت
 """
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QDialog, QFormLayout, QLineEdit,
     QComboBox, QMessageBox, QDoubleSpinBox, QFrame,
-    QScrollArea, QSizePolicy, QInputDialog
+    QTabWidget, QInputDialog
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from ui.styles.theme import COLORS, FONT, CARD_RADIUS
-from ui.components.widgets import ScreenShell, SectionTitle, make_divider
+from ui.styles.theme import COLORS, FONT
+from ui.components.widgets import ScreenShell, make_divider
 from utils.formatters import fmt_currency
 
 import database as db
 
 
 # ══════════════════════════════════════════
-#  Platform Card — with delete & commission
+#  Platform Actions Dialog
 # ══════════════════════════════════════════
 
-class PlatformCard(QWidget):
-    deposit_clicked    = pyqtSignal(int)
-    delete_clicked     = pyqtSignal(int)
-    commission_clicked = pyqtSignal(int)
+class PlatformActionsDialog(QDialog):
+    """ديالوج العمليات الخاصة بكل منصة"""
 
     def __init__(self, platform: dict, parent=None):
         super().__init__(parent)
-        self.platform_id = platform["id"]
-        self._build_ui(platform)
-
-    def _build_ui(self, p: dict):
-        self.setObjectName("card")
-        self.setMinimumWidth(210)
-        self.setMaximumWidth(260)
-        self.setMinimumHeight(190)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.platform       = platform
+        self._result_action = None
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.setWindowTitle(f"إجراءات — {platform['name']}")
+        self.setFixedWidth(340)
+        self._build_ui()
 
+    def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 14, 16, 14)
-        layout.setSpacing(8)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(10)
 
+        p      = self.platform
         p_type = p["type"]
-        if p_type == "machine":
-            type_color = COLORS["blue"]
-            type_text  = "ماكينة"
-        elif p_type == "wallet":
-            type_color = COLORS["purple"]
-            type_text  = "محفظة"
-        else:  # instapay
-            type_color = COLORS["cyan"]
-            type_text  = "انستا باي"
 
-        # Header: name RIGHT, badge + delete LEFT
-        header = QHBoxLayout()
+        # ── معلومات المنصة
+        info = QFrame()
+        info.setObjectName("card")
+        il = QVBoxLayout(info)
+        il.setContentsMargins(14, 10, 14, 10)
+        il.setSpacing(4)
+
         name_lbl = QLabel(p["name"])
         name_lbl.setStyleSheet(
-            f"color: {COLORS['text_primary']}; font-size: {FONT['lg']};"
-            f"font-weight: bold; font-family: {FONT['family']};"
+            f"color:{COLORS['text_primary']};font-size:16px;font-weight:bold;"
         )
-        name_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        header.addWidget(name_lbl)
-        header.addStretch()
+        name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        il.addWidget(name_lbl)
 
-        badge = QLabel(f"  {type_text}  ")
-        badge.setStyleSheet(
-            f"color: {type_color}; background: {type_color}22;"
-            f"border: 1px solid {type_color}55; border-radius: 5px;"
-            f"font-size: {FONT['xs']}; font-weight: bold;"
-            f"font-family: {FONT['family']}; padding: 2px 0;"
-        )
-        header.addWidget(badge)
+        bal_color = COLORS["green"] if p.get("balance", 0) > 0 else COLORS["text_muted"]
+        bal_lbl   = QLabel(f"الرصيد الحالي: {fmt_currency(p.get('balance', 0))}")
+        bal_lbl.setStyleSheet(f"color:{bal_color};font-size:13px;font-weight:bold;")
+        bal_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        il.addWidget(bal_lbl)
 
-        del_btn = QPushButton("✕")
-        del_btn.setFixedSize(22, 22)
-        del_btn.setStyleSheet(
-            f"background: {COLORS['red_bg']}; color: {COLORS['red']};"
-            f"border: 1px solid {COLORS['red_border']}; border-radius: 4px;"
-            f"font-size: 10px; font-weight: bold;"
-        )
-        del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        del_btn.clicked.connect(lambda: self.delete_clicked.emit(self.platform_id))
-        header.addWidget(del_btn)
-        layout.addLayout(header)
-
-        # Divider
-        div = QFrame(); div.setFrameShape(QFrame.Shape.HLine)
-        layout.addWidget(div)
-
-        # Balance
-        balance = p.get("balance", 0)
-        bal_color = COLORS["green"] if balance > 0 else COLORS["text_muted"]
-        balance_lbl = QLabel(f"{balance:,.2f} ج")
-        balance_lbl.setStyleSheet(
-            f"color: {bal_color}; font-size: {FONT['2xl']};"
-            f"font-weight: bold; font-family: {FONT['family']};"
-        )
-        balance_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(balance_lbl)
-
-        # Monthly limit for wallet / instapay
         if p_type in ("wallet", "instapay"):
             used      = p.get("monthly_used", 0)
             limit     = p.get("monthly_limit", 200000)
             remaining = limit - used
             pct       = min(100, int(used / limit * 100)) if limit else 0
-            limit_color = (COLORS["red"] if pct >= 90 else
-                           COLORS["yellow"] if pct >= 70 else COLORS["text_muted"])
-            limit_lbl = QLabel(f"متبقي: {remaining:,.0f} / {limit:,.0f} ج")
-            limit_lbl.setStyleSheet(f"color: {limit_color}; font-size: {FONT['xs']}; font-family: {FONT['family']};")
-            limit_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-            layout.addWidget(limit_lbl)
+            lim_color = (COLORS["red"]    if pct >= 90 else
+                         COLORS["yellow"] if pct >= 70 else
+                         COLORS["text_secondary"])
+            lim_lbl = QLabel(f"متبقي من الحد: {fmt_currency(remaining)}  ({pct}%)")
+            lim_lbl.setStyleSheet(f"color:{lim_color};font-size:12px;")
+            lim_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+            il.addWidget(lim_lbl)
+
+        layout.addWidget(info)
+        layout.addWidget(make_divider())
+
+        # ── أزرار الإجراءات حسب النوع
+        for label, color, bg, handler in self._get_actions(p_type):
+            btn = QPushButton(label)
+            btn.setFixedHeight(42)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setStyleSheet(
+                f"background:{bg};color:{color};"
+                f"border:1.5px solid {color};border-radius:8px;"
+                f"font-size:14px;font-weight:bold;padding:4px 16px;"
+            )
+            btn.clicked.connect(handler)
+            layout.addWidget(btn)
+
+        # ── حذف
+        layout.addWidget(make_divider())
+        del_btn = QPushButton("🗑️  حذف المنصة")
+        del_btn.setFixedHeight(38)
+        del_btn.setObjectName("btn_danger")
+        del_btn.clicked.connect(self._delete)
+        layout.addWidget(del_btn)
+
+        close_btn = QPushButton("إغلاق")
+        close_btn.setObjectName("btn_secondary")
+        close_btn.setFixedHeight(36)
+        close_btn.clicked.connect(self.reject)
+        layout.addWidget(close_btn)
+
+    def _get_actions(self, p_type: str) -> list:
+        actions = [
+            ("💰  إيداع للمنصة",
+             COLORS["green"], COLORS["green_bg"], self._deposit),
+        ]
+        if p_type == "machine":
+            actions.append((
+                "📊  تسجيل عمولة يومية",
+                COLORS["yellow"], COLORS["yellow_bg"], self._commission
+            ))
+        if p_type in ("wallet", "instapay"):
+            actions.append((
+                "✏️  تعديل الحد الشهري",
+                COLORS["blue"], COLORS["blue_bg"], self._edit_limit
+            ))
+        return actions
+
+    def _deposit(self):
+        p = self.platform
+        amount, ok = QInputDialog.getDouble(
+            self, "إيداع",
+            f"المبلغ المراد إيداعه في [{p['name']}]:\n"
+            f"الرصيد الحالي: {fmt_currency(p.get('balance', 0))}",
+            min=0.01, decimals=2
+        )
+        if ok and amount > 0:
+            try:
+                db.deposit_to_platform(p["id"], amount)
+                QMessageBox.information(self, "تم ✅", f"تم إيداع {fmt_currency(amount)}")
+                self._result_action = "refresh"
+                self.accept()
+            except Exception as e:
+                QMessageBox.critical(self, "خطأ", str(e))
+
+    def _commission(self):
+        p = self.platform
+        amount, ok = QInputDialog.getDouble(
+            self, "العمولة اليومية",
+            f"مبلغ العمولة لـ [{p['name']}]:\n"
+            f"الرصيد الحالي: {fmt_currency(p.get('balance', 0))}",
+            min=0.01, decimals=2
+        )
+        if ok and amount > 0:
+            try:
+                db.record_daily_commission(p["id"], amount)
+                QMessageBox.information(
+                    self, "تم ✅",
+                    f"تم تسجيل العمولة: {fmt_currency(amount)}\n"
+                    f"خُصمت من [{p['name']}] وأُضيفت للخزينة."
+                )
+                self._result_action = "refresh"
+                self.accept()
+            except Exception as e:
+                QMessageBox.critical(self, "خطأ", str(e))
+
+    def _edit_limit(self):
+        p       = self.platform
+        current = p.get("monthly_limit", 200000)
+        amount, ok = QInputDialog.getDouble(
+            self, "تعديل الحد الشهري",
+            f"الحد الشهري الجديد لـ [{p['name']}]:",
+            value=current, min=0, decimals=2
+        )
+        if ok:
+            try:
+                from database.schema import get_connection
+                with get_connection() as conn:
+                    conn.execute(
+                        "UPDATE platforms SET monthly_limit = ? WHERE id = ?",
+                        (amount, p["id"])
+                    )
+                    conn.commit()
+                QMessageBox.information(self, "تم ✅", f"تم تحديث الحد إلى {fmt_currency(amount)}")
+                self._result_action = "refresh"
+                self.accept()
+            except Exception as e:
+                QMessageBox.critical(self, "خطأ", str(e))
+
+    def _delete(self):
+        p = self.platform
+        if QMessageBox.question(
+            self, "تأكيد الحذف",
+            f"هل تريد حذف [{p['name']}]؟\n"
+            f"الرصيد الحالي: {fmt_currency(p.get('balance', 0))}\n\n"
+            "⚠️ سيتم إخفاؤها من كل القوائم.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        ) == QMessageBox.StandardButton.Yes:
+            db.delete_platform(p["id"])
+            self._result_action = "refresh"
+            self.accept()
+
+
+# ══════════════════════════════════════════
+#  Platform Row
+# ══════════════════════════════════════════
+
+class PlatformRow(QFrame):
+    actions_clicked = pyqtSignal(int)
+
+    def __init__(self, platform: dict, alternate: bool = False, parent=None):
+        super().__init__(parent)
+        self.platform_id = platform["id"]
+        self.setObjectName("platform_row")
+        self.setFixedHeight(52)
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        bg = COLORS["bg_card"] if not alternate else COLORS["bg_elevated"]
+        self.setStyleSheet(
+            f"QFrame#platform_row {{ background:{bg};"
+            f"border-bottom:1px solid {COLORS['border']}; }}"
+        )
+        self._build(platform)
+
+    def _build(self, p: dict):
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(16, 0, 16, 0)
+        layout.setSpacing(0)
+
+        p_type = p["type"]
+
+        # اسم المنصة (يمين)
+        name_lbl = QLabel(p["name"])
+        name_lbl.setStyleSheet(
+            f"color:{COLORS['text_primary']};font-size:14px;font-weight:bold;"
+            f"background:transparent;border:none;"
+        )
+        name_lbl.setFixedWidth(180)
+        name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(name_lbl)
 
         layout.addStretch()
 
-        # Action buttons
-        btns = QHBoxLayout(); btns.setSpacing(6)
-
-        dep_btn = QPushButton("إيداع +")
-        dep_btn.setObjectName("btn_ghost")
-        dep_btn.setFixedHeight(28)
-        dep_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        dep_btn.clicked.connect(lambda: self.deposit_clicked.emit(self.platform_id))
-        btns.addWidget(dep_btn)
-
-        # Daily commission — machines only (task 6)
-        if p_type == "machine":
-            comm_btn = QPushButton("عمولة يومية")
-            comm_btn.setObjectName("btn_ghost")
-            comm_btn.setFixedHeight(28)
-            comm_btn.setStyleSheet(
-                f"color: {COLORS['yellow']}; border-color: {COLORS['yellow_border']};"
-                f"background: {COLORS['yellow_bg']};"
+        # الحد المتبقي (للمحافظ وانستا باي فقط)
+        if p_type in ("wallet", "instapay"):
+            used      = p.get("monthly_used", 0)
+            limit     = p.get("monthly_limit", 200000)
+            remaining = limit - used
+            pct       = min(100, int(used / limit * 100)) if limit else 0
+            lim_color = (COLORS["red"]    if pct >= 90 else
+                         COLORS["yellow"] if pct >= 70 else
+                         COLORS["text_secondary"])
+            lim_lbl = QLabel(f"متبقي: {fmt_currency(remaining)}")
+            lim_lbl.setStyleSheet(
+                f"color:{lim_color};font-size:12px;"
+                f"background:transparent;border:none;"
             )
-            comm_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            comm_btn.clicked.connect(lambda: self.commission_clicked.emit(self.platform_id))
-            btns.addWidget(comm_btn)
+            lim_lbl.setFixedWidth(190)
+            lim_lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+            layout.addWidget(lim_lbl)
+            layout.addStretch()
 
-        layout.addLayout(btns)
+        # الرصيد (وسط)
+        balance   = p.get("balance", 0)
+        bal_color = COLORS["green"] if balance > 0 else COLORS["text_muted"]
+        bal_lbl   = QLabel(fmt_currency(balance))
+        bal_lbl.setStyleSheet(
+            f"color:{bal_color};font-size:15px;font-weight:bold;"
+            f"background:transparent;border:none;"
+        )
+        bal_lbl.setFixedWidth(160)
+        bal_lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(bal_lbl)
+
+        # زرار الإجراءات (يسار)
+        act_btn = QPushButton("⋮  إجراءات")
+        act_btn.setFixedHeight(30)
+        act_btn.setFixedWidth(100)
+        act_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        act_btn.setStyleSheet(
+            f"background:{COLORS['bg_input']};color:{COLORS['text_secondary']};"
+            f"border:1px solid {COLORS['border']};border-radius:6px;"
+            f"font-size:13px;padding:2px 10px;"
+        )
+        act_btn.clicked.connect(lambda: self.actions_clicked.emit(self.platform_id))
+        layout.addWidget(act_btn)
 
 
 # ══════════════════════════════════════════
-#  Card Scroll Row
+#  Platform List Tab
 # ══════════════════════════════════════════
 
-class _CardScrollRow(QWidget):
-    deposit_clicked    = pyqtSignal(int)
-    delete_clicked     = pyqtSignal(int)
-    commission_clicked = pyqtSignal(int)
+class PlatformListTab(QWidget):
+    refreshed = pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, p_type: str, parent=None):
         super().__init__(parent)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFixedHeight(210)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.p_type = p_type
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self._build_ui()
 
-        self._container = QWidget()
-        self._layout = QHBoxLayout(self._container)
-        self._layout.setContentsMargins(0, 4, 0, 4)
-        self._layout.setSpacing(12)
-        self._layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        scroll.setWidget(self._container)
+    def _build_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        root = QVBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 0)
-        root.addWidget(scroll)
+        # ── شريط الترتيب
+        sort_bar = QFrame()
+        sort_bar.setFixedHeight(38)
+        sort_bar.setStyleSheet(
+            f"background:{COLORS['bg_card']};"
+            f"border-bottom:1px solid {COLORS['border']};"
+        )
+        sb = QHBoxLayout(sort_bar)
+        sb.setContentsMargins(16, 0, 16, 0)
+        sb.setSpacing(6)
+        sb.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        sort_lbl = QLabel("ترتيب:")
+        sort_lbl.setStyleSheet(f"color:{COLORS['text_muted']};font-size:12px;background:transparent;border:none;")
+        sb.addWidget(sort_lbl)
+
+        self._sort_mode = "default"   # default | balance_desc | limit_asc | limit_desc
+
+        sort_options = [
+            ("الافتراضي",        "default"),
+            ("الرصيد ↓",         "balance_desc"),
+            ("الحد المتبقي ↓",   "limit_desc"),
+            ("الحد المتبقي ↑",   "limit_asc"),
+        ]
+        self._sort_btns = {}
+        for label, mode in sort_options:
+            btn = QPushButton(label)
+            btn.setFixedHeight(26)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda _, m=mode: self._set_sort(m))
+            self._sort_btns[mode] = btn
+            sb.addWidget(btn)
+
+        sb.addStretch()
+        layout.addWidget(sort_bar)
+        self._apply_sort_styles()
+
+        # ── هيدر الأعمدة
+        header = QFrame()
+        header.setFixedHeight(34)
+        header.setStyleSheet(
+            f"background:{COLORS['bg_dark']};"
+            f"border-bottom:2px solid {COLORS['border']};"
+        )
+        header.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        hl = QHBoxLayout(header)
+        hl.setContentsMargins(16, 0, 16, 0)
+        hl.setSpacing(0)
+
+        def hdr(text, width=None, align=Qt.AlignmentFlag.AlignRight):
+            lbl = QLabel(text)
+            lbl.setStyleSheet(
+                f"color:{COLORS['text_muted']};font-size:11px;"
+                f"font-weight:bold;background:transparent;border:none;"
+            )
+            lbl.setAlignment(align | Qt.AlignmentFlag.AlignVCenter)
+            if width:
+                lbl.setFixedWidth(width)
+            return lbl
+
+        hl.addWidget(hdr("اسم المنصة", 180))
+        hl.addStretch()
+
+        if self.p_type in ("wallet", "instapay"):
+            hl.addWidget(hdr("المتبقي من الحد", 190))
+            hl.addStretch()
+
+        hl.addWidget(hdr("الرصيد الحالي", 160, Qt.AlignmentFlag.AlignLeft))
+        hl.addWidget(hdr("إجراءات", 100))
+        layout.addWidget(header)
+
+        # منطقة الصفوف
+        self._rows_widget = QWidget()
+        self._rows_widget.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self._rows_layout = QVBoxLayout(self._rows_widget)
+        self._rows_layout.setContentsMargins(0, 0, 0, 0)
+        self._rows_layout.setSpacing(0)
+
+        layout.addWidget(self._rows_widget)
+        layout.addStretch()
+
+    def _set_sort(self, mode: str):
+        self._sort_mode = mode
+        self._apply_sort_styles()
+        if hasattr(self, "_platforms_data"):
+            self.load(self._platforms_data)
+
+    def _apply_sort_styles(self):
+        for mode, btn in self._sort_btns.items():
+            active = (mode == self._sort_mode)
+            btn.setStyleSheet(
+                f"background:{COLORS['blue_bg']};color:{COLORS['blue']};"
+                f"border:1px solid {COLORS['blue']};border-radius:5px;"
+                f"font-size:12px;padding:2px 8px;"
+                if active else
+                f"background:{COLORS['bg_input']};color:{COLORS['text_muted']};"
+                f"border:1px solid {COLORS['border']};border-radius:5px;"
+                f"font-size:12px;padding:2px 8px;"
+            )
+
+    def _sorted(self, platforms: list) -> list:
+        if self._sort_mode == "balance_desc":
+            return sorted(platforms, key=lambda p: p.get("balance", 0), reverse=True)
+        elif self._sort_mode == "limit_desc":
+            return sorted(platforms,
+                key=lambda p: p.get("monthly_limit", 0) - p.get("monthly_used", 0),
+                reverse=True)
+        elif self._sort_mode == "limit_asc":
+            return sorted(platforms,
+                key=lambda p: p.get("monthly_limit", 0) - p.get("monthly_used", 0))
+        return platforms
 
     def load(self, platforms: list):
-        for i in reversed(range(self._layout.count())):
-            w = self._layout.itemAt(i).widget()
-            if w: w.deleteLater()
+        self._platforms_data = platforms          # حفظ للـ re-sort
+        platforms = self._sorted(platforms)
+
+        # مسح القديم
+        while self._rows_layout.count():
+            item = self._rows_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
 
         if not platforms:
-            lbl = QLabel("لا توجد منصات في هذه الفئة")
-            lbl.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 12px;")
-            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._layout.addWidget(lbl)
+            empty = QLabel("لا توجد منصات في هذه الفئة")
+            empty.setStyleSheet(
+                f"color:{COLORS['text_muted']};font-size:13px;padding:28px;"
+            )
+            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._rows_layout.addWidget(empty)
             return
 
-        for p in platforms:
-            card = PlatformCard(p)
-            card.deposit_clicked.connect(self.deposit_clicked.emit)
-            card.delete_clicked.connect(self.delete_clicked.emit)
-            card.commission_clicked.connect(self.commission_clicked.emit)
-            self._layout.addWidget(card)
-        self._layout.addStretch()
+        for i, p in enumerate(platforms):
+            row = PlatformRow(p, alternate=(i % 2 == 1))
+            row.actions_clicked.connect(self._open_actions)
+            self._rows_layout.addWidget(row)
+
+    def _open_actions(self, platform_id: int):
+        platform = db.get_platform_by_id(platform_id)
+        if not platform:
+            return
+        dialog = PlatformActionsDialog(platform, self)
+        if dialog.exec() and dialog._result_action == "refresh":
+            self.refreshed.emit()
 
 
 # ══════════════════════════════════════════
@@ -203,123 +455,42 @@ class PlatformsScreen(ScreenShell):
         self._build_content()
 
     def _build_content(self):
-        add_btn = QPushButton("+ إضافة منصة")
+        add_btn = QPushButton("＋  إضافة منصة")
         add_btn.setObjectName("btn_primary")
-        add_btn.clicked.connect(self._add_platform) # type: ignore
+        add_btn.setFixedHeight(36)
+        add_btn.clicked.connect(self._add_platform)
         self.add_action(add_btn)
 
         c = self.content()
+        c.setContentsMargins(0, 0, 0, 0)
+        c.setSpacing(0)
 
-        # ── Machines section
-        machines_lbl = QLabel("⚙️  الماكينات")
-        machines_lbl.setStyleSheet(
-            f"color: {COLORS['blue']}; font-size: 13px; font-weight: bold;"
-        )
-        machines_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        c.addWidget(machines_lbl)
+        self.tabs = QTabWidget()
+        self.tabs.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
 
-        self._machines_scroll = _CardScrollRow()
-        self._machines_scroll.deposit_clicked.connect(self._deposit_to_platform)
-        self._machines_scroll.delete_clicked.connect(self._delete_platform)
-        self._machines_scroll.commission_clicked.connect(self._daily_commission)
-        c.addWidget(self._machines_scroll)
+        self._tab_machines = PlatformListTab("machine")
+        self._tab_machines.refreshed.connect(self.refresh)
+        self.tabs.addTab(self._tab_machines, "🏧  الماكينات")
 
-        c.addWidget(make_divider())
+        self._tab_wallets = PlatformListTab("wallet")
+        self._tab_wallets.refreshed.connect(self.refresh)
+        self.tabs.addTab(self._tab_wallets, "💳  المحافظ")
 
-        # ── Wallets section
-        wallets_lbl = QLabel("💳  المحافظ الإلكترونية")
-        wallets_lbl.setStyleSheet(
-            f"color: {COLORS['purple']}; font-size: 13px; font-weight: bold;"
-        )
-        wallets_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        c.addWidget(wallets_lbl)
+        self._tab_instapay = PlatformListTab("instapay")
+        self._tab_instapay.refreshed.connect(self.refresh)
+        self.tabs.addTab(self._tab_instapay, "🔷  انستا باي")
 
-        self._wallets_scroll = _CardScrollRow()
-        self._wallets_scroll.deposit_clicked.connect(self._deposit_to_platform)
-        self._wallets_scroll.delete_clicked.connect(self._delete_platform)
-        c.addWidget(self._wallets_scroll)
-
-        c.addWidget(make_divider())
-
-        # ── Instapay section (task 4)
-        instapay_lbl = QLabel("🔷  انستا باي")
-        instapay_lbl.setStyleSheet(
-            f"color: {COLORS['cyan']}; font-size: 13px; font-weight: bold;"
-        )
-        instapay_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        c.addWidget(instapay_lbl)
-
-        self._instapay_scroll = _CardScrollRow()
-        self._instapay_scroll.deposit_clicked.connect(self._deposit_to_platform)
-        self._instapay_scroll.delete_clicked.connect(self._delete_platform)
-        c.addWidget(self._instapay_scroll)
-
-        c.addStretch()
+        c.addWidget(self.tabs)
 
     def refresh(self):
         platforms = db.get_all_platforms()
-        machines  = [p for p in platforms if p["type"] == "machine"]
-        wallets   = [p for p in platforms if p["type"] == "wallet"]
-        instapay  = [p for p in platforms if p["type"] == "instapay"]
-        self._machines_scroll.load(machines)
-        self._wallets_scroll.load(wallets)
-        self._instapay_scroll.load(instapay)
+        self._tab_machines.load([p for p in platforms if p["type"] == "machine"])
+        self._tab_wallets.load( [p for p in platforms if p["type"] == "wallet"])
+        self._tab_instapay.load([p for p in platforms if p["type"] == "instapay"])
 
     def _add_platform(self):
         if AddPlatformDialog(self).exec():
             self.refresh()
-
-    def _deposit_to_platform(self, platform_id: int):
-        platform = db.get_platform_by_id(platform_id)
-        if not platform: return
-        amount, ok = QInputDialog.getDouble(
-            self, "إيداع",
-            f"المبلغ المراد إيداعه في [{platform['name']}]:",
-            min=0.01, decimals=2
-        )
-        if ok and amount > 0:
-            try:
-                db.deposit_to_platform(platform_id, amount)
-                self.refresh()
-                QMessageBox.information(self, "تم ", f"تم الإيداع  {fmt_currency(amount)}")
-            except Exception as e:
-                QMessageBox.critical(self, "خطأ", str(e))
-
-    def _delete_platform(self, platform_id: int):
-        """task 5: soft-delete with confirmation"""
-        platform = db.get_platform_by_id(platform_id)
-        if not platform: return
-        if QMessageBox.question(
-            self, "تأكيد الحذف",
-            f"هل تريد حذف المنصة [{platform['name']}]؟\n"
-            f"رصيدها الحالي: {fmt_currency(platform.get('balance', 0))}\n\n"
-            "⚠️ سيتم إخفاؤها من كل القوائم.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        ) == QMessageBox.StandardButton.Yes:
-            db.delete_platform(platform_id)
-            self.refresh()
-
-    def _daily_commission(self, platform_id: int):
-        """task 6: daily commission for machines"""
-        platform = db.get_platform_by_id(platform_id)
-        if not platform: return
-        amount, ok = QInputDialog.getDouble(
-            self, "العمولة اليومية",
-            f"أدخل مبلغ العمولة لـ [{platform['name']}]:\n"
-            f"(رصيد الماكينة: {fmt_currency(platform.get('balance', 0))})",
-            min=0.01, decimals=2
-        )
-        if ok and amount > 0:
-            try:
-                db.record_daily_commission(platform_id, amount)
-                self.refresh()
-                QMessageBox.information(
-                    self, "تم ",
-                    f"تم تسجيل العمولة اليومية: {fmt_currency(amount)}\n"
-                    f"تم خصمها من [{platform['name']}] وإضافتها للخزينة."
-                )
-            except Exception as e:
-                QMessageBox.critical(self, "خطأ", str(e))
 
 
 # ══════════════════════════════════════════
@@ -332,8 +503,7 @@ class AddPlatformDialog(QDialog):
         super().__init__(parent)
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.setWindowTitle("إضافة منصة جديدة")
-        self.setMinimumWidth(400)
-        self.setMinimumHeight(320)
+        self.setFixedWidth(400)
         self._build_ui()
 
     def _build_ui(self):
@@ -342,24 +512,24 @@ class AddPlatformDialog(QDialog):
         layout.setSpacing(16)
 
         title = QLabel("➕  إضافة منصة جديدة")
-        title.setObjectName("label_title")
-        title.setStyleSheet(f"font-size: 15px; color: {COLORS['text_primary']};")
-        title.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        title.setStyleSheet(
+            f"font-size:15px;color:{COLORS['text_primary']};font-weight:bold;"
+        )
+        title.setAlignment(Qt.AlignmentFlag.AlignRight)
         layout.addWidget(title)
 
         form = QFormLayout()
         form.setSpacing(12)
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
-        form.setFormAlignment(Qt.AlignmentFlag.AlignLeft)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("مثال: فوري، أمان، فودافون كاش")
         form.addRow("اسم المنصة *:", self.name_input)
 
         self.type_combo = QComboBox()
-        self.type_combo.addItem("ماكينة", "machine")
-        self.type_combo.addItem("محفظة إلكترونية", "wallet")
-        self.type_combo.addItem("انستا باي", "instapay")
+        self.type_combo.addItem("🏧  ماكينة",           "machine")
+        self.type_combo.addItem("💳  محفظة إلكترونية", "wallet")
+        self.type_combo.addItem("🔷  انستا باي",         "instapay")
         self.type_combo.currentIndexChanged.connect(self._on_type_changed)
         form.addRow("النوع:", self.type_combo)
 
@@ -369,56 +539,58 @@ class AddPlatformDialog(QDialog):
         self.balance_input.setSuffix("  ج")
         form.addRow("الرصيد الابتدائي:", self.balance_input)
 
-        self.limit_input = QDoubleSpinBox()
+        self._limit_label = QLabel("الحد الشهري:")
+        self.limit_input  = QDoubleSpinBox()
         self.limit_input.setRange(0, 10_000_000)
         self.limit_input.setDecimals(2)
         self.limit_input.setSuffix("  ج")
         self.limit_input.setValue(200000)
-        self._limit_row_label = QLabel("الحد الشهري:")
-        form.addRow(self._limit_row_label, self.limit_input)
+        form.addRow(self._limit_label, self.limit_input)
 
         layout.addLayout(form)
         layout.addStretch()
 
-        btns = QHBoxLayout(); btns.setSpacing(8)
+        btns = QHBoxLayout()
+        btns.setSpacing(8)
         cancel = QPushButton("إلغاء")
         cancel.setObjectName("btn_secondary")
         cancel.clicked.connect(self.reject)
-        btns.addWidget(cancel)
-
-        save = QPushButton("إضافة ")
+        save = QPushButton("إضافة ✅")
         save.setObjectName("btn_primary")
         save.clicked.connect(self._save)
+        btns.addWidget(cancel)
         btns.addWidget(save)
         layout.addLayout(btns)
 
         self._on_type_changed(0)
 
-    def _on_type_changed(self, idx):
+    def _on_type_changed(self, _):
         p_type = self.type_combo.currentData()
         if p_type == "machine":
             self.limit_input.setEnabled(False)
             self.limit_input.setValue(0)
-            self._limit_row_label.setStyleSheet(f"color: {COLORS['text_muted']};")
+            self._limit_label.setStyleSheet(f"color:{COLORS['text_muted']};")
         elif p_type == "instapay":
             self.limit_input.setEnabled(True)
             self.limit_input.setValue(400000)
-            self._limit_row_label.setStyleSheet("")
+            self._limit_label.setStyleSheet("")
         else:
             self.limit_input.setEnabled(True)
             self.limit_input.setValue(200000)
-            self._limit_row_label.setStyleSheet("")
+            self._limit_label.setStyleSheet("")
 
     def _save(self):
         name = self.name_input.text().strip()
         if not name:
             QMessageBox.warning(self, "تنبيه", "اسم المنصة مطلوب")
             return
-        p_type = self.type_combo.currentData()
-        balance = self.balance_input.value()
-        limit   = self.limit_input.value()
         try:
-            db.add_platform(name, p_type, balance, limit)
+            db.add_platform(
+                name,
+                self.type_combo.currentData(),
+                self.balance_input.value(),
+                self.limit_input.value()
+            )
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "خطأ", str(e))

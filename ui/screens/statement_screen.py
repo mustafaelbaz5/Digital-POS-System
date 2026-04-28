@@ -115,7 +115,7 @@ class TransactionActionDialog(QDialog):
             )
             self._add_status_btn(
                 layout,
-                label   = "  تم السداد",
+                label   = "✅  تم السداد",
                 active  = (status == "paid"),
                 color   = COLORS["green"],
                 bg      = COLORS["green_bg"],
@@ -134,7 +134,7 @@ class TransactionActionDialog(QDialog):
             )
             self._add_status_btn(
                 layout,
-                label   = "  تم التسليم",
+                label   = "✅  تم التسليم",
                 active  = delivered,
                 color   = COLORS["green"],
                 bg      = COLORS["green_bg"],
@@ -194,15 +194,15 @@ class TransactionActionDialog(QDialog):
 # ══════════════════════════════════════════
 
 def make_txn_actions(t: dict, on_status_change, on_delete) -> QWidget:
-    """زرار واحد ⋮ يفتح TransactionActionDialog"""
+    """زرار واحد ⋮ يفتح TransactionActionDialog — نفس شكل زرار المنصات"""
     cont   = QWidget()
     layout = QHBoxLayout(cont)
-    layout.setContentsMargins(4, 2, 4, 2)
+    layout.setContentsMargins(4, 4, 4, 4)
     layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
     btn = QPushButton("⋮  إجراءات")
-    btn.setFixedHeight(28)
-    btn.setMinimumWidth(80)
+    btn.setFixedHeight(30)
+    btn.setFixedWidth(100)
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
     btn.setStyleSheet(
         f"background:{COLORS['bg_input']};color:{COLORS['text_secondary']};"
@@ -210,12 +210,11 @@ def make_txn_actions(t: dict, on_status_change, on_delete) -> QWidget:
         f"font-size:13px;padding:2px 10px;"
     )
 
-    def _open_dialog():
-        parent_widget = cont.window()
-        dialog = TransactionActionDialog(t, on_status_change, on_delete, parent_widget)
+    def _open():
+        dialog = TransactionActionDialog(t, on_status_change, on_delete, cont.window())
         dialog.exec()
 
-    btn.clicked.connect(_open_dialog)
+    btn.clicked.connect(_open)
     layout.addWidget(btn)
     return cont
 
@@ -369,7 +368,7 @@ class CustomerStatementDialog(QDialog):
         for key, label, color in [
             ("all",     "الكل 📋",  COLORS["text_secondary"]),
             ("pending", "مؤجل ⏳",  COLORS["yellow"]),
-            ("paid",    "مسدد ",  COLORS["green"]),
+            ("paid",    "مسدد ✅",  COLORS["green"]),
             ("cash",    "نقدي 💵",  COLORS["blue"]),
             ("inbound", "وارد 📥",  COLORS["purple"]),
         ]:
@@ -447,7 +446,7 @@ class CustomerStatementDialog(QDialog):
 
             if op == "inbound":
                 delivered = bool(t.get("is_delivered", 0))
-                self.table.set_cell(row, 7, " تم" if delivered else "⏳ لا",
+                self.table.set_cell(row, 7, "✅ تم" if delivered else "⏳ لا",
                                     color=COLORS["green"] if delivered else COLORS["yellow"])
             else:
                 self.table.set_cell(row, 7, "—", color=COLORS["text_muted"])
@@ -526,7 +525,7 @@ class CustomerStatementDialog(QDialog):
             try:
                 db.delete_transaction(tid)
                 self._refresh_all()
-                QMessageBox.information(self, "تم ", "تم حذف العملية وعكس تأثيرها المالي")
+                QMessageBox.information(self, "تم ✅", "تم حذف العملية وعكس تأثيرها المالي")
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
@@ -540,7 +539,7 @@ class CustomerStatementDialog(QDialog):
         ) == QMessageBox.StandardButton.Yes:
             deleted = db.cleanup_paid_transactions(self.customer_id)
             self._refresh_all()
-            QMessageBox.information(self, "تم ", f"تم حذف {deleted} عملية مسددة")
+            QMessageBox.information(self, "تم ✅", f"تم حذف {deleted} عملية مسددة")
 
     def _open_customer_facing(self):
         dlg = CustomerFacingStatementDialog(self.customer_id, self)
@@ -551,7 +550,7 @@ class CustomerStatementDialog(QDialog):
             self, "حفظ كصورة", f"كشف_{self._data['customer']['name']}.png", "PNG (*.png)")
         if path:
             self.grab().save(path, "PNG")
-            QMessageBox.information(self, "تم ", f"تم حفظ الصورة:\n{path}")
+            QMessageBox.information(self, "تم ✅", f"تم حفظ الصورة:\n{path}")
 
     def _export_pdf(self):
         from PyQt6.QtPrintSupport import QPrinter
@@ -564,7 +563,7 @@ class CustomerStatementDialog(QDialog):
             printer.setOutputFileName(path)
             painter = QPainter(printer)
             self.render(painter); painter.end()
-            QMessageBox.information(self, "تم ", f"تم حفظ PDF:\n{path}")
+            QMessageBox.information(self, "تم ✅", f"تم حفظ PDF:\n{path}")
 
 
 # ══════════════════════════════════════════
@@ -639,7 +638,7 @@ class CustomerFacingStatementDialog(QDialog):
             layout.addWidget(self._make_txn_table(due_txns, "due"))
 
         if not pending_txns and not due_txns:
-            empty = QLabel("  لا توجد مبالغ مستحقة عليك أو لك")
+            empty = QLabel("✅  لا توجد مبالغ مستحقة عليك أو لك")
             empty.setStyleSheet(f"color:{COLORS['green']};font-size:14px;background:{COLORS['green_bg']};border-radius:8px;padding:12px;")
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(empty)
@@ -713,7 +712,7 @@ class CustomerFacingStatementDialog(QDialog):
             self, "حفظ كصورة", f"كشف_{self._data['customer']['name']}.png", "PNG (*.png)")
         if path:
             self.grab().save(path, "PNG")
-            QMessageBox.information(self, "تم ", f"تم حفظ الصورة:\n{path}")
+            QMessageBox.information(self, "تم ✅", f"تم حفظ الصورة:\n{path}")
 
 
 # ══════════════════════════════════════════
@@ -780,4 +779,4 @@ class GroupReportDialog(QDialog):
             self, "حفظ كصورة", "تقرير_المجموعة.png", "PNG (*.png)")
         if path:
             self.grab().save(path, "PNG")
-            QMessageBox.information(self, "تم ", f"تم حفظ الصورة:\n{path}")
+            QMessageBox.information(self, "تم ✅", f"تم حفظ الصورة:\n{path}")

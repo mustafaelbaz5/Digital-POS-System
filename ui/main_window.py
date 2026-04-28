@@ -50,6 +50,7 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._navigate("dashboard")
+        self.showMaximized()
 
     def _build_ui(self):
         central = QWidget()

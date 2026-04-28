@@ -6,7 +6,8 @@ Refactored: ScreenShell, fixed heavy query in inventory, cleaner layout
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QTabWidget, QFrame, QDateEdit,
-    QComboBox, QMessageBox, QGridLayout, QSizePolicy
+    QComboBox, QMessageBox, QGridLayout, QSizePolicy,
+    QLineEdit
 )
 from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QFont
@@ -271,7 +272,7 @@ class InventoryTab(QWidget):
             self._match_breakdown.setText(breakdown)
 
         if abs(diff) < 0.01:
-            self._match_result.setText("  متطابق")
+            self._match_result.setText("✅  متطابق")
             self._match_result.setStyleSheet(
                 f"border-radius: 8px; padding: 6px 10px;"
                 f"background: {COLORS['green_bg']}; color: {COLORS['green']};"
@@ -340,6 +341,40 @@ class TransactionsLogTab(QWidget):
         layout.setContentsMargins(0, 12, 0, 0)
         layout.setSpacing(10)
 
+        # ── شريط البحث بالمرجع
+        ref_frame = QFrame()
+        ref_frame.setObjectName("card")
+        rl = QHBoxLayout(ref_frame)
+        rl.setContentsMargins(14, 8, 14, 8)
+        rl.setSpacing(8)
+
+        ref_search_btn = QPushButton("🔍  بحث بالمرجع")
+        ref_search_btn.setObjectName("btn_secondary")
+        ref_search_btn.setFixedHeight(32)
+        ref_search_btn.clicked.connect(self._search_by_ref)
+        rl.addWidget(ref_search_btn)
+
+        clear_btn = QPushButton("✕  مسح")
+        clear_btn.setObjectName("btn_secondary")
+        clear_btn.setFixedHeight(32)
+        clear_btn.clicked.connect(self._clear_ref_search)
+        rl.addWidget(clear_btn)
+
+        rl.addStretch()
+
+        ref_lbl = QLabel("رقم المرجع / رقم العملية:")
+        ref_lbl.setObjectName("label_muted")
+        rl.addWidget(ref_lbl)
+
+        self.ref_input = QLineEdit()
+        self.ref_input.setPlaceholderText("ابحث برقم المرجع أو رقم العملية...")
+        self.ref_input.setFixedHeight(100)
+        self.ref_input.setFixedWidth(280)
+        self.ref_input.returnPressed.connect(self._search_by_ref)
+        rl.addWidget(self.ref_input)
+
+        layout.addWidget(ref_frame)
+
         # ── Filter bar
         filter_frame = QFrame()
         filter_frame.setObjectName("card")
@@ -360,9 +395,8 @@ class TransactionsLogTab(QWidget):
         self.status_filter.setFixedHeight(100)
         self.status_filter.setMinimumWidth(110)
         self.status_filter.addItem("كل الحالات", None)
-        # cash removed from UI — kept in DB for legacy data
         self.status_filter.addItem("⏳ مؤجل",    "pending")
-        self.status_filter.addItem(" مسدد",    "paid")
+        self.status_filter.addItem("مسدد",    "paid")
         fl.addWidget(self.status_filter)
 
         # Type
@@ -404,8 +438,8 @@ class TransactionsLogTab(QWidget):
             ("المصروف",        100),
             ("المطلوب",        100),
             ("الربح",           -1),
-            ("المرجع",         105),
-            ("الحالة",          -1),
+            ("المرجع",         -1),
+            ("الحالة",          120),
             ("إجراءات",       200),
         ]
         self.table = DataTable(columns)
@@ -431,7 +465,7 @@ class TransactionsLogTab(QWidget):
         self.platform_filter.blockSignals(False)
 
     def load_data(self):
-        date_from   = self.date_from.date().toString("yyyy-MM-dd")
+        date_from   = self.date_from.date().toString("yyyy-MM-dd") # type: ignore
         date_to     = self.date_to.date().toString("yyyy-MM-dd")
         status      = self.status_filter.currentData()
         platform_id = self.platform_filter.currentData()
@@ -472,7 +506,7 @@ class TransactionsLogTab(QWidget):
             self.table.set_cell(row, 7, fmt_currency(profit),
                 color=COLORS["green"] if profit >= 0 else COLORS["red"])
             ref = "🃏 كارت" if t.get("is_card") else (t.get("reference_no") or "—")
-            self.table.set_cell(row, 8, ref, color=COLORS["bg_dark"])
+            self.table.set_cell(row, 8, ref, color=COLORS["text_muted"])
             self.table.add_status_badge(
                 row, 9,
                 t.get("payment_status", ""),
@@ -491,6 +525,17 @@ class TransactionsLogTab(QWidget):
         )
         self.summary_lbl.setStyleSheet(f"color: {p_color}; font-size: 11px;")
 
+    def _search_by_ref(self):
+        ref = self.ref_input.text().strip()
+        if not ref:
+            return
+        txns = db.search_by_reference(ref)
+        self._render(txns)
+
+    def _clear_ref_search(self):
+        self.ref_input.clear()
+        self.load_data()
+
     def _on_status_change(self, tid: int, new_status: str):
         # الديالوج خلاص سأل المستخدم — ننفذ مباشرة بدون سؤال تاني
         try:
@@ -507,7 +552,7 @@ class TransactionsLogTab(QWidget):
             try:
                 db.delete_transaction(tid)
                 self.load_data()
-                QMessageBox.information(self, "تم ", "تم حذف العملية")
+                QMessageBox.information(self, "تم ✅", "تم حذف العملية")
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
@@ -643,7 +688,7 @@ class CleanupTab(QWidget):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         ) == QMessageBox.StandardButton.Yes:
             deleted = db.cleanup_paid_transactions(cid)
-            QMessageBox.information(self, "تم ", f"تم حذف {deleted} عملية مسددة")
+            QMessageBox.information(self, "تم ✅", f"تم حذف {deleted} عملية مسددة")
             self._refresh_stat()
 
     def _cleanup_all(self):
@@ -659,7 +704,7 @@ class CleanupTab(QWidget):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             ) == QMessageBox.StandardButton.Yes:
                 deleted = db.cleanup_paid_transactions()
-                QMessageBox.information(self, "تم ", f"تم حذف {deleted} عملية مسددة")
+                QMessageBox.information(self, "تم ✅", f"تم حذف {deleted} عملية مسددة")
                 self._refresh_stat()
 
 
