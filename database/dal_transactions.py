@@ -88,18 +88,13 @@ def add_outbound_transaction(
                 )
 
             # 4. تحديث حسب حالة الدفع
-            if payment_status == "cash":
-                # إضافة للخزينة النقدية
-                conn.execute(
-                    "UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1",
-                    (amount_required,)
-                )
-            elif payment_status == "pending" and customer_id:
-                # إضافة لمديونية العميل
+            if payment_status == "pending" and customer_id:
+                # مؤجل → يضاف للمديونية
                 conn.execute(
                     "UPDATE customers SET total_debt = total_debt + ? WHERE id = ?",
                     (amount_required, customer_id)
                 )
+            # paid → تم السداد مباشرة، لا يضاف للمديونية ولا للكاش
 
             conn.commit()
             return transaction_id
@@ -279,9 +274,9 @@ def get_transactions(
             SELECT
                 t.id, t.created_at, t.operation_type, t.service_name,
                 t.amount_spent, t.amount_required, t.profit,
-                t.reference_no, t.is_card, t.payment_status, t.notes,
-                p.name  AS platform_name, p.type AS platform_type,
-                c.name  AS customer_name
+                t.reference_no, t.is_card, t.payment_status, t.is_delivered,
+                t.notes, p.name AS platform_name, p.type AS platform_type,
+                c.name AS customer_name, t.customer_id
             FROM transactions t
             JOIN platforms p ON p.id = t.platform_id
             LEFT JOIN customers c ON c.id = t.customer_id
@@ -611,14 +606,12 @@ def delete_transaction(transaction_id: int) -> None:
                         "UPDATE platforms SET monthly_used = MAX(0, monthly_used - ?) WHERE id = ?",
                         (spent, pid)
                     )
-                # عكس تأثير الدفع
-                if status == "cash":
-                    conn.execute("UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1", (req,))
-                elif status == "pending" and cid:
+                # عكس تأثير الدفع — فقط pending يؤثر على المديونية
+                if status == "pending" and cid:
                     conn.execute(
                         "UPDATE customers SET total_debt = total_debt - ? WHERE id = ?", (req, cid)
                     )
-                # paid: no reversal needed on customer (already paid)
+                # paid: تم السداد مباشرة، لا يوجد تأثير على المديونية يحتاج عكس
 
             elif op == "inbound":
                 # أعد الخصم على المحفظة

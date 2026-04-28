@@ -210,7 +210,7 @@ class DashboardScreen(ScreenShell):
         dlg = CustomerDialog(self)
         if dlg.exec():
             self.refresh()
-            QMessageBox.information(self, "تم ✅", "تم إضافة العميل بنجاح")
+            QMessageBox.information(self, "تم ", "تم إضافة العميل بنجاح")
 
     def _edit_budget(self):
         current = db.get_budget()["main_budget"]
@@ -222,7 +222,7 @@ class DashboardScreen(ScreenShell):
             try:
                 db.update_main_budget(amount)
                 self.refresh()
-                QMessageBox.information(self, "تم ✅", f"تم تحديث الميزانية إلى {fmt_currency(amount)}")
+                QMessageBox.information(self, "تم ", f"تم تحديث الميزانية إلى {fmt_currency(amount)}")
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
@@ -237,6 +237,6 @@ class DashboardScreen(ScreenShell):
             try:
                 db.set_cash_vault(amount)
                 self.refresh()
-                QMessageBox.information(self, "تم ✅", f"تم تحديث الكاش إلى {fmt_currency(amount)}")
+                QMessageBox.information(self, "تم ", f"تم تحديث الكاش إلى {fmt_currency(amount)}")
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))

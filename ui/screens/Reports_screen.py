@@ -271,7 +271,7 @@ class InventoryTab(QWidget):
             self._match_breakdown.setText(breakdown)
 
         if abs(diff) < 0.01:
-            self._match_result.setText("✅  متطابق")
+            self._match_result.setText("  متطابق")
             self._match_result.setStyleSheet(
                 f"border-radius: 8px; padding: 6px 10px;"
                 f"background: {COLORS['green_bg']}; color: {COLORS['green']};"
@@ -360,9 +360,9 @@ class TransactionsLogTab(QWidget):
         self.status_filter.setFixedHeight(100)
         self.status_filter.setMinimumWidth(110)
         self.status_filter.addItem("كل الحالات", None)
-        self.status_filter.addItem("💵 نقدي",    "cash")
+        # cash removed from UI — kept in DB for legacy data
         self.status_filter.addItem("⏳ مؤجل",    "pending")
-        self.status_filter.addItem("✅ مسدد",    "paid")
+        self.status_filter.addItem(" مسدد",    "paid")
         fl.addWidget(self.status_filter)
 
         # Type
@@ -473,7 +473,12 @@ class TransactionsLogTab(QWidget):
                 color=COLORS["green"] if profit >= 0 else COLORS["red"])
             ref = "🃏 كارت" if t.get("is_card") else (t.get("reference_no") or "—")
             self.table.set_cell(row, 8, ref, color=COLORS["bg_dark"])
-            self.table.add_status_badge(row, 9, t.get("payment_status", ""))
+            self.table.add_status_badge(
+                row, 9,
+                t.get("payment_status", ""),
+                operation_type=t.get("operation_type", "outbound"),
+                is_delivered=t.get("is_delivered", 0)
+            )
             actions = make_txn_actions(t, self._on_status_change, self._on_delete)
             self.table.setCellWidget(row, 10, actions)
             total_profit   += profit
@@ -487,16 +492,12 @@ class TransactionsLogTab(QWidget):
         self.summary_lbl.setStyleSheet(f"color: {p_color}; font-size: 11px;")
 
     def _on_status_change(self, tid: int, new_status: str):
-        label_map = {"paid": "تم السداد", "pending": "مؤجل", "delivered": "تم التسليم", "not_delivered": "لم يُسلَّم"}
-        if QMessageBox.question(self, "تأكيد",
-            f"تغيير الحالة إلى '{label_map.get(new_status, new_status)}'؟",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        ) == QMessageBox.StandardButton.Yes:
-            try:
-                db.update_transaction_status(tid, new_status)
-                self.load_data()
-            except Exception as e:
-                QMessageBox.critical(self, "خطأ", str(e))
+        # الديالوج خلاص سأل المستخدم — ننفذ مباشرة بدون سؤال تاني
+        try:
+            db.update_transaction_status(tid, new_status)
+            self.load_data()
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ", str(e))
 
     def _on_delete(self, tid: int):
         if QMessageBox.question(self, "تأكيد الحذف",
@@ -506,7 +507,7 @@ class TransactionsLogTab(QWidget):
             try:
                 db.delete_transaction(tid)
                 self.load_data()
-                QMessageBox.information(self, "تم ✅", "تم حذف العملية")
+                QMessageBox.information(self, "تم ", "تم حذف العملية")
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
@@ -642,7 +643,7 @@ class CleanupTab(QWidget):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         ) == QMessageBox.StandardButton.Yes:
             deleted = db.cleanup_paid_transactions(cid)
-            QMessageBox.information(self, "تم ✅", f"تم حذف {deleted} عملية مسددة")
+            QMessageBox.information(self, "تم ", f"تم حذف {deleted} عملية مسددة")
             self._refresh_stat()
 
     def _cleanup_all(self):
@@ -658,7 +659,7 @@ class CleanupTab(QWidget):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             ) == QMessageBox.StandardButton.Yes:
                 deleted = db.cleanup_paid_transactions()
-                QMessageBox.information(self, "تم ✅", f"تم حذف {deleted} عملية مسددة")
+                QMessageBox.information(self, "تم ", f"تم حذف {deleted} عملية مسددة")
                 self._refresh_stat()
 
 

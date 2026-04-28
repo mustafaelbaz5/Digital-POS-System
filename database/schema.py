@@ -81,57 +81,87 @@ def initialize_database() -> None:
     with get_connection() as conn:
         conn.executescript(SCHEMA_SQL)
 
-        # Migrate platforms — recreate to allow instapay type
+        # ── Platforms table: إنشاء أو migration آمن ──────────────────
         try:
-            # Check if platforms table exists with old constraint
             info = conn.execute("PRAGMA table_info(platforms)").fetchall()
+
             if not info:
-                # Create fresh
-                conn.executescript("""
+                # الجدول مش موجود خالص → إنشاء جديد
+                conn.execute("""
                     CREATE TABLE platforms (
                         id              INTEGER PRIMARY KEY AUTOINCREMENT,
                         name            TEXT    NOT NULL UNIQUE,
-                        type            TEXT    NOT NULL
-                                        CHECK (type IN ('machine', 'wallet', 'instapay')),
+                        type            TEXT    NOT NULL,
                         balance         REAL    NOT NULL DEFAULT 0,
                         monthly_limit   REAL    NOT NULL DEFAULT 200000,
                         monthly_used    REAL    NOT NULL DEFAULT 0,
                         last_reset_date TEXT    NOT NULL DEFAULT (strftime('%Y-%m', 'now')),
                         is_active       INTEGER NOT NULL DEFAULT 1
-                    );
+                    )
                 """)
+                conn.commit()
+                print("[DB] platforms table created fresh")
             else:
-                # Try inserting instapay to check constraint
+                # الجدول موجود → تحقق إن instapay مسموح بيه
+                # الطريقة الآمنة: نجرب INSERT حقيقي بدون executescript
+                conn.execute("SAVEPOINT check_instapay")
                 try:
-                    conn.execute("INSERT OR IGNORE INTO platforms (name, type) VALUES ('__ip_test__', 'instapay')")
-                    conn.execute("DELETE FROM platforms WHERE name = '__ip_test__'")
-                    conn.commit()
+                    conn.execute(
+                        "INSERT INTO platforms (name, type, balance) VALUES ('__test__', 'instapay', 0)"
+                    )
+                    conn.execute("DELETE FROM platforms WHERE name = '__test__'")
+                    conn.execute("RELEASE SAVEPOINT check_instapay")
+                    # instapay مسموح → مفيش مشكلة
                 except Exception:
-                    # Old constraint — recreate table
-                    conn.executescript("""
-                        PRAGMA foreign_keys = OFF;
-                        CREATE TABLE platforms_v2 (
+                    # الـ CHECK constraint قديم → lazim نعمل migration
+                    conn.execute("ROLLBACK TO SAVEPOINT check_instapay")
+                    conn.execute("RELEASE SAVEPOINT check_instapay")
+
+                    print("[DB] Migrating platforms table to support instapay...")
+
+                    # خطوة 1: إيقاف foreign keys مؤقتاً
+                    conn.execute("PRAGMA foreign_keys = OFF")
+
+                    # خطوة 2: إنشاء الجدول الجديد
+                    conn.execute("""
+                        CREATE TABLE platforms_new (
                             id              INTEGER PRIMARY KEY AUTOINCREMENT,
                             name            TEXT    NOT NULL UNIQUE,
-                            type            TEXT    NOT NULL
-                                            CHECK (type IN ('machine', 'wallet', 'instapay')),
+                            type            TEXT    NOT NULL,
                             balance         REAL    NOT NULL DEFAULT 0,
                             monthly_limit   REAL    NOT NULL DEFAULT 200000,
                             monthly_used    REAL    NOT NULL DEFAULT 0,
                             last_reset_date TEXT    NOT NULL DEFAULT (strftime('%Y-%m', 'now')),
                             is_active       INTEGER NOT NULL DEFAULT 1
-                        );
-                        INSERT OR IGNORE INTO platforms_v2
-                            SELECT id, name, type, balance, monthly_limit, monthly_used, last_reset_date,
-                                   COALESCE(is_active, 1)
-                            FROM platforms;
-                        DROP TABLE platforms;
-                        ALTER TABLE platforms_v2 RENAME TO platforms;
-                        PRAGMA foreign_keys = ON;
+                        )
                     """)
+
+                    # خطوة 3: نسخ البيانات القديمة
+                    conn.execute("""
+                        INSERT INTO platforms_new
+                            (id, name, type, balance, monthly_limit,
+                             monthly_used, last_reset_date, is_active)
+                        SELECT
+                            id, name, type, balance,
+                            COALESCE(monthly_limit,   200000),
+                            COALESCE(monthly_used,    0),
+                            COALESCE(last_reset_date, strftime('%Y-%m', 'now')),
+                            COALESCE(is_active,       1)
+                        FROM platforms
+                    """)
+
+                    # خطوة 4: حذف القديم وإعادة التسمية
+                    conn.execute("DROP TABLE platforms")
+                    conn.execute("ALTER TABLE platforms_new RENAME TO platforms")
+
+                    # خطوة 5: إعادة تفعيل foreign keys
+                    conn.execute("PRAGMA foreign_keys = ON")
+
                     conn.commit()
+                    print("[DB] platforms migration done ")
+
         except Exception as e:
-            print(f"[DB] Platform migration note: {e}")
+            print(f"[DB] Platform setup error: {e}")
 
         # Transactions table migrations
         try:

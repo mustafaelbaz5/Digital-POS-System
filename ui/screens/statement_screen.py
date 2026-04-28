@@ -6,7 +6,8 @@ tasks: 13 (edit/delete), 14 (size), 15 (UI polish), 16 (timestamps), 17 (custome
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFrame, QFileDialog, QMessageBox,
-    QWidget, QScrollArea, QGridLayout, QSizePolicy
+    QWidget, QScrollArea, QGridLayout, QSizePolicy,
+    QApplication
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -39,60 +40,183 @@ def info_pill(label: str, value: str, color: str = None) -> QFrame:
 
 
 # ══════════════════════════════════════════
-#  Transaction action buttons helper
+#  Transaction Action Dialog
+# ══════════════════════════════════════════
+
+class TransactionActionDialog(QDialog):
+    """
+    ديالوج موحد لإجراءات العملية:
+    - outbound → مؤجل / تم السداد
+    - inbound  → لم يُسلَّم / تم التسليم
+    + حذف العملية
+    """
+
+    def __init__(self, t: dict, on_status_change, on_delete, parent=None):
+        super().__init__(parent)
+        self.t               = t
+        self.on_status_change = on_status_change
+        self.on_delete        = on_delete
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.setWindowTitle("إجراءات العملية")
+        self.setFixedWidth(360)
+        self._build_ui()
+
+    def _build_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(12)
+
+        op        = self.t.get("operation_type", "")
+        status    = self.t.get("payment_status", "")
+        delivered = bool(self.t.get("is_delivered", 0))
+        tid       = self.t["id"]
+
+        # ── معلومات العملية ──────────────────
+        info_frame = QFrame()
+        info_frame.setObjectName("card")
+        info_layout = QVBoxLayout(info_frame)
+        info_layout.setContentsMargins(14, 10, 14, 10)
+        info_layout.setSpacing(4)
+
+        svc_lbl = QLabel(self.t.get("service_name") or "—")
+        svc_lbl.setStyleSheet(
+            f"color:{COLORS['text_primary']};font-size:15px;font-weight:bold;"
+        )
+        svc_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        info_layout.addWidget(svc_lbl)
+
+        op_text  = "📤 صادر (تحويل)" if op == "outbound" else "📥 وارد (استلام)"
+        op_color = COLORS["blue"] if op == "outbound" else COLORS["purple"]
+        op_lbl   = QLabel(op_text)
+        op_lbl.setStyleSheet(f"color:{op_color};font-size:12px;")
+        op_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        info_layout.addWidget(op_lbl)
+
+        layout.addWidget(info_frame)
+
+        # ── عنوان قسم تعديل الحالة ──────────
+        status_title = QLabel("تعديل الحالة")
+        status_title.setStyleSheet(
+            f"color:{COLORS['text_secondary']};font-size:12px;font-weight:bold;"
+        )
+        status_title.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(status_title)
+
+        # ── أزرار الحالة حسب نوع العملية ────
+        if op == "outbound":
+            # الخيارات: مؤجل أو تم السداد
+            self._add_status_btn(
+                layout,
+                label   = "⏳  مؤجل",
+                active  = (status == "pending"),
+                color   = COLORS["yellow"],
+                bg      = COLORS["yellow_bg"],
+                handler = lambda: self._change_status(tid, "pending"),
+            )
+            self._add_status_btn(
+                layout,
+                label   = "  تم السداد",
+                active  = (status == "paid"),
+                color   = COLORS["green"],
+                bg      = COLORS["green_bg"],
+                handler = lambda: self._change_status(tid, "paid"),
+            )
+
+        elif op == "inbound":
+            # الخيارات: لم يُسلَّم أو تم التسليم
+            self._add_status_btn(
+                layout,
+                label   = "⏳  لم يُسلَّم بعد",
+                active  = (not delivered),
+                color   = COLORS["yellow"],
+                bg      = COLORS["yellow_bg"],
+                handler = lambda: self._change_status(tid, "not_delivered"),
+            )
+            self._add_status_btn(
+                layout,
+                label   = "  تم التسليم",
+                active  = delivered,
+                color   = COLORS["green"],
+                bg      = COLORS["green_bg"],
+                handler = lambda: self._change_status(tid, "delivered"),
+            )
+
+        # ── فاصل ────────────────────────────
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setStyleSheet(f"color:{COLORS['border']};")
+        layout.addWidget(line)
+
+        # ── زرار الحذف ──────────────────────
+        del_btn = QPushButton("🗑️  حذف العملية")
+        del_btn.setObjectName("btn_danger")
+        del_btn.setFixedHeight(38)
+        del_btn.clicked.connect(lambda: self._delete(tid))
+        layout.addWidget(del_btn)
+
+        # ── إغلاق ───────────────────────────
+        close_btn = QPushButton("إغلاق")
+        close_btn.setObjectName("btn_secondary")
+        close_btn.setFixedHeight(36)
+        close_btn.clicked.connect(self.reject)
+        layout.addWidget(close_btn)
+
+    def _add_status_btn(self, layout, label, active, color, bg, handler):
+        btn = QPushButton(label)
+        btn.setFixedHeight(40)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        if active:
+            btn.setStyleSheet(
+                f"background:{bg};color:{color};"
+                f"border:2px solid {color};border-radius:8px;"
+                f"font-size:14px;font-weight:bold;padding:4px 16px;"
+            )
+        else:
+            btn.setStyleSheet(
+                f"background:{COLORS['bg_input']};color:{COLORS['text_muted']};"
+                f"border:1px solid {COLORS['border']};border-radius:8px;"
+                f"font-size:14px;padding:4px 16px;"
+            )
+        btn.clicked.connect(handler)
+        layout.addWidget(btn)
+
+    def _change_status(self, tid: int, new_status: str):
+        self.accept()
+        self.on_status_change(tid, new_status)
+
+    def _delete(self, tid: int):
+        self.accept()
+        self.on_delete(tid)
+
+
+# ══════════════════════════════════════════
+#  زرار الإجراءات الموحد (زرار واحد ⋮)
 # ══════════════════════════════════════════
 
 def make_txn_actions(t: dict, on_status_change, on_delete) -> QWidget:
-    """زر تعديل الحالة + حذف للعملية (task 13)"""
-    cont = QWidget()
-    lay  = QHBoxLayout(cont)
-    lay.setContentsMargins(4, 2, 4, 2)
-    lay.setSpacing(4)
+    """زرار واحد ⋮ يفتح TransactionActionDialog"""
+    cont   = QWidget()
+    layout = QHBoxLayout(cont)
+    layout.setContentsMargins(4, 2, 4, 2)
+    layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-    op     = t.get("operation_type", "")
-    status = t.get("payment_status", "")
-    tid    = t["id"]
-
-    if op == "outbound":
-        if status == "pending":
-            btn = QPushButton("✅ سداد")
-            btn.setObjectName("btn_ghost")
-            btn.setFixedHeight(26)
-            btn.setStyleSheet(f"color:{COLORS['green']};border-color:{COLORS['green_border']};")
-            btn.clicked.connect(lambda: on_status_change(tid, "paid"))
-            lay.addWidget(btn)
-        elif status == "paid":
-            btn = QPushButton("↩ مؤجل")
-            btn.setObjectName("btn_ghost")
-            btn.setFixedHeight(26)
-            btn.clicked.connect(lambda: on_status_change(tid, "pending"))
-            lay.addWidget(btn)
-    elif op == "inbound":
-        delivered = bool(t.get("is_delivered", 0))
-        if not delivered:
-            btn = QPushButton("✅ تسليم")
-            btn.setObjectName("btn_ghost")
-            btn.setFixedHeight(26)
-            btn.setStyleSheet(f"color:{COLORS['green']};border-color:{COLORS['green_border']};")
-            btn.clicked.connect(lambda: on_status_change(tid, "delivered"))
-            lay.addWidget(btn)
-        else:
-            btn = QPushButton("↩ إلغاء")
-            btn.setObjectName("btn_ghost")
-            btn.setFixedHeight(26)
-            btn.clicked.connect(lambda: on_status_change(tid, "not_delivered"))
-            lay.addWidget(btn)
-
-    del_btn = QPushButton("🗑")
-    del_btn.setObjectName("btn_ghost")
-    del_btn.setFixedSize(26, 26)
-    del_btn.setStyleSheet(
-        f"color:{COLORS['red']};border-color:{COLORS['red_border']};"
-        f"background:{COLORS['red_bg']};border-radius:5px;"
+    btn = QPushButton("⋮  إجراءات")
+    btn.setFixedHeight(28)
+    btn.setMinimumWidth(80)
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    btn.setStyleSheet(
+        f"background:{COLORS['bg_input']};color:{COLORS['text_secondary']};"
+        f"border:1px solid {COLORS['border']};border-radius:6px;"
+        f"font-size:13px;padding:2px 10px;"
     )
-    del_btn.clicked.connect(lambda: on_delete(tid))
-    lay.addWidget(del_btn)
 
+    def _open_dialog():
+        parent_widget = cont.window()
+        dialog = TransactionActionDialog(t, on_status_change, on_delete, parent_widget)
+        dialog.exec()
+
+    btn.clicked.connect(_open_dialog)
+    layout.addWidget(btn)
     return cont
 
 
@@ -224,6 +348,7 @@ class CustomerStatementDialog(QDialog):
         c = self._data["customer"]
         debt = c.get("total_debt", 0) or 0
         debt_color = COLORS["red"] if debt > 0 else COLORS["green"]
+        self._stats_pills = []   # ← حفظ reference للتحديث لاحقاً
         for label, value, color in [
             ("المديونية الحالية", debt,                          debt_color),
             ("إجمالي المؤجل",   t.get("total_pending", 0) or 0, COLORS["yellow"]),
@@ -231,7 +356,9 @@ class CustomerStatementDialog(QDialog):
             ("إجمالي النقدي",   t.get("total_cash",    0) or 0, COLORS["blue"]),
             ("صافي الأرباح",    t.get("total_profit",  0) or 0, COLORS["purple"]),
         ]:
-            row.addWidget(info_pill(label, fmt_currency(value), color))
+            pill = info_pill(label, fmt_currency(value), color)
+            self._stats_pills.append(pill)
+            row.addWidget(pill)
         return row
 
     # ── Filter bar
@@ -242,7 +369,7 @@ class CustomerStatementDialog(QDialog):
         for key, label, color in [
             ("all",     "الكل 📋",  COLORS["text_secondary"]),
             ("pending", "مؤجل ⏳",  COLORS["yellow"]),
-            ("paid",    "مسدد ✅",  COLORS["green"]),
+            ("paid",    "مسدد ",  COLORS["green"]),
             ("cash",    "نقدي 💵",  COLORS["blue"]),
             ("inbound", "وارد 📥",  COLORS["purple"]),
         ]:
@@ -320,14 +447,19 @@ class CustomerStatementDialog(QDialog):
 
             if op == "inbound":
                 delivered = bool(t.get("is_delivered", 0))
-                self.table.set_cell(row, 7, "✅ تم" if delivered else "⏳ لا",
+                self.table.set_cell(row, 7, " تم" if delivered else "⏳ لا",
                                     color=COLORS["green"] if delivered else COLORS["yellow"])
             else:
                 self.table.set_cell(row, 7, "—", color=COLORS["text_muted"])
 
             ref = "🃏 كارت" if t.get("is_card") else (t.get("reference_no") or "—")
             self.table.set_cell(row, 8, ref, color=COLORS["text_muted"])
-            self.table.add_status_badge(row, 9, t.get("payment_status", ""))
+            self.table.add_status_badge(
+                row, 9,
+                t.get("payment_status", ""),
+                operation_type=t.get("operation_type", "outbound"),
+                is_delivered=t.get("is_delivered", 0)
+            )
 
             # task 13: action buttons
             actions = make_txn_actions(t, self._on_status_change, self._on_delete)
@@ -350,16 +482,40 @@ class CustomerStatementDialog(QDialog):
 
     # ── Task 13: Status change
     def _on_status_change(self, tid: int, new_status: str):
-        label_map = {"paid": "تم السداد", "pending": "مؤجل", "delivered": "تم التسليم", "not_delivered": "لم يُسلَّم"}
-        msg = f"هل تريد تغيير الحالة إلى '{label_map.get(new_status, new_status)}'؟"
-        if QMessageBox.question(self, "تأكيد", msg,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        ) == QMessageBox.StandardButton.Yes:
-            try:
-                db.update_transaction_status(tid, new_status)
-                self._load_data(); self._fill_table()
-            except Exception as e:
-                QMessageBox.critical(self, "خطأ", str(e))
+        # الديالوج خلاص سأل المستخدم — ننفذ مباشرة بدون سؤال تاني
+        try:
+            db.update_transaction_status(tid, new_status)
+            self._refresh_all()
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ", str(e))
+
+    def _refresh_all(self):
+        """إعادة تحميل البيانات وتحديث كل عناصر الواجهة"""
+        self._load_data()
+        self._fill_table()
+
+        # تحديث بطاقات الإحصائيات إذا كانت موجودة
+        if hasattr(self, "_stats_pills"):
+            t = self._data.get("totals", {})
+            c = self._data["customer"]
+            debt = c.get("total_debt", 0) or 0
+            debt_color = COLORS["red"] if debt > 0 else COLORS["green"]
+            new_vals = [
+                (debt,                          debt_color),
+                (t.get("total_pending", 0) or 0, COLORS["yellow"]),
+                (t.get("total_paid",    0) or 0, COLORS["green"]),
+                (t.get("total_cash",    0) or 0, COLORS["blue"]),
+                (t.get("total_profit",  0) or 0, COLORS["purple"]),
+            ]
+            for pill, (val, color) in zip(self._stats_pills, new_vals):
+                # pill هو QFrame — نحدث الـ QLabel الأول جوه
+                for child in pill.findChildren(QLabel):
+                    if child.text().startswith("ج") or "," in child.text() or child.text() == "0.00 ج":
+                        child.setText(fmt_currency(val))
+                        child.setStyleSheet(
+                            f"color:{color};font-size:17px;font-weight:bold;"
+                        )
+                        break
 
     # ── Task 13: Delete
     def _on_delete(self, tid: int):
@@ -369,8 +525,8 @@ class CustomerStatementDialog(QDialog):
         ) == QMessageBox.StandardButton.Yes:
             try:
                 db.delete_transaction(tid)
-                self._load_data(); self._fill_table()
-                QMessageBox.information(self, "تم ✅", "تم حذف العملية وعكس تأثيرها المالي")
+                self._refresh_all()
+                QMessageBox.information(self, "تم ", "تم حذف العملية وعكس تأثيرها المالي")
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
@@ -383,8 +539,8 @@ class CustomerStatementDialog(QDialog):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         ) == QMessageBox.StandardButton.Yes:
             deleted = db.cleanup_paid_transactions(self.customer_id)
-            self._load_data(); self._fill_table()
-            QMessageBox.information(self, "تم ✅", f"تم حذف {deleted} عملية مسددة")
+            self._refresh_all()
+            QMessageBox.information(self, "تم ", f"تم حذف {deleted} عملية مسددة")
 
     def _open_customer_facing(self):
         dlg = CustomerFacingStatementDialog(self.customer_id, self)
@@ -395,7 +551,7 @@ class CustomerStatementDialog(QDialog):
             self, "حفظ كصورة", f"كشف_{self._data['customer']['name']}.png", "PNG (*.png)")
         if path:
             self.grab().save(path, "PNG")
-            QMessageBox.information(self, "تم ✅", f"تم حفظ الصورة:\n{path}")
+            QMessageBox.information(self, "تم ", f"تم حفظ الصورة:\n{path}")
 
     def _export_pdf(self):
         from PyQt6.QtPrintSupport import QPrinter
@@ -408,7 +564,7 @@ class CustomerStatementDialog(QDialog):
             printer.setOutputFileName(path)
             painter = QPainter(printer)
             self.render(painter); painter.end()
-            QMessageBox.information(self, "تم ✅", f"تم حفظ PDF:\n{path}")
+            QMessageBox.information(self, "تم ", f"تم حفظ PDF:\n{path}")
 
 
 # ══════════════════════════════════════════
@@ -483,7 +639,7 @@ class CustomerFacingStatementDialog(QDialog):
             layout.addWidget(self._make_txn_table(due_txns, "due"))
 
         if not pending_txns and not due_txns:
-            empty = QLabel("✅  لا توجد مبالغ مستحقة عليك أو لك")
+            empty = QLabel("  لا توجد مبالغ مستحقة عليك أو لك")
             empty.setStyleSheet(f"color:{COLORS['green']};font-size:14px;background:{COLORS['green_bg']};border-radius:8px;padding:12px;")
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(empty)
@@ -557,7 +713,7 @@ class CustomerFacingStatementDialog(QDialog):
             self, "حفظ كصورة", f"كشف_{self._data['customer']['name']}.png", "PNG (*.png)")
         if path:
             self.grab().save(path, "PNG")
-            QMessageBox.information(self, "تم ✅", f"تم حفظ الصورة:\n{path}")
+            QMessageBox.information(self, "تم ", f"تم حفظ الصورة:\n{path}")
 
 
 # ══════════════════════════════════════════
@@ -624,4 +780,4 @@ class GroupReportDialog(QDialog):
             self, "حفظ كصورة", "تقرير_المجموعة.png", "PNG (*.png)")
         if path:
             self.grab().save(path, "PNG")
-            QMessageBox.information(self, "تم ✅", f"تم حفظ الصورة:\n{path}")
+            QMessageBox.information(self, "تم ", f"تم حفظ الصورة:\n{path}")

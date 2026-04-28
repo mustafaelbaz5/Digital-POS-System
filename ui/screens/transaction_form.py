@@ -47,10 +47,10 @@ class PaymentStatusSelector(QFrame):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(6, 4, 6, 4)
         layout.setSpacing(6)
-        self._btn_pending = self._make_btn("⏳  مؤجل", "pending")
-        self._btn_cash    = self._make_btn("💵  نقدي",  "cash")
+        self._btn_pending = self._make_btn("⏳  مؤجل",    "pending")
+        self._btn_paid    = self._make_btn("  تم السداد", "paid")
         layout.addWidget(self._btn_pending)
-        layout.addWidget(self._btn_cash)
+        layout.addWidget(self._btn_paid)
         self._apply("pending")
 
     def _make_btn(self, text, val):
@@ -72,7 +72,7 @@ class PaymentStatusSelector(QFrame):
             f"border:1px solid {COLORS['border']};border-radius:8px;"
             f"font-size:13px;padding:2px 14px;"
         )
-        self._btn_cash.setStyleSheet(
+        self._btn_paid.setStyleSheet(
             f"background:{COLORS['green_bg']};color:{COLORS['green']};"
             f"border:1.5px solid {COLORS['green']};border-radius:8px;"
             f"font-weight:bold;font-size:13px;padding:2px 14px;"
@@ -111,7 +111,7 @@ class DeliveryStatusSelector(QFrame):
         layout.addWidget(title)
         layout.addStretch()
         self._btn_no  = self._make_btn("⏳  لم يُسلَّم بعد", False)
-        self._btn_yes = self._make_btn("✅  تم التسليم",    True)
+        self._btn_yes = self._make_btn("  تم التسليم",    True)
         layout.addWidget(self._btn_no)
         layout.addWidget(self._btn_yes)
         self._apply(False)
@@ -145,7 +145,7 @@ class DeliveryStatusSelector(QFrame):
         )
         if self._effect_lbl:
             if delivered:
-                self._effect_lbl.setText("✅ المبلغ تم تسليمه للعميل")
+                self._effect_lbl.setText(" المبلغ تم تسليمه للعميل")
                 self._effect_lbl.setStyleSheet(f"color:{COLORS['green']};font-size:11px;")
             else:
                 self._effect_lbl.setText("⏳ المبلغ المسلم يُسجَّل كمستحق للعميل (يُخصم من مديونيته)")
@@ -176,7 +176,7 @@ class OutboundTab(QWidget):
         # Row 1: Platform + Service
         row1 = QHBoxLayout(); row1.setSpacing(16)
         self.platform_combo = QComboBox()
-        self.platform_combo.setMinimumWidth(200)
+        self.platform_combo.setMinimumWidth(300)
         self.platform_combo.currentIndexChanged.connect(self._update_balance)
         row1.addLayout(field("المنصة *", self.platform_combo))
         self.service_input = QLineEdit()
@@ -260,7 +260,7 @@ class OutboundTab(QWidget):
         layout.addLayout(field("ملاحظات", self.notes_input))
         layout.addStretch()
 
-        save_btn = QPushButton("✅  حفظ العملية الصادرة")
+        save_btn = QPushButton("  حفظ العملية الصادرة")
         save_btn.setObjectName("btn_primary"); save_btn.setFixedHeight(46)
         save_btn.clicked.connect(self._save)
         layout.addWidget(save_btn)
@@ -321,9 +321,9 @@ class OutboundTab(QWidget):
                 is_card=self.is_card_check.isChecked(),
                 notes=self.notes_input.toPlainText().strip()
             )
-            QMessageBox.information(self, "تم ✅",
+            QMessageBox.information(self, "تم ",
                 f"تم تسجيل العملية\nالربح: {fmt_currency(req - spent)}\n"
-                f"الحالة: {'مؤجل ⏳' if status == 'pending' else 'نقدي 💵'}")
+                f"الحالة: {'مؤجل ⏳' if status == 'pending' else 'تم السداد '}")
             self._reset(); self.transaction_added.emit()
         except ValueError as e:
             QMessageBox.warning(self, "تعذّر تنفيذ العملية", str(e))
@@ -428,7 +428,7 @@ class InboundTab(QWidget):
         layout.addLayout(field("ملاحظات", self.notes_input))
         layout.addStretch()
 
-        save_btn = QPushButton("✅  حفظ العملية الواردة")
+        save_btn = QPushButton("  حفظ العملية الواردة")
         save_btn.setObjectName("btn_success"); save_btn.setFixedHeight(46)
         save_btn.clicked.connect(self._save)
         layout.addWidget(save_btn)
@@ -505,9 +505,9 @@ class InboundTab(QWidget):
             )
             extra = ""
             if cid:
-                extra = "\n✅ تم تسليم الكاش للعميل" if is_delivered else \
+                extra = "\n تم تسليم الكاش للعميل" if is_delivered else \
                         f"\n⏳ {fmt_currency(delivered)} مسجلة كمستحقة للعميل"
-            QMessageBox.information(self, "تم ✅",
+            QMessageBox.information(self, "تم ",
                 f"تم تسجيل الاستلام\nالربح: {fmt_currency(received - delivered)}{extra}")
             self._reset(); self.transaction_added.emit()
         except ValueError as e:

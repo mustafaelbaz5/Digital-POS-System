@@ -408,7 +408,7 @@ class CustomerDialog(QDialog):
         cancel.setObjectName("btn_secondary")
         cancel.clicked.connect(self.reject)
         btns.addWidget(cancel)
-        save = QPushButton("حفظ ✅")
+        save = QPushButton("حفظ ")
         
         save.setObjectName("btn_primary")
         save.clicked.connect(self._save)
@@ -495,7 +495,7 @@ class GroupDialog(QDialog):
         cancel.setObjectName("btn_secondary")
         cancel.clicked.connect(self.reject)
         btns.addWidget(cancel)
-        save = QPushButton("حفظ ✅")
+        save = QPushButton("حفظ ")
         save.setObjectName("btn_primary")
         save.clicked.connect(self._save)
         btns.addWidget(save)

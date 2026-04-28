@@ -340,17 +340,27 @@ class DataTable(QTableWidget):
         item.setTextAlignment(align if align else AlignCenter)
         self.setItem(row, col, item)
 
-    def add_status_badge(self, row: int, col: int, status: str):
-        color_map = {
-            "cash":    COLORS["green"],
-            "pending": COLORS["yellow"],
-            "paid":    COLORS["text_muted"],
-        }
-        self.set_cell(
-            row, col,
-            get_status_text(status),
-            color=color_map.get(status, COLORS["text_secondary"])
-        )
+    def add_status_badge(self, row: int, col: int, status: str,
+                         operation_type: str = "outbound", is_delivered: int = 0):
+        """
+        outbound → مؤجل / مسدد
+        inbound  → لم يُسلَّم / تم التسليم
+        """
+        if operation_type == "inbound":
+            if is_delivered:
+                text, color = "تم التسليم ", COLORS["green"]
+            else:
+                text, color = "لم يُسلَّم ⏳", COLORS["yellow"]
+        else:
+            # outbound
+            if status == "pending":
+                text, color = "مؤجل ⏳", COLORS["yellow"]
+            elif status == "paid":
+                text, color = "مسدد ", COLORS["green"]
+            else:
+                text, color = status, COLORS["text_muted"]
+
+        self.set_cell(row, col, text, color=color)
 
     def clear_rows(self):
         self.setRowCount(0)

@@ -281,7 +281,7 @@ class PlatformsScreen(ScreenShell):
             try:
                 db.deposit_to_platform(platform_id, amount)
                 self.refresh()
-                QMessageBox.information(self, "تم ✅", f"تم الإيداع  {fmt_currency(amount)}")
+                QMessageBox.information(self, "تم ", f"تم الإيداع  {fmt_currency(amount)}")
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
@@ -314,7 +314,7 @@ class PlatformsScreen(ScreenShell):
                 db.record_daily_commission(platform_id, amount)
                 self.refresh()
                 QMessageBox.information(
-                    self, "تم ✅",
+                    self, "تم ",
                     f"تم تسجيل العمولة اليومية: {fmt_currency(amount)}\n"
                     f"تم خصمها من [{platform['name']}] وإضافتها للخزينة."
                 )
@@ -386,7 +386,7 @@ class AddPlatformDialog(QDialog):
         cancel.clicked.connect(self.reject)
         btns.addWidget(cancel)
 
-        save = QPushButton("إضافة ✅")
+        save = QPushButton("إضافة ")
         save.setObjectName("btn_primary")
         save.clicked.connect(self._save)
         btns.addWidget(save)
