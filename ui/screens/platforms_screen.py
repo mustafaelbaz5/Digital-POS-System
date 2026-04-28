@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from ui.styles.theme import COLORS, FONT
+from ui.styles.theme import COLORS, FONT, ROW_HEIGHT
 from ui.components.widgets import ScreenShell, make_divider
 from utils.formatters import fmt_currency
 
@@ -208,7 +208,7 @@ class PlatformRow(QFrame):
         super().__init__(parent)
         self.platform_id = platform["id"]
         self.setObjectName("platform_row")
-        self.setFixedHeight(52)
+        self.setFixedHeight(ROW_HEIGHT)
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         bg = COLORS["bg_card"] if not alternate else COLORS["bg_elevated"]
         self.setStyleSheet(

@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction
 
-from ui.styles.theme import COLORS, FONT
+from ui.styles.theme import COLORS, FONT, ROW_HEIGHT
 from ui.components.widgets import ScreenShell, DataTable, make_divider
 from utils.formatters import fmt_currency
 
@@ -108,7 +108,7 @@ class CustomersTab(QWidget):
         ]
         self.table = DataTable(columns)
         # task 8: increase row height
-        self.table.verticalHeader().setDefaultSectionSize(56)
+        self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._context_menu)
         layout.addWidget(self.table)
@@ -271,7 +271,7 @@ class GroupsTab(QWidget):
         ]
         self.table = DataTable(columns)
         # task 10: larger row height
-        self.table.verticalHeader().setDefaultSectionSize(60)
+        self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._context_menu)
         layout.addWidget(self.table)

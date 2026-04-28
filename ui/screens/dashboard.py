@@ -1,5 +1,5 @@
 """
-dashboard.py — لوحة التحكم الرئيسية
+dashboard.py — لوحة التحكم الرئيسية (Pro Dark Edition)
 """
 
 from PyQt6.QtWidgets import (
@@ -11,7 +11,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
 from datetime import datetime
 
-from ui.styles.theme import COLORS, FONT, CARD_RADIUS, BORDER_RADIUS
+from ui.styles.theme import COLORS, FONT, CARD_RADIUS, BORDER_RADIUS, ROW_HEIGHT
 from ui.components.widgets import StatCard, SectionTitle, ScreenShell
 from utils.formatters import fmt_currency, fmt_datetime
 
@@ -35,13 +35,13 @@ class DashboardScreen(ScreenShell):
 
     def _build_content(self):
         c = self.content()
-        c.setSpacing(20)
+        c.setSpacing(24)
 
         # ── Section 1: Stat Cards
         c.addWidget(self._make_section_header("📊  نظرة عامة على الأموال"))
         c.addLayout(self._make_stats_grid())
 
-        # ── Section 2: Recent Transactions (no match equation — task 1)
+        # ── Section 2: Recent Transactions
         c.addWidget(self._make_section_header("🕒  آخر العمليات"))
         self._ops_table = self._make_ops_table()
         c.addWidget(self._ops_table)
@@ -57,28 +57,26 @@ class DashboardScreen(ScreenShell):
     def _make_section_header(text: str) -> QLabel:
         lbl = QLabel(text)
         lbl.setStyleSheet(
-            f"color: {COLORS['text_secondary']}; font-size: {FONT['sm']};"
-            f"font-weight: bold; font-family: {FONT['family']};"
-            f"letter-spacing: 0.5px; padding-bottom: 2px;"
+            f"color: {COLORS['text_primary']}; font-size: {FONT['lg']};"
+            f"font-weight: bold; padding-bottom: 8px;"
             f"border-bottom: 1px solid {COLORS['border']};"
-            f"text-align: right;"
         )
-        lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)  # task 2: RTL titles
+        lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         return lbl
 
     def _make_stats_grid(self) -> QGridLayout:
         grid = QGridLayout()
-        grid.setSpacing(12)
+        grid.setSpacing(16)
         grid.setContentsMargins(0, 0, 0, 0)
 
-        self.card_budget  = StatCard("الميزانية الأصلية", accent_color=COLORS["teal_primary"])
+        self.card_budget  = StatCard("رأس المال",       accent_color=COLORS["text_secondary"])
         self.card_assets  = StatCard("إجمالي الأصول",    accent_color=COLORS["cyan"])
         self.card_cash    = StatCard("الخزينة النقدية",  accent_color=COLORS["green"])
         self.card_wallets = StatCard("إجمالي المحافظ",    accent_color=COLORS["purple"])
         self.card_debts   = StatCard("إجمالي المديونيات", accent_color=COLORS["yellow"])
         self.card_pending = StatCard("إجمالي المؤجل",     accent_color=COLORS["red"])
-        self.card_today   = StatCard("أرباح اليوم",       accent_color=COLORS["green"])
-        self.card_month   = StatCard("أرباح الشهر",       accent_color=COLORS["teal_bright"])
+        self.card_today   = StatCard("أرباح اليوم",       accent_color=COLORS["accent"])
+        self.card_month   = StatCard("أرباح الشهر",       accent_color=COLORS["accent_hover"])
         self.card_ops     = StatCard("عمليات اليوم",      accent_color=COLORS["blue"])
 
         placement = [
@@ -91,47 +89,35 @@ class DashboardScreen(ScreenShell):
         return grid
 
     def _make_ops_table(self) -> QTableWidget:
-        columns = ["التاريخ والوقت", "العميل", "الخدمة", "المنصة", "المطلوب", "الربح", "الحالة"]
+        columns = ["التاريخ", "العميل", "الخدمة", "المنصة", "المطلوب", "الربح", "الحالة"]
         tbl = QTableWidget()
         tbl.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         tbl.setColumnCount(len(columns))
         tbl.setHorizontalHeaderLabels(columns)
-        tbl.setMaximumHeight(320)
-        tbl.setMinimumHeight(220)
+        tbl.setMaximumHeight(350)
+        tbl.setMinimumHeight(250)
         tbl.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         tbl.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         tbl.verticalHeader().setVisible(False)
         tbl.setShowGrid(False)
-        tbl.setAlternatingRowColors(True)
         tbl.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        tbl.horizontalHeader().setHighlightSections(False)
-        tbl.horizontalHeader().setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        
         header = tbl.horizontalHeader()
-        widths = [200, 150, 150, 150, 100, 85,-1]
+        widths = [160, 150, 150, 150, 110, 110, -1]
         for i, w in enumerate(widths):
             if w == -1:
                 header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
             else:
                 tbl.setColumnWidth(i, w)
                 header.setSectionResizeMode(i, QHeaderView.ResizeMode.Fixed)
-        tbl.verticalHeader().setDefaultSectionSize(50)
-        tbl.setStyleSheet(
-            f"QTableWidget {{ background: {COLORS['bg_card']}; border: 1px solid {COLORS['border']};"
-            f"border-radius: {CARD_RADIUS}; gridline-color: transparent; }}"
-            f"QTableWidget::item {{background: {COLORS['bg_elevated']}; padding: 8px 16px; border-bottom: 1px solid {COLORS['border']}; }}"
-            f"QTableWidget::item:selected {{ background: {COLORS['teal_subtle']}; }}"
-            f"QHeaderView::section {{ background: {COLORS['bg_dark']}; color: {COLORS['text_secondary']};"
-            f"border: none; border-bottom: 2px solid {COLORS['border']};"
-            f"padding: 10px 16px; font-weight: bold; font-size: {FONT['sm']}; }}"
-            f"alternate-background-color: {COLORS['bg_elevated']};"
-        )
+        
+        tbl.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         return tbl
 
     def _fill_ops_table(self):
         txns = db.get_transactions(limit=15)
         self._ops_table.setRowCount(len(txns))
-        status_colors = {"cash": COLORS["green"], "pending": COLORS["yellow"], "paid": COLORS["text_muted"]}
-        status_text   = {"cash": "نقدي", "pending": "مؤجل", "paid": "مسدد"}
+        
         for row, t in enumerate(txns):
             def cell(col, text, color=None, bold=False):
                 item = QTableWidgetItem(str(text) if text else "—")
@@ -140,25 +126,30 @@ class DashboardScreen(ScreenShell):
                 if color: item.setForeground(QColor(color))
                 if bold:  f = item.font(); f.setBold(True); item.setFont(f)
                 self._ops_table.setItem(row, col, item)
-            # task 16: full timestamp
+
             raw_date = t.get("created_at") or ""
-            cell(0, raw_date[:16].replace("T", "  "), color=COLORS["text_muted"])
-            cell(1, t.get("customer_name") or "—", color=COLORS["text_secondary"])
+            cell(0, raw_date[:16].replace("T", " "), color=COLORS["text_secondary"])
+            cell(1, t.get("customer_name") or "—", bold=True)
             cell(2, t.get("service_name") or "—")
-            cell(3, t.get("platform_name") or "—", color=COLORS["text_muted"])
+            cell(3, t.get("platform_name") or "—", color=COLORS["text_secondary"])
             cell(4, fmt_currency(t.get("amount_required", 0) or 0), bold=True)
+            
             profit = t.get("profit", 0) or 0
-            cell(5, fmt_currency(profit), color=COLORS["green"] if profit >= 0 else COLORS["red"])
+            cell(5, fmt_currency(profit), color=COLORS["accent"] if profit >= 0 else COLORS["red"])
+            
             st = t.get("payment_status", "")
-            cell(6, status_text.get(st, st), color=status_colors.get(st))
+            st_text = {"cash": "نقدي ✅", "pending": "مؤجل ⏳", "paid": "مسدد ✓"}.get(st, st)
+            st_color = {"cash": COLORS["green"], "pending": COLORS["yellow"], "paid": COLORS["text_secondary"]}.get(st)
+            cell(6, st_text, color=st_color, bold=True)
 
     def _make_actions_panel(self) -> QFrame:
         frame = QFrame()
         frame.setObjectName("card")
         frame.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         row = QHBoxLayout(frame)
-        row.setContentsMargins(20, 16, 20, 16)
-        row.setSpacing(12)
+        row.setContentsMargins(24, 20, 24, 20)
+        row.setSpacing(16)
+        
         actions = [
             ("⊕  إضافة عملية",      "btn_primary",   self._go_to_transaction),
             ("👤  إضافة عميل",      "btn_secondary", self._add_customer),
@@ -166,10 +157,11 @@ class DashboardScreen(ScreenShell):
             ("💰  تعديل الكاش",    "btn_secondary", self._edit_cash),
             ("📊  التقارير",        "btn_secondary", self._go_to_reports),
         ]
+        
         for label, obj, slot in actions:
             btn = QPushButton(label)
             btn.setObjectName(obj)
-            btn.setMinimumHeight(44)
+            btn.setMinimumHeight(48)
             btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(slot)
@@ -186,6 +178,7 @@ class DashboardScreen(ScreenShell):
         self.card_pending.set_value(fmt_currency(stats["total_pending"]))
         self.card_today.set_value(fmt_currency(stats["today_profit"]))
         self.card_month.set_value(fmt_currency(stats["month_profit"]))
+        
         try:
             from datetime import date
             today_str = date.today().isoformat()
@@ -194,6 +187,7 @@ class DashboardScreen(ScreenShell):
             self.card_ops.set_value(str(ops_today))
         except Exception:
             self.card_ops.set_value("—")
+        
         self._fill_ops_table()
 
     def _go_to_transaction(self):
@@ -205,7 +199,6 @@ class DashboardScreen(ScreenShell):
         if hasattr(win, "navigate_to"): win.navigate_to("reports")
 
     def _add_customer(self):
-        """task 3: use exact same CustomerDialog as customers screen"""
         from ui.screens.customers_screen import CustomerDialog
         dlg = CustomerDialog(self)
         if dlg.exec():

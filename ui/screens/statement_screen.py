@@ -14,7 +14,7 @@ from PyQt6.QtGui import QFont
 
 import database as db
 from ui.components.widgets import DataTable
-from ui.styles.theme import COLORS, FONT, CARD_RADIUS
+from ui.styles.theme import COLORS, FONT, CARD_RADIUS, ROW_HEIGHT
 from utils.formatters import fmt_currency
 
 
@@ -412,7 +412,7 @@ class CustomerStatementDialog(QDialog):
             ("الحالة", 85), ("إجراءات", 120),
         ]
         self.table = DataTable(columns)
-        self.table.verticalHeader().setDefaultSectionSize(52)
+        self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         self.table.setMinimumHeight(300)
         return self.table
 
