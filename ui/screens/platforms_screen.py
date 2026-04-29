@@ -338,10 +338,10 @@ class PlatformListTab(QWidget):
 
         # ── هيدر الأعمدة
         header = QFrame()
-        header.setFixedHeight(34)
+        header.setFixedHeight(40)
         header.setStyleSheet(
-            f"background:{COLORS['bg_dark']};"
-            f"border-bottom:2px solid {COLORS['border']};"
+            f"background:{COLORS['bg_elevated']};"
+            f"border-bottom:1px solid {COLORS['border']};"
         )
         header.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         hl = QHBoxLayout(header)
@@ -351,8 +351,9 @@ class PlatformListTab(QWidget):
         def hdr(text, width=None, align=Qt.AlignmentFlag.AlignRight):
             lbl = QLabel(text)
             lbl.setStyleSheet(
-                f"color:{COLORS['text_muted']};font-size:11px;"
+                f"color:{COLORS['text_secondary']};font-size:11px;"
                 f"font-weight:bold;background:transparent;border:none;"
+                f"text-transform: uppercase;"
             )
             lbl.setAlignment(align | Qt.AlignmentFlag.AlignVCenter)
             if width:

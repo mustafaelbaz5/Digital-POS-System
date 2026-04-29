@@ -11,10 +11,11 @@ COLORS = {
 
     "bg_dark":      "#0D1117",   # main app background
     "bg_card":      "#0D1117",   # cards/sidebar/containers
-    "bg_elevated":  "#090C10",   # hover/input/popup/elevated surfaces
+    "bg_elevated":  "#161B22",   # elevated surfaces (lighter than bg_dark)
 
-    "bg_input":     "#090C10",
+    "bg_input":     "#090C10",   # inputs (darker for depth)
     "bg_hover":     "#21262D",
+    "bg_button":    "#21262D",   # distinct button background
 
     # ─────────────────────────────────────────
     # BORDERS
@@ -185,24 +186,26 @@ QScrollBar::handle:horizontal:hover {{
 
 /* ── Navigation ── */
 #nav_btn {{
-    background: transparent;
+    background: {COLORS['bg_elevated']};
     color: {COLORS['text_secondary']};
-    border: none;
+    border: 1px solid {COLORS['border']};
     border-radius: {BORDER_RADIUS};
     padding: 12px 18px;
     text-align: left;
     font-size: {FONT['md']};
-    margin: 2px 0;
+    margin: 2px 8px;
 }}
 #nav_btn:hover {{
-    background: {COLORS['bg_elevated']};
+    background: {COLORS['bg_button']};
     color: {COLORS['text_primary']};
+    border-color: {COLORS['border_light']};
 }}
 #nav_btn[active="true"] {{
     background: {COLORS['accent_dim']};
     color: {COLORS['accent']};
     font-weight: bold;
-    border-right: 3px solid {COLORS['accent']};
+    border: 1px solid {COLORS['accent']};
+    border-right: 4px solid {COLORS['accent']};
 }}
 
 /* ── Screen Header ── */
@@ -255,27 +258,36 @@ QScrollBar::handle:horizontal:hover {{
 }}
 
 /* ── Buttons ── */
-# btn_primary is used for confirmations and main actions
+QPushButton {{
+    font-family: {FONT['family']};
+    border-radius: {BORDER_RADIUS};
+    padding: 8px 16px;
+}}
+
 #btn_primary {{
     background: {COLORS['accent']};
     color: #ffffff;
-    border: none;
+    border: 1px solid {COLORS['accent_hover']};
     border-radius: {BORDER_RADIUS};
     padding: 0 24px;
     min-height: {BTN_HEIGHT}px;
     font-weight: bold;
     font-size: {FONT['md']};
 }}
-#btn_primary:hover {{ background: {COLORS['accent_hover']}; }}
+#btn_primary:hover {{ 
+    background: {COLORS['accent_hover']}; 
+    border-color: {COLORS['accent_hover']};
+}}
 #btn_primary:disabled {{
     background: {COLORS['border']};
     color: {COLORS['text_muted']};
+    border: none;
 }}
 
 #btn_secondary {{
-    background: {COLORS['bg_elevated']};
+    background: {COLORS['bg_button']};
     color: {COLORS['text_primary']};
-    border: 1px solid {COLORS['border']};
+    border: 1px solid {COLORS['border_light']};
     border-radius: {BORDER_RADIUS};
     padding: 0 20px;
     min-height: {BTN_HEIGHT}px;
@@ -283,11 +295,11 @@ QScrollBar::handle:horizontal:hover {{
 }}
 #btn_secondary:hover {{
     background: {COLORS['bg_hover']};
-    border-color: {COLORS['border_light']};
+    border-color: {COLORS['accent']};
 }}
 
 #btn_ghost {{
-    background: transparent;
+    background: {COLORS['bg_elevated']};
     color: {COLORS['text_secondary']};
     border: 1px solid {COLORS['border']};
     border-radius: 8px;
@@ -295,9 +307,9 @@ QScrollBar::handle:horizontal:hover {{
     font-size: {FONT['sm']};
 }}
 #btn_ghost:hover {{
-    background: {COLORS['bg_elevated']};
+    background: {COLORS['bg_button']};
     color: {COLORS['text_primary']};
-    border-color: {COLORS['accent']};
+    border-color: {COLORS['border_light']};
 }}
 
 #btn_danger {{
@@ -357,18 +369,29 @@ QTableWidget::item {{
     border-bottom: 1px solid {COLORS['border']};
 }}
 QTableWidget::item:selected {{
-    background: {COLORS['bg_elevated']};
+    background: {COLORS['bg_hover']};
     color: {COLORS['accent']};
+}}
+QTableWidget::item:hover {{
+    background: {COLORS['bg_hover']};
+}}
+QHeaderView {{
+    background: {COLORS['bg_elevated']};
+    border: none;
+    border-bottom: 1px solid {COLORS['border']};
 }}
 QHeaderView::section {{
     background: {COLORS['bg_elevated']};
     color: {COLORS['text_secondary']};
     border: none;
-    border-bottom: 1px solid {COLORS['border']};
+    border-left: 1px solid {COLORS['border']};
     padding: 12px 18px;
     font-size: {FONT['xs']};
     font-weight: bold;
     text-transform: uppercase;
+}}
+QHeaderView::section:last {{
+    border-left: none;
 }}
 
 /* ── Tabs ── */
