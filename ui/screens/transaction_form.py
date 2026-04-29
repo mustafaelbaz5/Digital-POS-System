@@ -429,7 +429,7 @@ class InboundTab(QWidget):
         layout.addStretch()
 
         save_btn = QPushButton("  حفظ العملية الواردة")
-        save_btn.setObjectName("btn_success"); save_btn.setFixedHeight(46)
+        save_btn.setObjectName("btn_primary"); save_btn.setFixedHeight(46)
         save_btn.clicked.connect(self._save)
         layout.addWidget(save_btn)
 

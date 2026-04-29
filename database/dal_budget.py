@@ -27,11 +27,9 @@ def set_cash_vault(new_amount: float) -> None:
         raise ValueError("قيمة الكاش لا يمكن أن تكون سالبة")
     with get_connection() as conn:
         try:
-            current = conn.execute("SELECT cash_vault FROM budget WHERE id = 1").fetchone()["cash_vault"]
-            delta = new_amount - (current or 0)
             conn.execute(
-                "UPDATE budget SET cash_vault = ?, main_budget = main_budget - ? WHERE id = 1",
-                (new_amount, delta)
+                "UPDATE budget SET cash_vault = ? WHERE id = 1",
+                (new_amount,)
             )
             conn.commit()
         except Exception:
@@ -123,7 +121,7 @@ def update_wallet_monthly_used(wallet_id: int, delta: float, conn=None) -> None:
 def deposit_to_platform(platform_id: int, amount: float, notes: str = "") -> None:
     """
     إيداع مبلغ لمنصة (ماكينة أو محفظة أو انستا باي)
-    - يخصم من main_budget
+    - يخصم من الخزينة النقدية (الكاش)
     - يزيد رصيد المنصة
     """
     if amount <= 0:
@@ -131,10 +129,10 @@ def deposit_to_platform(platform_id: int, amount: float, notes: str = "") -> Non
 
     with get_connection() as conn:
         try:
-            budget = conn.execute("SELECT main_budget FROM budget WHERE id = 1").fetchone()
-            if budget["main_budget"] < amount:
+            budget = conn.execute("SELECT cash_vault FROM budget WHERE id = 1").fetchone()
+            if budget["cash_vault"] < amount:
                 raise ValueError(
-                    f"الميزانية غير كافية — المتاح: {budget['main_budget']:,.2f} ج  |  "
+                    f"الكاش غير كافٍ — المتاح: {budget['cash_vault']:,.2f} ج  |  "
                     f"المطلوب: {amount:,.2f} ج"
                 )
 
@@ -144,7 +142,7 @@ def deposit_to_platform(platform_id: int, amount: float, notes: str = "") -> Non
             if not platform:
                 raise ValueError("المنصة غير موجودة أو محذوفة")
 
-            conn.execute("UPDATE budget SET main_budget = main_budget - ? WHERE id = 1", (amount,))
+            conn.execute("UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1", (amount,))
             conn.execute("UPDATE platforms SET balance = balance + ? WHERE id = ?", (amount, platform_id))
             conn.execute(
                 "INSERT INTO machine_deposits (platform_id, amount, notes) VALUES (?, ?, ?)",

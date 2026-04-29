@@ -386,10 +386,11 @@ class TransactionsLogTab(QWidget):
             ("الخدمة",  150),
             ("المنصة",  120),
             ("العميل",  -1),
-            ("المطلوب", 120),
-            ("الربح",   120),
+            ("المطلوب", 100),
+            ("المصروف", 100),
+            ("الربح",   100),
             ("الحالة",  120),
-            ("إجراءات", 180),
+            ("إجراءات", 150),
         ]
         self.table = DataTable(columns)
         layout.addWidget(self.table)
@@ -437,19 +438,22 @@ class TransactionsLogTab(QWidget):
             self.table.set_cell(row, 3, t.get("customer_name") or "—", bold=True)
             
             required = t.get("amount_required", 0) or 0
+            spent    = t.get("amount_spent", 0) or 0
             profit   = t.get("profit", 0) or 0
+            
             self.table.set_cell(row, 4, fmt_currency(required), bold=True)
-            self.table.set_cell(row, 5, fmt_currency(profit), color=COLORS["accent"] if profit >= 0 else COLORS["red"])
+            self.table.set_cell(row, 5, fmt_currency(spent), color=COLORS["text_secondary"])
+            self.table.set_cell(row, 6, fmt_currency(profit), color=COLORS["accent"] if profit >= 0 else COLORS["red"])
             
             self.table.add_status_badge(
-                row, 6,
+                row, 7,
                 t.get("payment_status", ""),
                 operation_type=t.get("operation_type", "outbound"),
                 is_delivered=t.get("is_delivered", 0)
             )
             
             actions = make_txn_actions(t, self._on_status_change, self._on_delete)
-            self.table.setCellWidget(row, 7, actions)
+            self.table.setCellWidget(row, 8, actions)
             
             total_profit   += profit
             total_required += required

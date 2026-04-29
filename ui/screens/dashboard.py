@@ -89,7 +89,7 @@ class DashboardScreen(ScreenShell):
         return grid
 
     def _make_ops_table(self) -> QTableWidget:
-        columns = ["التاريخ", "العميل", "الخدمة", "المنصة", "المطلوب", "الربح", "الحالة"]
+        columns = ["التاريخ", "العميل", "الخدمة", "المنصة", "المطلوب", "المصروف", "الربح", "الحالة"]
         tbl = QTableWidget()
         tbl.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         tbl.setColumnCount(len(columns))
@@ -103,7 +103,7 @@ class DashboardScreen(ScreenShell):
         tbl.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         
         header = tbl.horizontalHeader()
-        widths = [160, 150, 150, 150, 110, 110, -1]
+        widths = [150, 130, 130, 130, 100, 100, 100, -1]
         for i, w in enumerate(widths):
             if w == -1:
                 header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
@@ -133,14 +133,15 @@ class DashboardScreen(ScreenShell):
             cell(2, t.get("service_name") or "—")
             cell(3, t.get("platform_name") or "—", color=COLORS["text_secondary"])
             cell(4, fmt_currency(t.get("amount_required", 0) or 0), bold=True)
+            cell(5, fmt_currency(t.get("amount_spent", 0) or 0), color=COLORS["text_secondary"])
             
             profit = t.get("profit", 0) or 0
-            cell(5, fmt_currency(profit), color=COLORS["accent"] if profit >= 0 else COLORS["red"])
+            cell(6, fmt_currency(profit), color=COLORS["accent"] if profit >= 0 else COLORS["red"])
             
             st = t.get("payment_status", "")
             st_text = {"cash": "نقدي ✅", "pending": "مؤجل ⏳", "paid": "مسدد ✓"}.get(st, st)
             st_color = {"cash": COLORS["green"], "pending": COLORS["yellow"], "paid": COLORS["text_secondary"]}.get(st)
-            cell(6, st_text, color=st_color, bold=True)
+            cell(7, st_text, color=st_color, bold=True)
 
     def _make_actions_panel(self) -> QFrame:
         frame = QFrame()
@@ -153,8 +154,7 @@ class DashboardScreen(ScreenShell):
         actions = [
             ("⊕  إضافة عملية",      "btn_primary",   self._go_to_transaction),
             ("👤  إضافة عميل",      "btn_secondary", self._add_customer),
-            ("💵  تعديل الميزانية", "btn_secondary", self._edit_budget),
-            ("💰  تعديل الكاش",    "btn_secondary", self._edit_cash),
+            ("💵  تعديل الكاش (الخزينة)", "btn_secondary", self._edit_cash),
             ("📊  التقارير",        "btn_secondary", self._go_to_reports),
         ]
         
@@ -204,20 +204,6 @@ class DashboardScreen(ScreenShell):
         if dlg.exec():
             self.refresh()
             QMessageBox.information(self, "تم ", "تم إضافة العميل بنجاح")
-
-    def _edit_budget(self):
-        current = db.get_budget()["main_budget"]
-        amount, ok = QInputDialog.getDouble(
-            self, "تعديل الميزانية", "أدخل رأس المال الجديد:",
-            value=current, min=0, decimals=2
-        )
-        if ok:
-            try:
-                db.update_main_budget(amount)
-                self.refresh()
-                QMessageBox.information(self, "تم ", f"تم تحديث الميزانية إلى {fmt_currency(amount)}")
-            except Exception as e:
-                QMessageBox.critical(self, "خطأ", str(e))
 
     def _edit_cash(self):
         current = db.get_budget()["cash_vault"]

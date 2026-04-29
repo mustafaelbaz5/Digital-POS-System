@@ -32,6 +32,9 @@ def add_outbound_transaction(
     - إذا pending → يضيف amount_required لمديونية العميل
     يرجع ID العملية
     """
+    amount_spent = round(float(amount_spent), 2)
+    amount_required = round(float(amount_required), 2)
+
     with get_connection() as conn:
         try:
             # 1. التحقق من رصيد المنصة
@@ -94,7 +97,13 @@ def add_outbound_transaction(
                     "UPDATE customers SET total_debt = total_debt + ? WHERE id = ?",
                     (amount_required, customer_id)
                 )
-            # paid → تم السداد مباشرة، لا يضاف للمديونية ولا للكاش
+            elif payment_status in ("paid", "cash"):
+                # تم السداد → يضاف للخزينة النقدية (إلا إذا كانت ببطاقة بنكية)
+                if not is_card:
+                    conn.execute(
+                        "UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1",
+                        (amount_required,)
+                    )
 
             conn.commit()
             return transaction_id
@@ -123,6 +132,9 @@ def add_inbound_transaction(
     - الربح = amount_received - amount_delivered
     يرجع ID العملية
     """
+    amount_received = round(float(amount_received), 2)
+    amount_delivered = round(float(amount_delivered), 2)
+
     with get_connection() as conn:
         try:
             # 1. التحقق من نوع المنصة
@@ -168,13 +180,14 @@ def add_inbound_transaction(
                 (amount_received, wallet_id)
             )
 
-            # 5. خصم من الخزينة النقدية
-            conn.execute(
-                "UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1",
-                (amount_delivered,)
-            )
+            # 5. خصم من الخزينة النقدية (فقط لو تم التسليم فعلاً)
+            if is_delivered:
+                conn.execute(
+                    "UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1",
+                    (amount_delivered,)
+                )
 
-            # 6. تسجيل في حساب العميل — المبلغ المسلم (له أو لم يُسلَّم بعد)
+            # 6. تسجيل في حساب العميل
             if customer_id:
                 if is_delivered:
                     # تم التسليم → ليس له شيء مستحق (صفر مديونية)
@@ -197,38 +210,9 @@ def add_inbound_transaction(
 def mark_as_delivered(transaction_id: int) -> None:
     """
     تحويل عملية واردة من 'لم يُسلَّم' إلى 'تم التسليم'
-    يُصفّر المبلغ المستحق للعميل
+    تستخدم الوظيفة المركزية لضمان تحديث الكاش والمديونية
     """
-    with get_connection() as conn:
-        try:
-            row = conn.execute("""
-                SELECT customer_id, amount_spent, is_delivered, operation_type
-                FROM transactions WHERE id = ?
-            """, (transaction_id,)).fetchone()
-
-            if not row:
-                raise ValueError("العملية غير موجودة")
-            if row["operation_type"] != "inbound":
-                raise ValueError("هذه الوظيفة للعمليات الواردة فقط")
-            if row["is_delivered"]:
-                raise ValueError("تم التسليم مسبقاً")
-
-            conn.execute(
-                "UPDATE transactions SET is_delivered = 1 WHERE id = ?",
-                (transaction_id,)
-            )
-
-            # إلغاء تأثير المبلغ على العميل (كان مسجلاً كـ "له")
-            if row["customer_id"]:
-                conn.execute(
-                    "UPDATE customers SET total_debt = total_debt + ? WHERE id = ?",
-                    (row["amount_spent"], row["customer_id"])
-                )
-
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
+    update_transaction_status(transaction_id, 'delivered')
 
 
 # ══════════════════════════════════════════
@@ -353,38 +337,9 @@ def get_customer_statement(customer_id: int) -> dict:
 def mark_as_paid(transaction_id: int) -> None:
     """
     تحويل عملية من 'مؤجل' إلى 'تم السداد'
-    يخصم المبلغ من مديونية العميل
+    تستخدم الوظيفة المركزية لضمان تحديث الكاش والمديونية
     """
-    with get_connection() as conn:
-        try:
-            row = conn.execute("""
-                SELECT customer_id, amount_required, payment_status
-                FROM transactions WHERE id = ?
-            """, (transaction_id,)).fetchone()
-
-            if not row:
-                raise ValueError("العملية غير موجودة")
-            if row["payment_status"] != "pending":
-                raise ValueError("العملية ليست في حالة مؤجل")
-
-            # تحديث حالة العملية
-            conn.execute(
-                "UPDATE transactions SET payment_status = 'paid' WHERE id = ?",
-                (transaction_id,)
-            )
-
-            # خصم من المديونية
-            if row["customer_id"]:
-                conn.execute(
-                    "UPDATE customers SET total_debt = total_debt - ? WHERE id = ?",
-                    (row["amount_required"], row["customer_id"])
-                )
-
-            conn.commit()
-
-        except Exception:
-            conn.rollback()
-            raise
+    update_transaction_status(transaction_id, 'paid')
 
 
 # ══════════════════════════════════════════
@@ -467,6 +422,8 @@ def get_dashboard_stats() -> dict:
             FROM transactions WHERE payment_status = 'pending'
         """).fetchone()
 
+        # إجمالي الأصول = المحافظ + الماكينات + الخزينة (الكاش)
+        # ملاحظة: main_budget هنا يعتبر جزءاً من السيولة الإجمالية أو تم استبداله بمفهوم الخزينة الموحد
         total_assets = (
             (machines["total"]  or 0) +
             (wallets["total"]   or 0) +
@@ -474,10 +431,14 @@ def get_dashboard_stats() -> dict:
             (budget["cash_vault"] or 0)
         )
 
+        # الرصيد الإجمالي
         total_balances = total_assets
 
+        # صافي المركز المالي = الأصول + الديون
+        net_position = total_assets + (debts["total"] or 0)
+
         return {
-            "main_budget":     budget["main_budget"]  or 0,
+            "main_budget":     budget["cash_vault"]   or 0,  # توحيد الميزانية مع الخزينة
             "cash_vault":      budget["cash_vault"]   or 0,
             "total_machines":  machines["total"]      or 0,
             "total_wallets":   (wallets["total"] or 0) + (instapay["total"] or 0),
@@ -485,9 +446,9 @@ def get_dashboard_stats() -> dict:
             "total_debts":     debts["total"]         or 0,
             "today_profit":    today_profit["total"]  or 0,
             "month_profit":    month_profit["total"]  or 0,
-            "total_balances":  total_balances,
-            "total_assets":    total_assets,
-            "net_position":    total_balances + (debts["total"] or 0) - (budget["main_budget"] or 0),
+            "total_balances":  round(total_balances, 2),
+            "total_assets":    round(total_assets, 2),
+            "net_position":    round(net_position, 2),
             "total_pending":   pending["total"] or 0,
         }
 
@@ -504,7 +465,7 @@ def update_transaction_status(transaction_id: int, new_status: str) -> None:
         try:
             row = conn.execute("""
                 SELECT customer_id, amount_required, amount_spent,
-                       payment_status, is_delivered, operation_type
+                       payment_status, is_delivered, operation_type, is_card
                 FROM transactions WHERE id = ?
             """, (transaction_id,)).fetchone()
 
@@ -517,7 +478,7 @@ def update_transaction_status(transaction_id: int, new_status: str) -> None:
                     return
 
                 if old == 'pending' and new_status == 'paid':
-                    # pending → paid: خصم من مديونية العميل
+                    # pending → paid: خصم من مديونية العميل + إضافة للكاش
                     conn.execute(
                         "UPDATE transactions SET payment_status = 'paid' WHERE id = ?",
                         (transaction_id,)
@@ -527,9 +488,15 @@ def update_transaction_status(transaction_id: int, new_status: str) -> None:
                             "UPDATE customers SET total_debt = total_debt - ? WHERE id = ?",
                             (row["amount_required"], row["customer_id"])
                         )
+                    # إضافة للخزينة (للعمليات الصادرة فقط وبشرط ألا تكون كارت)
+                    if row["operation_type"] == "outbound" and not row["is_card"]:
+                        conn.execute(
+                            "UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1",
+                            (row["amount_required"],)
+                        )
 
                 elif old == 'paid' and new_status == 'pending':
-                    # paid → pending: أعد المبلغ لمديونية العميل
+                    # paid → pending: أعد المبلغ لمديونية العميل - خصم من الكاش
                     conn.execute(
                         "UPDATE transactions SET payment_status = 'pending' WHERE id = ?",
                         (transaction_id,)
@@ -539,6 +506,12 @@ def update_transaction_status(transaction_id: int, new_status: str) -> None:
                             "UPDATE customers SET total_debt = total_debt + ? WHERE id = ?",
                             (row["amount_required"], row["customer_id"])
                         )
+                    # خصم من الخزينة (للعمليات الصادرة فقط وبشرط ألا تكون كارت)
+                    if row["operation_type"] == "outbound" and not row["is_card"]:
+                        conn.execute(
+                            "UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1",
+                            (row["amount_required"],)
+                        )
                 else:
                     raise ValueError(f"لا يمكن التحويل من '{old}' إلى '{new_status}'")
 
@@ -547,7 +520,20 @@ def update_transaction_status(transaction_id: int, new_status: str) -> None:
                     raise ValueError("تغيير التسليم للعمليات الواردة فقط")
                 if row["is_delivered"]:
                     return
+                
+                # التحقق من وجود كاش كافٍ في الخزينة
+                budget = conn.execute("SELECT cash_vault FROM budget WHERE id = 1").fetchone()
+                if budget["cash_vault"] < row["amount_spent"]:
+                    raise ValueError(
+                        f"الكاش غير كافٍ لإتمام التسليم - المتاح: {budget['cash_vault']:.2f} ج"
+                    )
+
                 conn.execute("UPDATE transactions SET is_delivered = 1 WHERE id = ?", (transaction_id,))
+                # خصم من الخزينة النقدية لأننا سلمنا المبلغ فعلياً
+                conn.execute(
+                    "UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1",
+                    (row["amount_spent"],)
+                )
                 if row["customer_id"]:
                     conn.execute(
                         "UPDATE customers SET total_debt = total_debt + ? WHERE id = ?",
@@ -560,6 +546,11 @@ def update_transaction_status(transaction_id: int, new_status: str) -> None:
                 if not row["is_delivered"]:
                     return
                 conn.execute("UPDATE transactions SET is_delivered = 0 WHERE id = ?", (transaction_id,))
+                # إعادة المبلغ للخزينة لأننا ألغينا التسليم
+                conn.execute(
+                    "UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1",
+                    (row["amount_spent"],)
+                )
                 if row["customer_id"]:
                     conn.execute(
                         "UPDATE customers SET total_debt = total_debt - ? WHERE id = ?",
@@ -606,18 +597,27 @@ def delete_transaction(transaction_id: int) -> None:
                         "UPDATE platforms SET monthly_used = MAX(0, monthly_used - ?) WHERE id = ?",
                         (spent, pid)
                     )
-                # عكس تأثير الدفع — فقط pending يؤثر على المديونية
+                # عكس تأثير الدفع
                 if status == "pending" and cid:
                     conn.execute(
                         "UPDATE customers SET total_debt = total_debt - ? WHERE id = ?", (req, cid)
                     )
-                # paid: تم السداد مباشرة، لا يوجد تأثير على المديونية يحتاج عكس
+                elif status in ("paid", "cash"):
+                    # تم السداد → أعد سحب المبلغ من الخزينة (فقط لو لم يكن كارت)
+                    if not row["is_card"]:
+                        conn.execute(
+                            "UPDATE budget SET cash_vault = MAX(0, cash_vault - ?) WHERE id = 1", (req,)
+                        )
 
             elif op == "inbound":
                 # أعد الخصم على المحفظة
                 conn.execute("UPDATE platforms SET balance = balance - ? WHERE id = ?", (req, pid))
-                # أعد الكاش
-                conn.execute("UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1", (spent,))
+                
+                # عكس تأثير الكاش
+                if delivered:
+                    # تم التسليم → أعد المبلغ المخصوم للخزينة
+                    conn.execute("UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1", (spent,))
+                
                 # عكس تأثير العميل
                 if cid and not delivered:
                     conn.execute(
