@@ -480,7 +480,7 @@ def get_dashboard_stats() -> dict:
             "main_budget":     budget["main_budget"]  or 0,
             "cash_vault":      budget["cash_vault"]   or 0,
             "total_machines":  machines["total"]      or 0,
-            "total_wallets":   wallets["total"]       or 0,
+            "total_wallets":   (wallets["total"] or 0) + (instapay["total"] or 0),
             "total_instapay":  instapay["total"]      or 0,
             "total_debts":     debts["total"]         or 0,
             "today_profit":    today_profit["total"]  or 0,

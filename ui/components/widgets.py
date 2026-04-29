@@ -269,7 +269,7 @@ class DataTable(QTableWidget):
             f = item.font()
             f.setBold(True)
             item.setFont(f)
-        item.setTextAlignment(align if align else AlignLeft)
+        item.setTextAlignment(align if align else AlignCenter)
         self.setItem(row, col, item)
 
     def add_status_badge(self, row: int, col: int, status: str,

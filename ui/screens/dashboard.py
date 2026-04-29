@@ -69,19 +69,19 @@ class DashboardScreen(ScreenShell):
         grid.setSpacing(16)
         grid.setContentsMargins(0, 0, 0, 0)
 
-        self.card_budget  = StatCard("رأس المال",       accent_color=COLORS["text_secondary"])
-        self.card_assets  = StatCard("إجمالي الأصول",    accent_color=COLORS["cyan"])
-        self.card_cash    = StatCard("الخزينة النقدية",  accent_color=COLORS["green"])
-        self.card_wallets = StatCard("إجمالي المحافظ",    accent_color=COLORS["purple"])
-        self.card_debts   = StatCard("إجمالي المديونيات", accent_color=COLORS["yellow"])
-        self.card_pending = StatCard("إجمالي المؤجل",     accent_color=COLORS["red"])
-        self.card_today   = StatCard("أرباح اليوم",       accent_color=COLORS["accent"])
-        self.card_month   = StatCard("أرباح الشهر",       accent_color=COLORS["accent_hover"])
-        self.card_ops     = StatCard("عمليات اليوم",      accent_color=COLORS["blue"])
+        self.card_budget   = StatCard("رأس المال",       accent_color=COLORS["text_secondary"])
+        self.card_assets   = StatCard("إجمالي الأصول",    accent_color=COLORS["cyan"])
+        self.card_cash     = StatCard("الخزينة النقدية",  accent_color=COLORS["green"])
+        self.card_wallets  = StatCard("إجمالي المحافظ",    accent_color=COLORS["purple"])
+        self.card_machines = StatCard("إجمالي الماكينات",   accent_color=COLORS["blue"])
+        self.card_pending  = StatCard("إجمالي المؤجل",     accent_color=COLORS["red"])
+        self.card_today    = StatCard("أرباح اليوم",       accent_color=COLORS["accent"])
+        self.card_month    = StatCard("أرباح الشهر",       accent_color=COLORS["accent_hover"])
+        self.card_ops      = StatCard("عمليات اليوم",      accent_color=COLORS["blue"])
 
         placement = [
             (self.card_budget, 0, 0), (self.card_assets, 0, 1), (self.card_cash, 0, 2),
-            (self.card_wallets, 1, 0), (self.card_debts, 1, 1), (self.card_pending, 1, 2),
+            (self.card_wallets, 1, 0), (self.card_machines, 1, 1), (self.card_pending, 1, 2),
             (self.card_today, 2, 0),  (self.card_month, 2, 1),  (self.card_ops, 2, 2),
         ]
         for card, r, col in placement:
@@ -174,7 +174,7 @@ class DashboardScreen(ScreenShell):
         self.card_assets.set_value(fmt_currency(stats["total_assets"]))
         self.card_cash.set_value(fmt_currency(stats["cash_vault"]))
         self.card_wallets.set_value(fmt_currency(stats["total_wallets"]))
-        self.card_debts.set_value(fmt_currency(stats["total_debts"]))
+        self.card_machines.set_value(fmt_currency(stats["total_machines"]))
         self.card_pending.set_value(fmt_currency(stats["total_pending"]))
         self.card_today.set_value(fmt_currency(stats["today_profit"]))
         self.card_month.set_value(fmt_currency(stats["month_profit"]))
