@@ -10,9 +10,12 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QDate, pyqtSignal
 from PyQt6.QtGui import QFont
-
-from ui.styles.theme import COLORS, FONT, CARD_RADIUS, ROW_HEIGHT
-from ui.components.widgets import ScreenShell, DataTable, SectionTitle, make_divider
+from ui.styles.theme import (
+    COLORS, FONT, CARD_RADIUS, ROW_HEIGHT,
+    GAP_XS, GAP_SM, GAP_MD, GAP_LG, GAP_XL,
+    MARGIN_CONTENT, MARGIN_CARD
+)
+from ui.components.widgets import ScreenShell, DataTable, SectionTitle, make_divider, CardGroup
 from utils.formatters import fmt_currency
 
 import database as db
@@ -182,8 +185,8 @@ class InventoryTab(QWidget):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 16, 0, 0)
-        layout.setSpacing(20)
+        layout.setContentsMargins(0, GAP_MD, 0, 0)
+        layout.setSpacing(GAP_LG)
 
         # ── Date range filter bar
         self.date_picker = DateRangePicker()
@@ -191,10 +194,10 @@ class InventoryTab(QWidget):
         layout.addWidget(self.date_picker)
 
         # ── Mini stat cards
+        stats_group = CardGroup("📊  ملخص الفترة")
         self._cards_grid = QGridLayout()
-        self._cards_grid.setSpacing(12)
-        layout.addLayout(self._cards_grid)
-
+        self._cards_grid.setSpacing(GAP_MD)
+        
         self.card_cash     = MiniStatCard("الخزينة النقدية",    color=COLORS["green"])
         self.card_machines = MiniStatCard("إجمالي الماكينات",  color=COLORS["blue"])
         self.card_wallets  = MiniStatCard("إجمالي المحافظ",    color=COLORS["purple"])
@@ -209,18 +212,16 @@ class InventoryTab(QWidget):
             self.card_debts, self.card_profit, self.card_budget, self.card_pending,
         ]):
             self._cards_grid.addWidget(card, i // 4, i % 4)
+        
+        stats_group.add_layout(self._cards_grid)
+        layout.addWidget(stats_group)
 
         # ── Match equation bar
         layout.addWidget(self._make_match_bar())
 
         # ── Platforms table
-        sec_lbl = QLabel("تفاصيل المنصات")
-        sec_lbl.setStyleSheet(
-            f"color: {COLORS['text_primary']}; font-size: {FONT['md']}; font-weight: bold;"
-            f"padding-top: 8px;"
-        )
-        layout.addWidget(sec_lbl)
-
+        platforms_group = CardGroup("🏢  تفاصيل المنصات")
+        
         columns = [
             ("المنصة",       180),
             ("النوع",          120),
@@ -231,30 +232,21 @@ class InventoryTab(QWidget):
         ]
         self.platforms_table = DataTable(columns)
         self.platforms_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        layout.addWidget(self.platforms_table)
+        platforms_group.add_widget(self.platforms_table)
+        layout.addWidget(platforms_group)
 
     def _make_match_bar(self) -> QFrame:
-        frame = QFrame()
-        frame.setObjectName("card_highlight")
-
-        layout = QVBoxLayout(frame)
-        layout.setContentsMargins(24, 16, 24, 16)
-        layout.setSpacing(12)
+        frame = CardGroup("⚖️  معادلة المطابقة")
 
         header = QHBoxLayout()
-        title = QLabel("⚖️  معادلة المطابقة")
-        title.setStyleSheet(
-            f"color: {COLORS['accent']}; font-size: {FONT['md']}; font-weight: bold;"
-        )
-        header.addWidget(title)
-        header.addStretch()
         formula = QLabel("(أرصدة + كاش + ديون)  =  (ميزانية + أرباح كلية)")
         formula.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: {FONT['xs']};")
+        header.addStretch()
         header.addWidget(formula)
-        layout.addLayout(header)
+        frame.add_layout(header)
 
         row = QHBoxLayout()
-        row.setSpacing(16)
+        row.setSpacing(GAP_MD)
 
         # Right side
         self._match_right = QLabel("—")
@@ -290,12 +282,12 @@ class InventoryTab(QWidget):
         eq.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 20px;")
         row.addWidget(self._match_left)
 
-        layout.addLayout(row)
+        frame.add_layout(row)
 
         self._match_breakdown = QLabel("")
         self._match_breakdown.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: {FONT['xs']};")
         self._match_breakdown.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self._match_breakdown)
+        frame.add_widget(self._match_breakdown)
 
         return frame
 
@@ -418,19 +410,18 @@ class TransactionsLogTab(QWidget):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 16, 0, 0)
-        layout.setSpacing(12)
+        layout.setContentsMargins(0, GAP_MD, 0, 0)
+        layout.setSpacing(GAP_LG)
 
-        # ── Search Bar
+        # ── Date picker (first section)
         self.date_picker = DateRangePicker()
         self.date_picker.changed.connect(self.load_data)
         layout.addWidget(self.date_picker)
 
-        filters_frame = QFrame()
-        filters_frame.setObjectName("card")
-        fl = QHBoxLayout(filters_frame)
-        fl.setContentsMargins(16, 8, 16, 8)
-        fl.setSpacing(12)
+        # ── Filters Card
+        filters_group = CardGroup("🔍  فلترة العمليات")
+        fl = QHBoxLayout()
+        fl.setSpacing(GAP_MD)
 
         self.ref_input = QLineEdit()
         self.ref_input.setPlaceholderText("بحث برقم المرجع...")
@@ -455,9 +446,12 @@ class TransactionsLogTab(QWidget):
         fl.addWidget(self.platform_filter)
         
         fl.addStretch()
-        layout.addWidget(filters_frame)
+        filters_group.add_layout(fl)
+        layout.addWidget(filters_group)
 
-        # ── Table
+        # ── Table Card
+        table_group = CardGroup("📋  سجل العمليات")
+        
         columns = [
             ("التاريخ", 140),
             ("المرجع",  90),
@@ -471,11 +465,13 @@ class TransactionsLogTab(QWidget):
             ("إجراءات", 150),
         ]
         self.table = DataTable(columns)
-        layout.addWidget(self.table)
+        table_group.add_widget(self.table)
 
         self.summary_lbl = QLabel("")
         self.summary_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: {FONT['sm']};")
-        layout.addWidget(self.summary_lbl)
+        table_group.add_widget(self.summary_lbl)
+        
+        layout.addWidget(table_group)
 
     def load_platforms_filter(self):
         self.platform_filter.clear()

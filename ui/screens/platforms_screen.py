@@ -11,8 +11,11 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from ui.styles.theme import COLORS, FONT, ROW_HEIGHT
-from ui.components.widgets import ScreenShell, make_divider
+from ui.styles.theme import (
+    COLORS, FONT, ROW_HEIGHT, 
+    GAP_XS, GAP_SM, GAP_MD, GAP_LG, MARGIN_CARD
+)
+from ui.components.widgets import ScreenShell, make_divider, CardGroup
 from utils.formatters import fmt_currency
 
 import database as db
@@ -296,23 +299,17 @@ class PlatformListTab(QWidget):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout.setContentsMargins(GAP_MD, GAP_MD, GAP_MD, GAP_MD)
+        layout.setSpacing(GAP_MD)
 
-        # ── شريط الترتيب
-        sort_bar = QFrame()
-        sort_bar.setFixedHeight(38)
-        sort_bar.setStyleSheet(
-            f"background:{COLORS['bg_card']};"
-            f"border-bottom:1px solid {COLORS['border']};"
-        )
-        sb = QHBoxLayout(sort_bar)
-        sb.setContentsMargins(16, 0, 16, 0)
-        sb.setSpacing(6)
+        # ── Toolbar Card
+        sort_group = CardGroup()
+        sb = QHBoxLayout()
+        sb.setSpacing(GAP_SM)
         sb.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         sort_lbl = QLabel("ترتيب:")
-        sort_lbl.setStyleSheet(f"color:{COLORS['text_muted']};font-size:12px;background:transparent;border:none;")
+        sort_lbl.setStyleSheet(f"color:{COLORS['text_muted']};font-size:12px;")
         sb.addWidget(sort_lbl)
 
         self._sort_mode = "default"   # default | balance_desc | limit_asc | limit_desc
@@ -333,17 +330,23 @@ class PlatformListTab(QWidget):
             sb.addWidget(btn)
 
         sb.addStretch()
-        layout.addWidget(sort_bar)
+        sort_group.add_layout(sb)
+        layout.addWidget(sort_group)
         self._apply_sort_styles()
 
-        # ── هيدر الأعمدة
+        # ── List Card
+        list_group = CardGroup()
+        list_layout = QVBoxLayout()
+        list_layout.setSpacing(0)
+        list_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Header
         header = QFrame()
         header.setFixedHeight(40)
         header.setStyleSheet(
             f"background:{COLORS['bg_elevated']};"
             f"border-bottom:1px solid {COLORS['border']};"
         )
-        header.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         hl = QHBoxLayout(header)
         hl.setContentsMargins(16, 0, 16, 0)
         hl.setSpacing(0)
@@ -369,16 +372,18 @@ class PlatformListTab(QWidget):
 
         hl.addWidget(hdr("الرصيد الحالي", 160, Qt.AlignmentFlag.AlignLeft))
         hl.addWidget(hdr("إجراءات", 100))
-        layout.addWidget(header)
+        list_layout.addWidget(header)
 
-        # منطقة الصفوف
+        # منطقه الصفوف
         self._rows_widget = QWidget()
-        self._rows_widget.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self._rows_layout = QVBoxLayout(self._rows_widget)
         self._rows_layout.setContentsMargins(0, 0, 0, 0)
         self._rows_layout.setSpacing(0)
 
-        layout.addWidget(self._rows_widget)
+        list_layout.addWidget(self._rows_widget)
+        list_group.add_layout(list_layout)
+        layout.addWidget(list_group)
+        
         layout.addStretch()
 
     def _set_sort(self, mode: str):
@@ -463,8 +468,8 @@ class PlatformsScreen(ScreenShell):
         self.add_action(add_btn)
 
         c = self.content()
-        c.setContentsMargins(0, 0, 0, 0)
-        c.setSpacing(0)
+        c.setContentsMargins(0, GAP_MD, 0, 0)
+        c.setSpacing(GAP_LG)
 
         self.tabs = QTabWidget()
         self.tabs.setLayoutDirection(Qt.LayoutDirection.RightToLeft)

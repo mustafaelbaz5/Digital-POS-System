@@ -11,8 +11,11 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
 from datetime import datetime
 
-from ui.styles.theme import COLORS, FONT, CARD_RADIUS, BORDER_RADIUS, ROW_HEIGHT
-from ui.components.widgets import StatCard, SectionTitle, ScreenShell
+from ui.styles.theme import (
+    COLORS, FONT, CARD_RADIUS, BORDER_RADIUS, ROW_HEIGHT,
+    GAP_XS, GAP_SM, GAP_MD, GAP_LG, GAP_XL, MARGIN_CONTENT
+)
+from ui.components.widgets import StatCard, SectionTitle, ScreenShell, CardGroup, make_divider
 from utils.formatters import fmt_currency, fmt_datetime
 
 import database as db
@@ -35,38 +38,30 @@ class DashboardScreen(ScreenShell):
 
     def _build_content(self):
         c = self.content()
-        c.setSpacing(24)
+        c.setSpacing(GAP_LG)
 
         # ── Section 1: Stat Cards
-        c.addWidget(self._make_section_header("📊  نظرة عامة على الأموال"))
-        c.addLayout(self._make_stats_grid())
+        stats_group = CardGroup("📊  نظرة عامة على الأموال")
+        stats_group.add_layout(self._make_stats_grid())
+        c.addWidget(stats_group)
 
         # ── Section 2: Recent Transactions
-        c.addWidget(self._make_section_header("🕒  آخر العمليات"))
+        ops_group = CardGroup("🕒  آخر العمليات")
         self._ops_table = self._make_ops_table()
-        c.addWidget(self._ops_table)
+        ops_group.add_widget(self._ops_table)
+        c.addWidget(ops_group)
 
         # ── Section 3: Quick Actions
-        c.addWidget(self._make_section_header("⚡  الإجراءات السريعة"))
-        c.addWidget(self._make_actions_panel())
+        actions_group = CardGroup("⚡  الإجراءات السريعة")
+        actions_group.add_widget(self._make_actions_panel())
+        c.addWidget(actions_group)
 
-        c.addSpacing(40)
+        c.addSpacing(GAP_MD)
         c.addStretch()
-
-    @staticmethod
-    def _make_section_header(text: str) -> QLabel:
-        lbl = QLabel(text)
-        lbl.setStyleSheet(
-            f"color: {COLORS['text_primary']}; font-size: {FONT['lg']};"
-            f"font-weight: bold; padding-bottom: 8px;"
-            f"border-bottom: 1px solid {COLORS['border']};"
-        )
-        lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        return lbl
 
     def _make_stats_grid(self) -> QGridLayout:
         grid = QGridLayout()
-        grid.setSpacing(16)
+        grid.setSpacing(GAP_MD)
         grid.setContentsMargins(0, 0, 0, 0)
 
         self.card_budget   = StatCard("رأس المال",       accent_color=COLORS["text_secondary"])

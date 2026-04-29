@@ -15,7 +15,9 @@ from PyQt6.QtGui import QColor
 from ui.styles.theme import (
     COLORS, FONT, CARD_RADIUS, BORDER_RADIUS,
     get_status_style, get_status_text,
-    BTN_HEIGHT, INPUT_HEIGHT, ROW_HEIGHT
+    BTN_HEIGHT, INPUT_HEIGHT, ROW_HEIGHT,
+    GAP_XS, GAP_SM, GAP_MD, GAP_LG, GAP_XL,
+    MARGIN_CONTENT, MARGIN_CARD
 )
 
 RTL = Qt.LayoutDirection.RightToLeft
@@ -42,11 +44,11 @@ class ScreenShell(QWidget):
         self._header = QWidget()
         self._header.setObjectName("screen_header")
         hl = QHBoxLayout(self._header)
-        hl.setContentsMargins(32, 0, 32, 0)
-        hl.setSpacing(16)
+        hl.setContentsMargins(MARGIN_CONTENT, 0, MARGIN_CONTENT, 0)
+        hl.setSpacing(GAP_MD)
 
         title_block = QVBoxLayout()
-        title_block.setSpacing(4)
+        title_block.setSpacing(GAP_XS)
 
         self._title_lbl = QLabel(title)
         self._title_lbl.setObjectName("screen_title")
@@ -63,7 +65,7 @@ class ScreenShell(QWidget):
         hl.addStretch()
 
         self._actions = QHBoxLayout()
-        self._actions.setSpacing(12)
+        self._actions.setSpacing(GAP_MD)
         hl.addLayout(self._actions)
 
         root.addWidget(self._header)
@@ -76,8 +78,8 @@ class ScreenShell(QWidget):
 
         self._content_w = QWidget()
         self._content_l = QVBoxLayout(self._content_w)
-        self._content_l.setContentsMargins(32, 24, 32, 32)
-        self._content_l.setSpacing(24)
+        self._content_l.setContentsMargins(MARGIN_CONTENT, GAP_LG, MARGIN_CONTENT, MARGIN_CONTENT)
+        self._content_l.setSpacing(GAP_LG)
         scroll.setWidget(self._content_w)
 
         root.addWidget(scroll)
@@ -94,6 +96,40 @@ class ScreenShell(QWidget):
 
 
 # ══════════════════════════════════════════════════════
+#  CardGroup
+# ══════════════════════════════════════════════════════
+
+class CardGroup(QFrame):
+    """
+    A container that groups items inside a styled card.
+    Useful for separating logical sections of a screen.
+    """
+    def __init__(self, title: str = "", parent=None):
+        super().__init__(parent)
+        self.setObjectName("card")
+        self.setLayoutDirection(RTL)
+        
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(MARGIN_CARD, MARGIN_CARD, MARGIN_CARD, MARGIN_CARD)
+        self._layout.setSpacing(GAP_MD)
+        
+        if title:
+            header = SectionTitle(title)
+            self._layout.addWidget(header)
+            self._layout.addWidget(make_divider())
+            self._layout.addSpacing(GAP_XS)
+
+    def add_widget(self, widget: QWidget):
+        self._layout.addWidget(widget)
+    
+    def add_layout(self, layout: QVBoxLayout | QHBoxLayout):
+        self._layout.addLayout(layout)
+
+    def layout(self) -> QVBoxLayout:
+        return self._layout
+
+
+# ══════════════════════════════════════════════════════
 #  StatCard
 # ══════════════════════════════════════════════════════
 
@@ -106,7 +142,7 @@ class StatCard(QWidget):
 
     def _build(self, title: str, value: str, icon: str):
         self.setObjectName("stat_card")
-        self.setMinimumHeight(120)
+        self.setMinimumHeight(130)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setLayoutDirection(RTL)
 
@@ -125,8 +161,8 @@ class StatCard(QWidget):
         outer.addWidget(self._bar)
 
         inner = QVBoxLayout()
-        inner.setContentsMargins(20, 20, 20, 20)
-        inner.setSpacing(10)
+        inner.setContentsMargins(MARGIN_CARD, MARGIN_CARD, MARGIN_CARD, MARGIN_CARD)
+        inner.setSpacing(GAP_SM)
 
         # Title
         title_lbl = QLabel(title)
@@ -177,8 +213,8 @@ class PlatformCard(QWidget):
         self.setLayoutDirection(RTL)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(10)
+        layout.setContentsMargins(MARGIN_CARD, MARGIN_CARD, MARGIN_CARD, MARGIN_CARD)
+        layout.setSpacing(GAP_MD)
 
         ptype = p.get("type", "machine")
         type_color, type_text = {
@@ -189,7 +225,7 @@ class PlatformCard(QWidget):
 
         # ─ Header row
         hrow = QHBoxLayout()
-        hrow.setSpacing(8)
+        hrow.setSpacing(GAP_SM)
 
         name = QLabel(p["name"])
         name.setStyleSheet(
@@ -207,7 +243,7 @@ class PlatformCard(QWidget):
         hrow.addWidget(badge)
         layout.addLayout(hrow)
 
-        layout.addSpacing(4)
+        layout.addSpacing(GAP_XS)
 
         # ─ Balance
         bal = p.get("balance", 0)
@@ -302,8 +338,8 @@ class SectionTitle(QWidget):
         super().__init__(parent)
         self.setLayoutDirection(RTL)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 4, 0, 4)
-        layout.setSpacing(4)
+        layout.setContentsMargins(0, GAP_XS, 0, GAP_XS)
+        layout.setSpacing(GAP_XS)
 
         t = QLabel(title)
         t.setStyleSheet(f"color:{COLORS['text_primary']}; font-size:{FONT['lg']}; font-weight:bold;")
@@ -328,8 +364,8 @@ class GroupLabel(QWidget):
         self.setLayoutDirection(RTL)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 12, 0, 4)
-        layout.setSpacing(10)
+        layout.setContentsMargins(0, GAP_MD, 0, GAP_XS)
+        layout.setSpacing(GAP_SM + 2)
 
         dot = QFrame()
         dot.setFixedSize(8, 8)
@@ -358,8 +394,8 @@ class InfoRow(QWidget):
         self.setLayoutDirection(RTL)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 6, 0, 6)
-        layout.setSpacing(12)
+        layout.setContentsMargins(0, GAP_SM, 0, GAP_SM)
+        layout.setSpacing(GAP_MD)
 
         self._lbl = QLabel(label)
         self._lbl.setStyleSheet(f"color:{COLORS['text_secondary']};")
@@ -396,8 +432,8 @@ def make_section_header(title: str, btn_text: str = None,
     w = QWidget()
     w.setLayoutDirection(RTL)
     row = QHBoxLayout(w)
-    row.setContentsMargins(0, 8, 0, 8)
-    row.setSpacing(16)
+    row.setContentsMargins(0, GAP_SM, 0, GAP_SM)
+    row.setSpacing(GAP_MD)
 
     lbl = QLabel(title)
     lbl.setStyleSheet(f"color:{COLORS['text_primary']}; font-size:{FONT['lg']}; font-weight:bold;")

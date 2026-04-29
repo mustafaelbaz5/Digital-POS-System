@@ -119,6 +119,17 @@ INPUT_HEIGHT   = 44
 BORDER_RADIUS  = "10px"
 CARD_RADIUS    = "14px"
 
+# Standard Spacing (Gaps)
+GAP_XS = 4
+GAP_SM = 8
+GAP_MD = 16
+GAP_LG = 24
+GAP_XL = 32
+
+# Standard Margins
+MARGIN_CONTENT = 32
+MARGIN_CARD    = 20
+
 
 # ──────────────────────────────────────────────────
 # MAIN STYLESHEET
@@ -181,7 +192,7 @@ QScrollBar::handle:horizontal:hover {{
     background: {COLORS['border']};
     max-height: 1px;
     border: none;
-    margin: 8px 12px;
+    margin: {GAP_SM}px {GAP_MD}px;
 }}
 
 /* ── Navigation ── */
@@ -233,12 +244,16 @@ QScrollBar::handle:horizontal:hover {{
 }}
 #card:hover {{
     border-color: {COLORS['border_light']};
+    background: {COLORS['bg_elevated']};
 }}
 
 #stat_card {{
     background: {COLORS['bg_card']};
     border: 1px solid {COLORS['border']};
     border-radius: {CARD_RADIUS};
+}}
+#stat_card:hover {{
+    border-color: {COLORS['accent']};
 }}
 
 #card_highlight {{

@@ -12,8 +12,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction
 
-from ui.styles.theme import COLORS, FONT, ROW_HEIGHT
-from ui.components.widgets import ScreenShell, DataTable, make_divider
+from ui.styles.theme import COLORS, FONT, ROW_HEIGHT, GAP_SM, GAP_MD, GAP_LG
+from ui.components.widgets import ScreenShell, DataTable, make_divider, CardGroup
 from utils.formatters import fmt_currency
 
 import database as db
@@ -63,13 +63,13 @@ class CustomersTab(QWidget):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 12, 0, 0)
-        layout.setSpacing(0)
+        layout.setContentsMargins(0, GAP_MD, 0, 0)
+        layout.setSpacing(GAP_LG)
 
-        # Toolbar
+        # ── Toolbar Card
+        toolbar_group = CardGroup("🔍  البحث والفلترة")
         toolbar = QHBoxLayout()
-        toolbar.setSpacing(8)
-        toolbar.setContentsMargins(0, 0, 0, 0)
+        toolbar.setSpacing(GAP_MD)
 
         add_btn = QPushButton("＋  إضافة عميل")
         add_btn.setObjectName("btn_primary")
@@ -91,12 +91,11 @@ class CustomersTab(QWidget):
         self.search_input.textChanged.connect(self._load_table)
         toolbar.addWidget(self.search_input)
 
-        layout.addLayout(toolbar)
+        toolbar_group.add_layout(toolbar)
+        layout.addWidget(toolbar_group)
 
-        # task 7: clear margin between search bar and table
-        layout.addSpacing(16)
-
-        # Table — task 8: taller rows, prominent statement button
+        # ── Table Card
+        table_group = CardGroup("👥  قائمة العملاء")
         columns = [
             ("الاسم",    200),
             ("التليفون", 130),
@@ -107,16 +106,17 @@ class CustomersTab(QWidget):
             ("الكشف",    130),
         ]
         self.table = DataTable(columns)
-        # task 8: increase row height
         self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._context_menu)
-        layout.addWidget(self.table)
+        table_group.add_widget(self.table)
 
         self.total_label = QLabel("")
         self.total_label.setObjectName("label_muted")
         self.total_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(self.total_label)
+        table_group.add_widget(self.total_label)
+        
+        layout.addWidget(table_group)
 
     def load_data(self):
         current = self.group_filter.currentData()
@@ -239,30 +239,32 @@ class GroupsTab(QWidget):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 12, 0, 0)
-        layout.setSpacing(0)
+        layout.setContentsMargins(0, GAP_MD, 0, 0)
+        layout.setSpacing(GAP_LG)
 
+        # ── Toolbar Card
+        toolbar_group = CardGroup("🔍  إدارة المجموعات")
         toolbar = QHBoxLayout()
-        toolbar.setSpacing(8)
+        toolbar.setSpacing(GAP_MD)
         add_btn = QPushButton("＋  إضافة مجموعة")
         add_btn.setObjectName("btn_primary")
         add_btn.setFixedHeight(36)
         add_btn.clicked.connect(self._add_group)
         toolbar.addWidget(add_btn)
         toolbar.addStretch()
-        layout.addLayout(toolbar)
+        toolbar_group.add_layout(toolbar)
 
-        # task 9: search input for groups
-        layout.addSpacing(10)
+        # search input for groups
         self.group_search = QLineEdit()
         self.group_search.setPlaceholderText("🔍  بحث باسم المجموعة...")
         self.group_search.setFixedHeight(36)
         self.group_search.textChanged.connect(self._filter_groups)
-        layout.addWidget(self.group_search)
+        toolbar_group.add_widget(self.group_search)
+        
+        layout.addWidget(toolbar_group)
 
-        layout.addSpacing(14)
-
-        # task 10: taller rows, visible action buttons
+        # ── Table Card
+        table_group = CardGroup("📋  قائمة المجموعات")
         columns = [
             ("اسم المجموعة", 200),
             ("القائد",        180),
@@ -270,11 +272,12 @@ class GroupsTab(QWidget):
             ("إجراءات",       180),
         ]
         self.table = DataTable(columns)
-        # task 10: larger row height
         self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._context_menu)
-        layout.addWidget(self.table)
+        table_group.add_widget(self.table)
+        
+        layout.addWidget(table_group)
 
     def load_data(self):
         self._all_groups = db.get_all_groups()

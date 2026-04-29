@@ -14,7 +14,10 @@ from PyQt6.QtGui import QFont
 
 import database as db
 from ui.components.widgets import DataTable
-from ui.styles.theme import COLORS, FONT, CARD_RADIUS, ROW_HEIGHT
+from ui.styles.theme import (
+    COLORS, FONT, CARD_RADIUS, ROW_HEIGHT,
+    GAP_XS, GAP_SM, GAP_MD, GAP_LG, MARGIN_CARD
+)
 from utils.formatters import fmt_currency
 
 
@@ -26,8 +29,8 @@ def info_pill(label: str, value: str, color: str = None) -> QFrame:
     frame = QFrame()
     frame.setObjectName("card")
     layout = QVBoxLayout(frame)
-    layout.setContentsMargins(14, 10, 14, 10)
-    layout.setSpacing(3)
+    layout.setContentsMargins(MARGIN_CARD, MARGIN_CARD // 2, MARGIN_CARD, MARGIN_CARD // 2)
+    layout.setSpacing(GAP_XS)
     val_lbl = QLabel(value)
     val_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
     val_lbl.setStyleSheet(f"color:{color or COLORS['text_primary']};font-size:17px;font-weight:bold;")

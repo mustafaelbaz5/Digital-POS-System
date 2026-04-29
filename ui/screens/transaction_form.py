@@ -11,8 +11,10 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from ui.styles.theme import COLORS, FONT
-from ui.components.widgets import ScreenShell, make_divider
+from ui.styles.theme import (
+    COLORS, FONT, GAP_XS, GAP_SM, GAP_MD, GAP_LG, MARGIN_CARD
+)
+from ui.components.widgets import ScreenShell, make_divider, CardGroup
 from utils.formatters import fmt_currency
 
 import database as db
@@ -23,7 +25,7 @@ def field(label_text: str, widget: QWidget) -> QVBoxLayout:
     lbl.setObjectName("label_field")
     lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
     box = QVBoxLayout()
-    box.setSpacing(6)
+    box.setSpacing(GAP_XS + 2)
     box.addWidget(lbl)
     box.addWidget(widget)
     return box
@@ -170,41 +172,47 @@ class OutboundTab(QWidget):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(18)  # task 11: better spacing
+        layout.setContentsMargins(0, GAP_MD, 0, 0)
+        layout.setSpacing(GAP_LG)
 
-        # Row 1: Platform + Service
-        row1 = QHBoxLayout(); row1.setSpacing(16)
+        # ── Section 1: Platform & Service
+        info_group = CardGroup("🏢  بيانات الخدمة")
+        
+        row1 = QHBoxLayout(); row1.setSpacing(GAP_MD)
         self.platform_combo = QComboBox()
         self.platform_combo.setMinimumWidth(300)
         self.platform_combo.currentIndexChanged.connect(self._update_balance)
         row1.addLayout(field("المنصة *", self.platform_combo))
+        
         self.service_input = QLineEdit()
         self.service_input.setPlaceholderText("مثال: شحن رصيد، تحويل...")
         row1.addLayout(field("اسم الخدمة *", self.service_input))
-        layout.addLayout(row1)
+        info_group.add_layout(row1)
 
         self.balance_lbl = QLabel("")
         self.balance_lbl.setStyleSheet(
             f"color:{COLORS['teal_bright']};font-size:12px;"
-            f"background:{COLORS['bg_input']};border-radius:6px;padding:4px 10px;"
+            f"background:{COLORS['bg_input']};border-radius:6px;padding:6px 12px;"
         )
         self.balance_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(self.balance_lbl)
+        info_group.add_widget(self.balance_lbl)
+        layout.addWidget(info_group)
 
-        # Row 2: Amounts
-        row2 = QHBoxLayout(); row2.setSpacing(16)
+        # ── Section 2: Amounts & Customer
+        financial_group = CardGroup("💰  المبالغ والعملاء")
+        
+        row2 = QHBoxLayout(); row2.setSpacing(GAP_MD)
         self.amount_spent = QDoubleSpinBox()
         self.amount_spent.setRange(0.01, 9_999_999); self.amount_spent.setDecimals(2)
         self.amount_spent.setSuffix(" ج"); self.amount_spent.valueChanged.connect(self._calc_profit)
         row2.addLayout(field("المبلغ المصروف (من المنصة) *", self.amount_spent))
+        
         self.amount_required = QDoubleSpinBox()
         self.amount_required.setRange(0.01, 9_999_999); self.amount_required.setDecimals(2)
         self.amount_required.setSuffix(" ج"); self.amount_required.valueChanged.connect(self._calc_profit)
         row2.addLayout(field("المبلغ المطلوب (من العميل) *", self.amount_required))
-        layout.addLayout(row2)
+        financial_group.add_layout(row2)
 
-        # task 12: plain text profit label (no frame/box)
         profit_row = QHBoxLayout()
         profit_lbl_title = QLabel("الربح المتوقع:")
         profit_lbl_title.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:12px;")
@@ -213,51 +221,47 @@ class OutboundTab(QWidget):
         self.profit_label = QLabel("0.00 ج")
         self.profit_label.setStyleSheet(f"color:{COLORS['green']};font-size:16px;font-weight:bold;")
         profit_row.addWidget(self.profit_label)
-        layout.addLayout(profit_row)
+        financial_group.add_layout(profit_row)
 
-        layout.addWidget(make_divider())
+        financial_group.add_widget(make_divider())
 
-        # Row 3: Customer search — task 11: clean consistent styling
-        cust_lbl = QLabel("العميل *"); cust_lbl.setObjectName("label_field")
-        cust_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(cust_lbl)
-
-        cust_search_row = QHBoxLayout(); cust_search_row.setSpacing(8)
+        # Customer selection
+        cust_search_row = QHBoxLayout(); cust_search_row.setSpacing(GAP_SM)
         self.customer_search = QLineEdit()
         self.customer_search.setPlaceholderText("🔍 ابحث باسم أو تليفون...")
         self.customer_search.setFixedHeight(38)
         self.customer_search.textChanged.connect(self._filter_customers)
-        cust_search_row.addWidget(self.customer_search, 1)
+        cust_search_row.addLayout(field("ابحث عن عميل", self.customer_search))
+        
         self.customer_combo = QComboBox()
         self.customer_combo.setMinimumWidth(200)
-        cust_search_row.addWidget(self.customer_combo, 2)
-        layout.addLayout(cust_search_row)
+        cust_search_row.addLayout(field("اختر العميل *", self.customer_combo))
+        financial_group.add_layout(cust_search_row)
+        layout.addWidget(financial_group)
 
-        # Row 4: Payment status
-        status_lbl = QLabel("حالة الدفع *"); status_lbl.setObjectName("label_field")
-        status_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(status_lbl)
+        # ── Section 3: Status & Notes
+        status_group = CardGroup("✅  الحالة والملاحظات")
+        
+        status_layout = QVBoxLayout(); status_layout.setSpacing(GAP_SM)
         self.status_selector = PaymentStatusSelector()
-        layout.addWidget(self.status_selector)
+        status_layout.addLayout(field("حالة الدفع *", self.status_selector))
+        status_group.add_layout(status_layout)
 
-        layout.addWidget(make_divider())
-
-        # Row 5: Reference + Card
-        row4 = QHBoxLayout(); row4.setSpacing(16)
+        row4 = QHBoxLayout(); row4.setSpacing(GAP_MD)
         self.ref_input = QLineEdit(); self.ref_input.setPlaceholderText("رقم المرجع / العملية")
         row4.addLayout(field("رقم المرجع", self.ref_input))
-        card_col = QVBoxLayout(); card_col.setSpacing(5)
-        sp = QLabel(" "); sp.setObjectName("label_field"); card_col.addWidget(sp)
+        
         self.is_card_check = QCheckBox("كارت (بدون رقم عملية)")
         self.is_card_check.stateChanged.connect(lambda s: self.ref_input.setEnabled(not bool(s)))
-        card_col.addWidget(self.is_card_check); card_col.addStretch()
-        row4.addLayout(card_col)
-        layout.addLayout(row4)
+        row4.addLayout(field("إضافي", self.is_card_check))
+        status_group.add_layout(row4)
 
         self.notes_input = QTextEdit()
         self.notes_input.setMaximumHeight(80)
         self.notes_input.setPlaceholderText("ملاحظات (اختياري)")
-        layout.addLayout(field("ملاحظات", self.notes_input))
+        status_group.add_layout(field("ملاحظات", self.notes_input))
+        layout.addWidget(status_group)
+
         layout.addStretch()
 
         save_btn = QPushButton("  حفظ العملية الصادرة")
@@ -353,40 +357,48 @@ class InboundTab(QWidget):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(18)
+        layout.setContentsMargins(0, GAP_MD, 0, 0)
+        layout.setSpacing(GAP_LG)
 
         note = QLabel("📌  عملية الاستلام متاحة للمحافظ الإلكترونية وانستا باي فقط")
         note.setStyleSheet(
             f"color:{COLORS['cyan']};background:{COLORS['cyan_bg']};"
             f"border:1px solid {COLORS['border_light']};"
-            f"border-radius:8px;padding:8px 14px;font-size:12px;")
+            f"border-radius:8px;padding:10px 16px;font-size:12px;")
         note.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(note)
 
-        row1 = QHBoxLayout(); row1.setSpacing(16)
+        # ── Section 1: Wallet & Service
+        info_group = CardGroup("🏢  بيانات الاستلام")
+        
+        row1 = QHBoxLayout(); row1.setSpacing(GAP_MD)
         self.wallet_combo = QComboBox(); self.wallet_combo.setMinimumWidth(200)
         self.wallet_combo.currentIndexChanged.connect(self._update_wallet_info)
         row1.addLayout(field("المحفظة / انستا باي *", self.wallet_combo))
+        
         self.service_input = QLineEdit()
         self.service_input.setPlaceholderText("مثال: استلام تحويل فودافون")
         row1.addLayout(field("اسم الخدمة *", self.service_input))
-        layout.addLayout(row1)
+        info_group.add_layout(row1)
 
-        layout.addWidget(self._make_info_bar())
+        info_group.add_widget(self._make_info_bar())
+        layout.addWidget(info_group)
 
-        row2 = QHBoxLayout(); row2.setSpacing(16)
+        # ── Section 2: Amounts & Customer
+        financial_group = CardGroup("💰  المبالغ والعملاء")
+        
+        row2 = QHBoxLayout(); row2.setSpacing(GAP_MD)
         self.amount_received = QDoubleSpinBox()
         self.amount_received.setRange(0.01, 9_999_999); self.amount_received.setDecimals(2)
         self.amount_received.setSuffix(" ج"); self.amount_received.valueChanged.connect(self._calc_profit)
         row2.addLayout(field("المبلغ المستلم في المحفظة *", self.amount_received))
+        
         self.amount_delivered = QDoubleSpinBox()
         self.amount_delivered.setRange(0.01, 9_999_999); self.amount_delivered.setDecimals(2)
         self.amount_delivered.setSuffix(" ج"); self.amount_delivered.valueChanged.connect(self._calc_profit)
         row2.addLayout(field("المبلغ المسلم كاش *", self.amount_delivered))
-        layout.addLayout(row2)
+        financial_group.add_layout(row2)
 
-        # task 12: plain text profit
         profit_row = QHBoxLayout()
         p_title = QLabel("الربح المتوقع:")
         p_title.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:12px;")
@@ -394,38 +406,41 @@ class InboundTab(QWidget):
         self.profit_label = QLabel("0.00 ج")
         self.profit_label.setStyleSheet(f"color:{COLORS['green']};font-size:16px;font-weight:bold;")
         profit_row.addWidget(self.profit_label)
-        layout.addLayout(profit_row)
+        financial_group.add_layout(profit_row)
 
-        layout.addWidget(make_divider())
+        financial_group.add_widget(make_divider())
 
-        # Customer search
-        cust_lbl = QLabel("العميل (مُحوِّل المبلغ)"); cust_lbl.setObjectName("label_field")
-        cust_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(cust_lbl)
-
-        cust_row = QHBoxLayout(); cust_row.setSpacing(8)
+        # Customer selection
+        cust_row = QHBoxLayout(); cust_row.setSpacing(GAP_SM)
         self.customer_search = QLineEdit()
         self.customer_search.setPlaceholderText("🔍 ابحث باسم أو تليفون...")
         self.customer_search.setFixedHeight(38)
         self.customer_search.textChanged.connect(self._filter_customers)
-        cust_row.addWidget(self.customer_search, 1)
+        cust_row.addLayout(field("العميل (مُحوِّل المبلغ)", self.customer_search))
+        
         self.customer_combo = QComboBox(); self.customer_combo.setMinimumWidth(200)
-        cust_row.addWidget(self.customer_combo, 2)
-        layout.addLayout(cust_row)
+        cust_row.addLayout(field("اختر العميل", self.customer_combo))
+        financial_group.add_layout(cust_row)
+        layout.addWidget(financial_group)
 
+        # ── Section 3: Status & Notes
+        status_group = CardGroup("✅  الحالة والملاحظات")
+        
         self.ref_input = QLineEdit(); self.ref_input.setPlaceholderText("رقم المرجع")
-        layout.addLayout(field("رقم المرجع", self.ref_input))
+        status_group.add_layout(field("رقم المرجع", self.ref_input))
 
         self._effect_lbl = QLabel("")
         self._effect_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.delivery_selector = DeliveryStatusSelector(self._effect_lbl)
-        layout.addWidget(self.delivery_selector)
-        layout.addWidget(self._effect_lbl)
+        status_group.add_layout(field("تسليم الكاش للعميل", self.delivery_selector))
+        status_group.add_widget(self._effect_lbl)
 
         self.notes_input = QTextEdit()
         self.notes_input.setMaximumHeight(60)
         self.notes_input.setPlaceholderText("ملاحظات (اختياري)")
-        layout.addLayout(field("ملاحظات", self.notes_input))
+        status_group.add_layout(field("ملاحظات", self.notes_input))
+        layout.addWidget(status_group)
+
         layout.addStretch()
 
         save_btn = QPushButton("  حفظ العملية الواردة")
