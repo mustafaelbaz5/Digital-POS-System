@@ -19,6 +19,6 @@ from .dal_transactions import (
     add_outbound_transaction, add_inbound_transaction,
     get_transactions, search_by_reference,
     get_customer_statement, mark_as_paid, mark_as_delivered,
-    cleanup_paid_transactions, get_dashboard_stats,
+    cleanup_paid_transactions, count_finished_transactions, get_dashboard_stats,
     update_transaction_status, delete_transaction,
 )

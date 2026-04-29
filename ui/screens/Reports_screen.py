@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QComboBox, QMessageBox, QGridLayout, QSizePolicy,
     QLineEdit
 )
-from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtCore import Qt, QDate, pyqtSignal
 from PyQt6.QtGui import QFont
 
 from ui.styles.theme import COLORS, FONT, CARD_RADIUS, ROW_HEIGHT
@@ -16,6 +16,122 @@ from ui.components.widgets import ScreenShell, DataTable, SectionTitle, make_div
 from utils.formatters import fmt_currency
 
 import database as db
+
+
+# ══════════════════════════════════════════
+#  Date Range Picker Component
+# ══════════════════════════════════════════
+
+class DateRangePicker(QFrame):
+    """
+    مكون موحد لاختيار الفترة الزمنية مع أزرار سريعة
+    """
+    changed = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("card")
+        self._build_ui()
+
+    def _build_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(12)
+
+        # Row 1: Quick Select Buttons
+        quick_layout = QHBoxLayout()
+        quick_layout.setSpacing(8)
+        
+        self.btn_today = self._make_quick_btn("اليوم", "today")
+        self.btn_yesterday = self._make_quick_btn("أمس", "yesterday")
+        self.btn_week = self._make_quick_btn("هذا الأسبوع", "week")
+        self.btn_month = self._make_quick_btn("هذا الشهر", "month")
+        self.btn_last_month = self._make_quick_btn("الشهر الماضي", "last_month")
+        
+        quick_layout.addWidget(self.btn_today)
+        quick_layout.addWidget(self.btn_yesterday)
+        quick_layout.addWidget(self.btn_week)
+        quick_layout.addWidget(self.btn_month)
+        quick_layout.addWidget(self.btn_last_month)
+        quick_layout.addStretch()
+        
+        layout.addLayout(quick_layout)
+
+        # Divider
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setStyleSheet(f"background-color: {COLORS['border']}; max-height: 1px;")
+        layout.addWidget(line)
+
+        # Row 2: Custom Date Selectors
+        custom_layout = QHBoxLayout()
+        custom_layout.setSpacing(12)
+
+        from_lbl = QLabel("من:")
+        from_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 12px;")
+        custom_layout.addWidget(from_lbl)
+
+        self.date_from = QDateEdit(QDate.currentDate().addDays(-30))
+        self.date_from.setCalendarPopup(True)
+        self.date_from.setFixedHeight(34)
+        self.date_from.setFixedWidth(120)
+        self.date_from.dateChanged.connect(self._on_custom_changed)
+        custom_layout.addWidget(self.date_from)
+
+        to_lbl = QLabel("إلى:")
+        to_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 12px;")
+        custom_layout.addWidget(to_lbl)
+
+        self.date_to = QDateEdit(QDate.currentDate())
+        self.date_to.setCalendarPopup(True)
+        self.date_to.setFixedHeight(34)
+        self.date_to.setFixedWidth(120)
+        self.date_to.dateChanged.connect(self._on_custom_changed)
+        custom_layout.addWidget(self.date_to)
+        
+        custom_layout.addStretch()
+        layout.addLayout(custom_layout)
+
+    def _make_quick_btn(self, text, val):
+        btn = QPushButton(text)
+        btn.setFixedHeight(28)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setStyleSheet(
+            f"QPushButton {{ background: {COLORS['bg_elevated']}; color: {COLORS['text_secondary']}; "
+            f"border: 1px solid {COLORS['border']}; border-radius: 6px; padding: 0 12px; font-size: 11px; }}"
+            f"QPushButton:hover {{ background: {COLORS['teal_subtle']}; border-color: {COLORS['teal_primary']}; }}"
+        )
+        btn.clicked.connect(lambda: self._apply_quick(val))
+        return btn
+
+    def _apply_quick(self, val):
+        today = QDate.currentDate()
+        if val == "today":
+            self.date_from.setDate(today)
+            self.date_to.setDate(today)
+        elif val == "yesterday":
+            yesterday = today.addDays(-1)
+            self.date_from.setDate(yesterday)
+            self.date_to.setDate(yesterday)
+        elif val == "week":
+            self.date_from.setDate(today.addDays(-(today.dayOfWeek() % 7)))
+            self.date_to.setDate(today)
+        elif val == "month":
+            self.date_from.setDate(QDate(today.year(), today.month(), 1))
+            self.date_to.setDate(today)
+        elif val == "last_month":
+            last_month = today.addMonths(-1)
+            self.date_from.setDate(QDate(last_month.year(), last_month.month(), 1))
+            self.date_to.setDate(QDate(last_month.year(), last_month.month(), last_month.daysInMonth()))
+        
+        self.changed.emit()
+
+    def _on_custom_changed(self):
+        self.changed.emit()
+
+    def get_range(self):
+        return (self.date_from.date().toString("yyyy-MM-dd"), 
+                self.date_to.date().toString("yyyy-MM-dd"))
 
 
 # ══════════════════════════════════════════
@@ -70,36 +186,9 @@ class InventoryTab(QWidget):
         layout.setSpacing(20)
 
         # ── Date range filter bar
-        filter_bar = QFrame()
-        filter_bar.setObjectName("card")
-        fb_layout = QHBoxLayout(filter_bar)
-        fb_layout.setContentsMargins(20, 12, 20, 12)
-        fb_layout.setSpacing(12)
-
-        run_btn = QPushButton("🔍  تشغيل الجرد")
-        run_btn.setObjectName("btn_primary")
-        run_btn.setFixedHeight(38)
-        run_btn.clicked.connect(self.run_inventory)
-        fb_layout.addWidget(run_btn)
-
-        fb_layout.addStretch()
-
-        for lbl_text, attr, days_offset in [
-            ("إلى:", "date_to", 0),
-            ("من:",  "date_from", -30),
-        ]:
-            lbl = QLabel(lbl_text)
-            lbl.setStyleSheet(f"color: {COLORS['text_secondary']};")
-            fb_layout.addWidget(lbl)
-
-            de = QDateEdit(QDate.currentDate().addDays(days_offset))
-            de.setCalendarPopup(True)
-            de.setFixedHeight(38)
-            de.setFixedWidth(130)
-            setattr(self, attr, de)
-            fb_layout.addWidget(de)
-
-        layout.addWidget(filter_bar)
+        self.date_picker = DateRangePicker()
+        self.date_picker.changed.connect(self.run_inventory)
+        layout.addWidget(self.date_picker)
 
         # ── Mini stat cards
         self._cards_grid = QGridLayout()
@@ -211,11 +300,10 @@ class InventoryTab(QWidget):
         return frame
 
     def run_inventory(self):
-        date_from = self.date_from.date().toString("yyyy-MM-dd")
-        date_to   = self.date_to.date().toString("yyyy-MM-dd")
+        date_from, date_to = self.date_picker.get_range()
 
-        if self.date_from.date() > self.date_to.date():
-            QMessageBox.warning(self, "تنبيه", "تاريخ البداية يجب أن يكون قبل تاريخ النهاية")
+        if self.date_picker.date_from.date() > self.date_picker.date_to.date():
+            # QMessageBox.warning(self, "تنبيه", "تاريخ البداية يجب أن يكون قبل تاريخ النهاية")
             return
 
         stats     = db.get_dashboard_stats()
@@ -262,7 +350,7 @@ class InventoryTab(QWidget):
             self._match_breakdown.setText(breakdown)
 
         if abs(diff) < 0.01:
-            self._match_result.setText("✅  متطابق")
+            self._match_result.setText("  متطابق")
             self._match_result.setStyleSheet(
                 f"border-radius: 8px; padding: 8px 12px;"
                 f"background: {COLORS['green_bg']}; color: {COLORS['green']};"
@@ -334,62 +422,52 @@ class TransactionsLogTab(QWidget):
         layout.setSpacing(12)
 
         # ── Search Bar
-        search_frame = QFrame()
-        search_frame.setObjectName("card")
-        sl = QHBoxLayout(search_frame)
-        sl.setContentsMargins(16, 12, 16, 12)
-        sl.setSpacing(12)
+        self.date_picker = DateRangePicker()
+        self.date_picker.changed.connect(self.load_data)
+        layout.addWidget(self.date_picker)
+
+        filters_frame = QFrame()
+        filters_frame.setObjectName("card")
+        fl = QHBoxLayout(filters_frame)
+        fl.setContentsMargins(16, 8, 16, 8)
+        fl.setSpacing(12)
 
         self.ref_input = QLineEdit()
-        self.ref_input.setPlaceholderText("بحث برقم المرجع أو العملية...")
-        self.ref_input.setFixedHeight(38)
-        self.ref_input.setFixedWidth(250)
-        sl.addWidget(self.ref_input)
+        self.ref_input.setPlaceholderText("بحث برقم المرجع...")
+        self.ref_input.setFixedHeight(34)
+        self.ref_input.setFixedWidth(200)
+        self.ref_input.textChanged.connect(self.load_data)
+        fl.addWidget(self.ref_input)
 
         self.status_filter = QComboBox()
-        self.status_filter.setFixedHeight(38)
+        self.status_filter.setFixedHeight(34)
         self.status_filter.setMinimumWidth(120)
         self.status_filter.addItem("كل الحالات", None)
         self.status_filter.addItem("⏳ مؤجل",    "pending")
-        self.status_filter.addItem("✅ مسدد",    "paid")
-        sl.addWidget(self.status_filter)
+        self.status_filter.addItem(" مسدد",    "paid")
+        self.status_filter.currentIndexChanged.connect(self.load_data)
+        fl.addWidget(self.status_filter)
 
         self.platform_filter = QComboBox()
-        self.platform_filter.setFixedHeight(38)
+        self.platform_filter.setFixedHeight(34)
         self.platform_filter.setMinimumWidth(140)
-        sl.addWidget(self.platform_filter)
-
-        sl.addStretch()
-
-        for lbl_text, attr, days in [("إلى:", "date_to", 0), ("من:", "date_from", -30)]:
-            lbl = QLabel(lbl_text)
-            lbl.setStyleSheet(f"color: {COLORS['text_secondary']};")
-            sl.addWidget(lbl)
-            de = QDateEdit(QDate.currentDate().addDays(days))
-            de.setCalendarPopup(True)
-            de.setFixedHeight(38)
-            de.setFixedWidth(120)
-            setattr(self, attr, de)
-            sl.addWidget(de)
-
-        search_btn = QPushButton("🔍  بحث")
-        search_btn.setObjectName("btn_primary")
-        search_btn.setFixedHeight(38)
-        search_btn.clicked.connect(self.load_data)
-        sl.addWidget(search_btn)
-
-        layout.addWidget(search_frame)
+        self.platform_filter.currentIndexChanged.connect(self.load_data)
+        fl.addWidget(self.platform_filter)
+        
+        fl.addStretch()
+        layout.addWidget(filters_frame)
 
         # ── Table
         columns = [
-            ("التاريخ", 150),
-            ("الخدمة",  150),
-            ("المنصة",  120),
+            ("التاريخ", 140),
+            ("المرجع",  90),
+            ("الخدمة",  130),
+            ("المنصة",  110),
             ("العميل",  -1),
-            ("المطلوب", 100),
-            ("المصروف", 100),
-            ("الربح",   100),
-            ("الحالة",  120),
+            ("المطلوب", -1),
+            ("المصروف", 90),
+            ("الربح",   90),
+            ("الحالة",  -1),
             ("إجراءات", 150),
         ]
         self.table = DataTable(columns)
@@ -406,8 +484,7 @@ class TransactionsLogTab(QWidget):
             self.platform_filter.addItem(p["name"], p["id"])
 
     def load_data(self):
-        date_from   = self.date_from.date().toString("yyyy-MM-dd") # type: ignore
-        date_to     = self.date_to.date().toString("yyyy-MM-dd")
+        date_from, date_to = self.date_picker.get_range()
         status      = self.status_filter.currentData()
         platform_id = self.platform_filter.currentData()
         ref         = self.ref_input.text().strip()
@@ -433,27 +510,32 @@ class TransactionsLogTab(QWidget):
         for row, t in enumerate(transactions):
             dt = (t.get("created_at") or "")[:16].replace("T", " ")
             self.table.set_cell(row, 0, dt, color=COLORS["text_secondary"])
-            self.table.set_cell(row, 1, t.get("service_name") or "—")
-            self.table.set_cell(row, 2, t.get("platform_name") or "—", color=COLORS["text_secondary"])
-            self.table.set_cell(row, 3, t.get("customer_name") or "—", bold=True)
+            
+            # المرجع
+            ref = t.get("reference_no") or f"#{t.get('id')}"
+            self.table.set_cell(row, 1, ref, color=COLORS["text_muted"])
+            
+            self.table.set_cell(row, 2, t.get("service_name") or "—")
+            self.table.set_cell(row, 3, t.get("platform_name") or "—", color=COLORS["text_secondary"])
+            self.table.set_cell(row, 4, t.get("customer_name") or "—", bold=True)
             
             required = t.get("amount_required", 0) or 0
             spent    = t.get("amount_spent", 0) or 0
             profit   = t.get("profit", 0) or 0
             
-            self.table.set_cell(row, 4, fmt_currency(required), bold=True)
-            self.table.set_cell(row, 5, fmt_currency(spent), color=COLORS["text_secondary"])
-            self.table.set_cell(row, 6, fmt_currency(profit), color=COLORS["accent"] if profit >= 0 else COLORS["red"])
+            self.table.set_cell(row, 5, fmt_currency(required), bold=True)
+            self.table.set_cell(row, 6, fmt_currency(spent), color=COLORS["text_secondary"])
+            self.table.set_cell(row, 7, fmt_currency(profit), color=COLORS["accent"] if profit >= 0 else COLORS["red"])
             
             self.table.add_status_badge(
-                row, 7,
+                row, 8,
                 t.get("payment_status", ""),
                 operation_type=t.get("operation_type", "outbound"),
                 is_delivered=t.get("is_delivered", 0)
             )
             
             actions = make_txn_actions(t, self._on_status_change, self._on_delete)
-            self.table.setCellWidget(row, 8, actions)
+            self.table.setCellWidget(row, 9, actions)
             
             total_profit   += profit
             total_required += required
@@ -477,7 +559,7 @@ class TransactionsLogTab(QWidget):
             try:
                 db.delete_transaction(tid)
                 self.load_data()
-                QMessageBox.information(self, "تم ✅", "تم حذف العملية")
+                QMessageBox.information(self, "تم ", "تم حذف العملية")
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
@@ -556,8 +638,8 @@ class CleanupTab(QWidget):
             self.customer_combo.addItem(c["name"], c["id"])
 
     def _refresh_stat(self):
-        txns = db.get_transactions(payment_status="paid", limit=5000)
-        self.stat_label.setText(f"عدد العمليات المسددة القابلة للحذف: {len(txns)} عملية")
+        count = db.count_finished_transactions()
+        self.stat_label.setText(f"عدد العمليات المنتهية القابلة للحذف: {count} عملية")
 
     def _cleanup_single(self):
         cid = self.customer_combo.currentData()

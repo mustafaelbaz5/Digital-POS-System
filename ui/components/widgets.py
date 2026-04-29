@@ -276,14 +276,14 @@ class DataTable(QTableWidget):
                          operation_type: str = "outbound", is_delivered: int = 0):
         if operation_type == "inbound":
             if is_delivered:
-                text, color = "تم التسليم ✅", COLORS["green"]
+                text, color = "تم التسليم ", COLORS["green"]
             else:
                 text, color = "لم يُسلَّم ⏳", COLORS["yellow"]
         else:
             if status == "pending":
                 text, color = "مؤجل ⏳", COLORS["yellow"]
             elif status == "paid":
-                text, color = "مسدد ✅", COLORS["green"]
+                text, color = "مسدد ", COLORS["green"]
             else:
                 text, color = status, COLORS["text_muted"]
 

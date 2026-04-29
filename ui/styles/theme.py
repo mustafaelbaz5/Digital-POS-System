@@ -451,4 +451,4 @@ def get_status_style(status: str) -> str:
 
 
 def get_status_text(status: str) -> str:
-    return {"cash": "نقدي ✅", "pending": "مؤجل ⏳", "paid": "مسدد ✓"}.get(status, status)
+    return {"cash": "نقدي ", "pending": "مؤجل ⏳", "paid": "مسدد ✓"}.get(status, status)

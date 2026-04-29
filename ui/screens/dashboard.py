@@ -89,7 +89,7 @@ class DashboardScreen(ScreenShell):
         return grid
 
     def _make_ops_table(self) -> QTableWidget:
-        columns = ["التاريخ", "العميل", "الخدمة", "المنصة", "المطلوب", "المصروف", "الربح", "الحالة"]
+        columns = ["التاريخ", "المرجع", "العميل", "الخدمة", "المنصة", "المطلوب", "المصروف", "الربح", "الحالة"]
         tbl = QTableWidget()
         tbl.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         tbl.setColumnCount(len(columns))
@@ -103,7 +103,7 @@ class DashboardScreen(ScreenShell):
         tbl.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         
         header = tbl.horizontalHeader()
-        widths = [150, 130, 130, 130, 100, 100, 100, -1]
+        widths = [140, 90, -1, 130, 130, -1, 120, 120, -1]
         for i, w in enumerate(widths):
             if w == -1:
                 header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
@@ -129,19 +129,24 @@ class DashboardScreen(ScreenShell):
 
             raw_date = t.get("created_at") or ""
             cell(0, raw_date[:16].replace("T", " "), color=COLORS["text_secondary"])
-            cell(1, t.get("customer_name") or "—", bold=True)
-            cell(2, t.get("service_name") or "—")
-            cell(3, t.get("platform_name") or "—", color=COLORS["text_secondary"])
-            cell(4, fmt_currency(t.get("amount_required", 0) or 0), bold=True)
-            cell(5, fmt_currency(t.get("amount_spent", 0) or 0), color=COLORS["text_secondary"])
+            
+            # المرجع: يفضل رقم العملية إذا لم يوجد مرجع يدوي
+            ref = t.get("reference_no") or f"#{t.get('id')}"
+            cell(1, ref, color=COLORS["text_muted"])
+            
+            cell(2, t.get("customer_name") or "—", bold=True)
+            cell(3, t.get("service_name") or "—")
+            cell(4, t.get("platform_name") or "—", color=COLORS["text_secondary"])
+            cell(5, fmt_currency(t.get("amount_required", 0) or 0), bold=True)
+            cell(6, fmt_currency(t.get("amount_spent", 0) or 0), color=COLORS["text_secondary"])
             
             profit = t.get("profit", 0) or 0
-            cell(6, fmt_currency(profit), color=COLORS["accent"] if profit >= 0 else COLORS["red"])
+            cell(7, fmt_currency(profit), color=COLORS["accent"] if profit >= 0 else COLORS["red"])
             
             st = t.get("payment_status", "")
-            st_text = {"cash": "نقدي ✅", "pending": "مؤجل ⏳", "paid": "مسدد ✓"}.get(st, st)
+            st_text = {"cash": "نقدي ", "pending": "مؤجل ⏳", "paid": "مسدد ✓"}.get(st, st)
             st_color = {"cash": COLORS["green"], "pending": COLORS["yellow"], "paid": COLORS["text_secondary"]}.get(st)
-            cell(7, st_text, color=st_color, bold=True)
+            cell(8, st_text, color=st_color, bold=True)
 
     def _make_actions_panel(self) -> QFrame:
         frame = QFrame()

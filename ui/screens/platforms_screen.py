@@ -133,7 +133,7 @@ class PlatformActionsDialog(QDialog):
         if ok and amount > 0:
             try:
                 db.deposit_to_platform(p["id"], amount)
-                QMessageBox.information(self, "تم ✅", f"تم إيداع {fmt_currency(amount)}")
+                QMessageBox.information(self, "تم ", f"تم إيداع {fmt_currency(amount)}")
                 self._result_action = "refresh"
                 self.accept()
             except Exception as e:
@@ -151,7 +151,7 @@ class PlatformActionsDialog(QDialog):
             try:
                 db.record_daily_commission(p["id"], amount)
                 QMessageBox.information(
-                    self, "تم ✅",
+                    self, "تم ",
                     f"تم تسجيل العمولة: {fmt_currency(amount)}\n"
                     f"خُصمت من [{p['name']}] وأُضيفت للخزينة."
                 )
@@ -177,7 +177,7 @@ class PlatformActionsDialog(QDialog):
                         (amount, p["id"])
                     )
                     conn.commit()
-                QMessageBox.information(self, "تم ✅", f"تم تحديث الحد إلى {fmt_currency(amount)}")
+                QMessageBox.information(self, "تم ", f"تم تحديث الحد إلى {fmt_currency(amount)}")
                 self._result_action = "refresh"
                 self.accept()
             except Exception as e:
@@ -556,7 +556,7 @@ class AddPlatformDialog(QDialog):
         cancel = QPushButton("إلغاء")
         cancel.setObjectName("btn_secondary")
         cancel.clicked.connect(self.reject)
-        save = QPushButton("إضافة ✅")
+        save = QPushButton("إضافة ")
         save.setObjectName("btn_primary")
         save.clicked.connect(self._save)
         btns.addWidget(cancel)

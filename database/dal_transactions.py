@@ -348,22 +348,44 @@ def mark_as_paid(transaction_id: int) -> None:
 
 def cleanup_paid_transactions(customer_id: int = None) -> int:
     """
-    حذف العمليات المسددة (paid)
-    customer_id: إذا None يحذف الكل، وإلا يحذف لعميل معين
-    يرجع عدد الصفوف المحذوفة
+    حذف العمليات المنتهية لتوفير المساحة:
+    - العمليات الصادرة (outbound) التي تم سدادها (paid أو cash).
+    - العمليات الواردة (inbound) التي تم تسليمها (delivered).
     """
     with get_connection() as conn:
+        query = """
+            DELETE FROM transactions 
+            WHERE (
+                (operation_type = 'outbound' AND payment_status IN ('paid', 'cash'))
+                OR 
+                (operation_type = 'inbound' AND is_delivered = 1)
+            )
+        """
         if customer_id:
-            cursor = conn.execute(
-                "DELETE FROM transactions WHERE payment_status = 'paid' AND customer_id = ?",
-                (customer_id,)
-            )
+            query += " AND customer_id = ?"
+            cursor = conn.execute(query, (customer_id,))
         else:
-            cursor = conn.execute(
-                "DELETE FROM transactions WHERE payment_status = 'paid'"
-            )
+            cursor = conn.execute(query)
+            
         conn.commit()
         return cursor.rowcount
+
+
+def count_finished_transactions(customer_id: int = None) -> int:
+    """حساب عدد العمليات المنتهية (جاهزة للتنظيف)"""
+    with get_connection() as conn:
+        query = """
+            SELECT COUNT(*) FROM transactions 
+            WHERE (
+                (operation_type = 'outbound' AND payment_status IN ('paid', 'cash'))
+                OR 
+                (operation_type = 'inbound' AND is_delivered = 1)
+            )
+        """
+        if customer_id:
+            query += " AND customer_id = ?"
+            return conn.execute(query, (customer_id,)).fetchone()[0]
+        return conn.execute(query).fetchone()[0]
 
 
 # ══════════════════════════════════════════
