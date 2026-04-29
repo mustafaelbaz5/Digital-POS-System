@@ -60,14 +60,20 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Sidebar (يسار في RTL)
         sidebar = self._build_sidebar()
         main_layout.addWidget(sidebar)
 
-        # Main Content
+        # فاصل رفيع بين الشريط الجانبي والمحتوى
+        sep = QFrame()
+        sep.setFixedWidth(1)
+        sep.setStyleSheet("background: #30363D; border: none;")
+        main_layout.addWidget(sep)
+
+        # منطقة المحتوى مع مسافة داخلية على الجانبين
         self.stack = QStackedWidget()
         self.stack.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        main_layout.addWidget(self.stack, 1)   # stretch = 1
+        self.stack.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(self.stack, 1)
 
     def _build_sidebar(self) -> QWidget:
         sidebar = QWidget()
