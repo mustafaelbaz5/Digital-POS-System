@@ -164,8 +164,9 @@ def search_customers(query: str) -> list[dict]:
 
 
 def get_export_data() -> dict:
-    """جلب العملاء النشطين الذين لديهم مديونية أو عمليات مؤجلة، مجمّعة حسب المجموعة"""
+    """جلب بيانات التصدير: العملاء والمجموعات وملخص المديونيات"""
     with get_connection() as conn:
+        # العملاء الذين لديهم مديونية أو عمليات مؤجلة
         customers = conn.execute("""
             SELECT c.id, c.name, c.phone, c.total_debt, c.group_id,
                    g.name AS group_name
@@ -182,16 +183,38 @@ def get_export_data() -> dict:
             ORDER BY g.name NULLS LAST, c.name
         """).fetchall()
 
+        # ملخص: كل العملاء بمديونية مرتبة تنازلياً
+        summary_rows = conn.execute("""
+            SELECT c.name, c.phone, c.total_debt,
+                   COALESCE(g.name, '') AS group_name
+            FROM customers c
+            LEFT JOIN groups g ON g.id = c.group_id
+            WHERE c.is_active = 1 AND c.total_debt != 0
+            ORDER BY c.total_debt DESC
+        """).fetchall()
+
         if not customers:
-            return {"ungrouped": [], "groups": []}
+            return {
+                "ungrouped":     [],
+                "groups":        [],
+                "all_customers": [
+                    {
+                        "name":       r["name"],
+                        "phone":      r["phone"] or "",
+                        "group_name": r["group_name"],
+                        "total_debt": float(r["total_debt"] or 0),
+                    }
+                    for r in summary_rows
+                ],
+            }
 
         customer_ids = [r["id"] for r in customers]
         placeholders = ",".join("?" * len(customer_ids))
         txn_rows = conn.execute(f"""
             SELECT t.customer_id,
-                   DATE(t.created_at) AS date,
-                   t.service_name     AS service,
-                   t.amount_required  AS amount
+                   strftime('%Y-%m-%d %H:%M', t.created_at) AS date,
+                   t.service_name                            AS service,
+                   t.amount_required                         AS amount
             FROM transactions t
             WHERE t.customer_id IN ({placeholders})
               AND t.payment_status = 'pending'
@@ -207,7 +230,7 @@ def get_export_data() -> dict:
             "amount":  t["amount"],
         })
 
-    ungrouped: list = []
+    ungrouped:   list = []
     groups_dict: dict = {}
 
     for r in customers:
@@ -240,4 +263,13 @@ def get_export_data() -> dict:
     return {
         "ungrouped": ungrouped,
         "groups":    list(groups_dict.values()),
+        "all_customers": [
+            {
+                "name":       r["name"],
+                "phone":      r["phone"] or "",
+                "group_name": r["group_name"],
+                "total_debt": float(r["total_debt"] or 0),
+            }
+            for r in summary_rows
+        ],
     }

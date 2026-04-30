@@ -93,7 +93,7 @@ class CustomerStatementDialog(QDialog):
         row.addStretch()
 
         c = self._data["customer"]
-        title = QLabel(f"📋  كشف حساب  —  {c['name']}")
+        title = QLabel(f"  كشف حساب  —  {c['name']}")
         title.setStyleSheet(f"color:{COLORS['text_primary']};font-size:16px;font-weight:bold;")
         row.addWidget(title)
         return row
@@ -176,9 +176,9 @@ class CustomerStatementDialog(QDialog):
 
         self._filter_btns = {}
         filters = [
-            ("all",     "الكل 📋",   COLORS["text_secondary"]),
+            ("all",     "الكل ",   COLORS["text_secondary"]),
             ("pending", "مؤجل ⏳",   COLORS["yellow"]),
-            ("paid",    "مسدد ✅",   COLORS["green"]),
+            ("paid",    "مسدد ",   COLORS["green"]),
             ("cash",    "نقدي 💵",   COLORS["blue"]),
             ("inbound", "وارد 📥",   COLORS["purple"]),
         ]
@@ -269,7 +269,7 @@ class CustomerStatementDialog(QDialog):
             # عمود تسليم الكاش (خاص بالوارد فقط)
             if op == "inbound":
                 delivered = bool(t.get("is_delivered", 0))
-                dlv_text  = "✅ تم" if delivered else "⏳ لا"
+                dlv_text  = " تم" if delivered else "⏳ لا"
                 dlv_color = COLORS["green"] if delivered else COLORS["yellow"]
                 self.table.set_cell(row, 7, dlv_text, color=dlv_color)
             else:
@@ -281,7 +281,7 @@ class CustomerStatementDialog(QDialog):
 
             # زرار سداد
             if t.get("payment_status") == "pending":
-                btn = QPushButton("✅ سداد")
+                btn = QPushButton(" سداد")
                 btn.setObjectName("btn_ghost"); btn.setFixedHeight(26)
                 btn.clicked.connect(lambda _, tid=t["id"]: self._mark_paid(tid))
                 cont = QWidget(); bl = QHBoxLayout(cont)
@@ -314,7 +314,7 @@ class CustomerStatementDialog(QDialog):
                 db.mark_as_paid(tid)
                 self._load_data()
                 self._fill_table()
-                QMessageBox.information(self, "تم ✅", "تم تحويل العملية إلى مسددة")
+                QMessageBox.information(self, "تم ", "تم تحويل العملية إلى مسددة")
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
@@ -325,7 +325,7 @@ class CustomerStatementDialog(QDialog):
         ) == QMessageBox.StandardButton.Yes:
             deleted = db.cleanup_paid_transactions(self.customer_id)
             self._load_data(); self._fill_table()
-            QMessageBox.information(self, "تم ✅", f"تم حذف {deleted} عملية مسددة")
+            QMessageBox.information(self, "تم ", f"تم حذف {deleted} عملية مسددة")
 
     def _open_customer_facing(self):
         """فتح كشف الحساب المخصص للعميل (بدون أرباح)"""
@@ -337,7 +337,7 @@ class CustomerStatementDialog(QDialog):
             self, "حفظ كصورة", f"كشف_{self._data['customer']['name']}.png", "PNG (*.png)")
         if path:
             self.grab().save(path, "PNG")
-            QMessageBox.information(self, "تم ✅", f"تم حفظ الصورة:\n{path}")
+            QMessageBox.information(self, "تم ", f"تم حفظ الصورة:\n{path}")
 
     def _export_pdf(self):
         from PyQt6.QtPrintSupport import QPrinter
@@ -350,7 +350,7 @@ class CustomerStatementDialog(QDialog):
             printer.setOutputFileName(path)
             painter = QPainter(printer)
             self.render(painter); painter.end()
-            QMessageBox.information(self, "تم ✅", f"تم حفظ PDF:\n{path}")
+            QMessageBox.information(self, "تم ", f"تم حفظ PDF:\n{path}")
 
 
 # ══════════════════════════════════════════
@@ -415,7 +415,7 @@ class GroupReportDialog(QDialog):
             self, "حفظ كصورة", "تقرير_المجموعة.png", "PNG (*.png)")
         if path:
             self.grab().save(path, "PNG")
-            QMessageBox.information(self, "تم ✅", f"تم حفظ الصورة:\n{path}")
+            QMessageBox.information(self, "تم ", f"تم حفظ الصورة:\n{path}")
 
 
 # ══════════════════════════════════════════
@@ -515,7 +515,7 @@ class ClientReportDialog(QDialog):
 
         # ── لا توجد عمليات
         if not pending_txns and not due_txns:
-            empty = QLabel("✅  لا توجد مبالغ مستحقة عليك أو لك")
+            empty = QLabel("  لا توجد مبالغ مستحقة عليك أو لك")
             empty.setStyleSheet(
                 f"color:{COLORS['green']};font-size:14px;"
                 f"background:{COLORS['green_bg']};border-radius:8px;padding:12px;")
@@ -643,7 +643,7 @@ class ClientReportDialog(QDialog):
             border= COLORS["border"]
             color = COLORS["text_secondary"]
             label = "الحساب متساوٍ"
-            icon  = "✅"
+            icon  = ""
 
         frame.setStyleSheet(
             f"QFrame#card {{ background:{bg}; border:2px solid {border}; border-radius:12px; }}"
@@ -692,7 +692,7 @@ class ClientReportDialog(QDialog):
             self, "حفظ كصورة", f"تقرير_{name}.png", "PNG (*.png)")
         if path:
             self.grab().save(path, "PNG")
-            QMessageBox.information(self, "تم ✅", f"تم الحفظ:\n{path}")
+            QMessageBox.information(self, "تم ", f"تم الحفظ:\n{path}")
 
     def _export_pdf(self):
         from PyQt6.QtPrintSupport import QPrinter
@@ -706,7 +706,7 @@ class ClientReportDialog(QDialog):
             printer.setOutputFileName(path)
             painter = QPainter(printer)
             self.render(painter); painter.end()
-            QMessageBox.information(self, "تم ✅", f"تم الحفظ:\n{path}")
+            QMessageBox.information(self, "تم ", f"تم الحفظ:\n{path}")
 
 
 # ══════════════════════════════════════════
@@ -758,7 +758,7 @@ class CustomerFacingStatementDialog(QDialog):
         layout.addWidget(self._make_net_card())
 
         if self._owed:
-            layout.addWidget(self._section_label("📋  المبالغ المطلوبة منك"))
+            layout.addWidget(self._section_label("  المبالغ المطلوبة منك"))
             layout.addWidget(self._make_owed_table())
 
         if self._due:
@@ -766,7 +766,7 @@ class CustomerFacingStatementDialog(QDialog):
             layout.addWidget(self._make_due_table())
 
         if not self._owed and not self._due:
-            empty = QLabel("✅  لا توجد مبالغ معلقة — حسابك صافي")
+            empty = QLabel("  لا توجد مبالغ معلقة — حسابك صافي")
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
             empty.setStyleSheet(
                 f"color:{COLORS['green']};font-size:16px;font-weight:bold;"
@@ -864,10 +864,10 @@ class CustomerFacingStatementDialog(QDialog):
             net_bg    = COLORS["green_bg"]
             net_icon  = "💰"
         else:
-            net_text  = "الحساب صافي ✅"
+            net_text  = "الحساب صافي "
             net_color = COLORS["text_secondary"]
             net_bg    = COLORS["bg_input"]
-            net_icon  = "✅"
+            net_icon  = ""
 
         net_frame = QFrame()
         net_frame.setStyleSheet(
@@ -1019,7 +1019,7 @@ class CustomerFacingStatementDialog(QDialog):
             f"كشف_عميل_{c.get('name','')}.png", "PNG (*.png)")
         if path:
             self.grab().save(path, "PNG")
-            QMessageBox.information(self, "تم ✅", f"تم حفظ الصورة:\n{path}")
+            QMessageBox.information(self, "تم ", f"تم حفظ الصورة:\n{path}")
 
     def _export_pdf(self):
         from PyQt6.QtPrintSupport import QPrinter
@@ -1035,7 +1035,7 @@ class CustomerFacingStatementDialog(QDialog):
             painter = QPainter(printer)
             self.render(painter)
             painter.end()
-            QMessageBox.information(self, "تم ✅", f"تم حفظ PDF:\n{path}")
+            QMessageBox.information(self, "تم ", f"تم حفظ PDF:\n{path}")
 
 # ──────────────────────────────────────────────────────────
 #  make_txn_actions — helper مشترك للتقارير وكشف الحساب
@@ -1115,7 +1115,7 @@ class _ActionDialog(QDialog):
         # ── Status change buttons (outbound)
         if op == "outbound":
             if st == "pending":
-                btn = QPushButton("✅  تحويل إلى مسدد (paid)")
+                btn = QPushButton("  تحويل إلى مسدد (paid)")
                 btn.setObjectName("btn_primary")
                 btn.setFixedHeight(40)
                 btn.clicked.connect(lambda: self._do("paid"))
@@ -1133,7 +1133,7 @@ class _ActionDialog(QDialog):
         elif op == "inbound":
             delivered = bool(t.get("is_delivered", 0))
             if not delivered:
-                btn = QPushButton("✅  تسليم الكاش للعميل")
+                btn = QPushButton("  تسليم الكاش للعميل")
                 btn.setObjectName("btn_primary")
                 btn.setFixedHeight(40)
                 btn.clicked.connect(lambda: self._do("delivered"))

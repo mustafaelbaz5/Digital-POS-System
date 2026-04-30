@@ -450,7 +450,7 @@ class TransactionsLogTab(QWidget):
         layout.addWidget(filters_group)
 
         # ── Table Card
-        table_group = CardGroup("📋  سجل العمليات")
+        table_group = CardGroup("  سجل العمليات")
         
         columns = [
             ("التاريخ", 140),
@@ -671,7 +671,7 @@ class ReportsScreen(ScreenShell):
         self.tabs.addTab(self.inventory_tab, "📊  الجرد المالي")
 
         self.log_tab = TransactionsLogTab()
-        self.tabs.addTab(self.log_tab, "📋  سجل العمليات")
+        self.tabs.addTab(self.log_tab, "  سجل العمليات")
 
         self.cleanup_tab = CleanupTab()
         self.tabs.addTab(self.cleanup_tab, "🗑️  تنظيف البيانات")

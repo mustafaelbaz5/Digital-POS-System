@@ -240,7 +240,7 @@ class OutboundTab(QWidget):
         layout.addWidget(financial_group)
 
         # ── Section 3: Status & Notes
-        status_group = CardGroup("✅  الحالة والملاحظات")
+        status_group = CardGroup("  الحالة والملاحظات")
         
         status_layout = QVBoxLayout(); status_layout.setSpacing(GAP_SM)
         self.status_selector = PaymentStatusSelector()
@@ -424,7 +424,7 @@ class InboundTab(QWidget):
         layout.addWidget(financial_group)
 
         # ── Section 3: Status & Notes
-        status_group = CardGroup("✅  الحالة والملاحظات")
+        status_group = CardGroup("  الحالة والملاحظات")
         
         self.ref_input = QLineEdit(); self.ref_input.setPlaceholderText("رقم المرجع")
         status_group.add_layout(field("رقم المرجع", self.ref_input))

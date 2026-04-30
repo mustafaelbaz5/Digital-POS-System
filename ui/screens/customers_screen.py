@@ -48,7 +48,7 @@ class CustomersScreen(ScreenShell):
         self.tabs.addTab(self.customers_tab, "👥  العملاء")
 
         self.groups_tab = GroupsTab()
-        self.tabs.addTab(self.groups_tab, "📋  المجموعات")
+        self.tabs.addTab(self.groups_tab, "  المجموعات")
 
         self.tabs.currentChanged.connect(self._on_tab)
         c.addWidget(self.tabs)
@@ -185,7 +185,7 @@ class CustomersTab(QWidget):
             self.table.set_cell(row, 5, c.get("notes") or "—", COLORS["text_muted"])
 
             # task 8: prominent statement button
-            btn = QPushButton("📋  كشف الحساب")
+            btn = QPushButton("  كشف الحساب")
             btn.setFixedHeight(36)
             btn.setStyleSheet(
                 f"background:{COLORS['accent']}; color:#fff; border-radius:8px;"
@@ -216,7 +216,7 @@ class CustomersTab(QWidget):
         if row < 0 or row >= len(self._customers): return
         c   = self._customers[row]
         menu = QMenu(self)
-        menu.addAction(QAction("📋  كشف حساب", self, triggered=lambda: self._open_statement(c["id"])))
+        menu.addAction(QAction("  كشف حساب", self, triggered=lambda: self._open_statement(c["id"])))
         menu.addAction(QAction("✏️  تعديل",    self, triggered=lambda: self._edit(c)))
         menu.addSeparator()
         menu.addAction(QAction("🗑️  حذف",      self, triggered=lambda: self._delete(c)))
@@ -279,7 +279,7 @@ class GroupsTab(QWidget):
         layout.addSpacing(GAP_SM)
 
         # ── Table card — task 10: bigger rows + visible buttons
-        table_card = CardGroup("📋  قائمة المجموعات")
+        table_card = CardGroup("  قائمة المجموعات")
 
         cols = [
             ("اسم المجموعة", 200),
