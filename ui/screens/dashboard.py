@@ -150,14 +150,13 @@ class DashboardScreen(ScreenShell):
         row = QHBoxLayout(frame)
         row.setContentsMargins(24, 20, 24, 20)
         row.setSpacing(16)
-        
+
         actions = [
-            ("⊕  إضافة عملية",      "btn_primary",   self._go_to_transaction),
-            ("👤  إضافة عميل",      "btn_secondary", self._add_customer),
+            ("⊕  إضافة عملية",           "btn_primary",   self._go_to_transaction),
+            ("👤  إضافة عميل",           "btn_secondary", self._add_customer),
             ("💵  تعديل الكاش (الخزينة)", "btn_secondary", self._edit_cash),
-            ("📊  التقارير",        "btn_secondary", self._go_to_reports),
         ]
-        
+
         for label, obj, slot in actions:
             btn = QPushButton(label)
             btn.setObjectName(obj)
@@ -166,6 +165,15 @@ class DashboardScreen(ScreenShell):
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(slot)
             row.addWidget(btn)
+
+        self._btn_export = QPushButton("☁️  تصدير البيانات")
+        self._btn_export.setObjectName("btn_secondary")
+        self._btn_export.setMinimumHeight(48)
+        self._btn_export.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_export.clicked.connect(self._export_to_sheets)
+        row.addWidget(self._btn_export)
+
         return frame
 
     def refresh(self):
@@ -219,3 +227,20 @@ class DashboardScreen(ScreenShell):
                 QMessageBox.information(self, "تم ", f"تم تحديث الكاش إلى {fmt_currency(amount)}")
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
+
+    def _export_to_sheets(self):
+        self._btn_export.setEnabled(False)
+        self._btn_export.setText("جاري التصدير...")
+        try:
+            data = db.get_export_data()
+            from utils.google_sheets import export_to_sheets
+            url = export_to_sheets(data)
+            QMessageBox.information(
+                self, "تم التصدير",
+                f"تم تصدير البيانات بنجاح\n\nرابط الشيت:\n{url}"
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ في التصدير", str(e))
+        finally:
+            self._btn_export.setEnabled(True)
+            self._btn_export.setText("☁️  تصدير البيانات")

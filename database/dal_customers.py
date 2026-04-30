@@ -161,3 +161,83 @@ def search_customers(query: str) -> list[dict]:
             ORDER BY c.name
         """, (pattern, pattern)).fetchall()
         return [dict(r) for r in rows]
+
+
+def get_export_data() -> dict:
+    """جلب العملاء النشطين الذين لديهم مديونية أو عمليات مؤجلة، مجمّعة حسب المجموعة"""
+    with get_connection() as conn:
+        customers = conn.execute("""
+            SELECT c.id, c.name, c.phone, c.total_debt, c.group_id,
+                   g.name AS group_name
+            FROM customers c
+            LEFT JOIN groups g ON g.id = c.group_id
+            WHERE c.is_active = 1
+              AND (
+                c.total_debt != 0
+                OR EXISTS (
+                    SELECT 1 FROM transactions t
+                    WHERE t.customer_id = c.id AND t.payment_status = 'pending'
+                )
+              )
+            ORDER BY g.name NULLS LAST, c.name
+        """).fetchall()
+
+        if not customers:
+            return {"ungrouped": [], "groups": []}
+
+        customer_ids = [r["id"] for r in customers]
+        placeholders = ",".join("?" * len(customer_ids))
+        txn_rows = conn.execute(f"""
+            SELECT t.customer_id,
+                   DATE(t.created_at) AS date,
+                   t.service_name     AS service,
+                   t.amount_required  AS amount
+            FROM transactions t
+            WHERE t.customer_id IN ({placeholders})
+              AND t.payment_status = 'pending'
+              AND t.operation_type = 'outbound'
+            ORDER BY t.created_at ASC
+        """, customer_ids).fetchall()
+
+    txn_by_customer: dict = {}
+    for t in txn_rows:
+        txn_by_customer.setdefault(t["customer_id"], []).append({
+            "date":    t["date"],
+            "service": t["service"],
+            "amount":  t["amount"],
+        })
+
+    ungrouped: list = []
+    groups_dict: dict = {}
+
+    for r in customers:
+        cust = {
+            "id":           r["id"],
+            "name":         r["name"],
+            "phone":        r["phone"] or "",
+            "total_debt":   float(r["total_debt"] or 0),
+            "transactions": txn_by_customer.get(r["id"], []),
+        }
+        if r["group_id"] is None:
+            ungrouped.append(cust)
+        else:
+            gid = r["group_id"]
+            if gid not in groups_dict:
+                groups_dict[gid] = {
+                    "id":         gid,
+                    "name":       r["group_name"] or "",
+                    "total_debt": 0.0,
+                    "members":    [],
+                }
+            groups_dict[gid]["total_debt"] += cust["total_debt"]
+            groups_dict[gid]["members"].append({
+                "name":         cust["name"],
+                "phone":        cust["phone"],
+                "total_debt":   cust["total_debt"],
+                "transactions": cust["transactions"],
+            })
+
+    return {
+        "ungrouped": ungrouped,
+        "groups":    list(groups_dict.values()),
+    }

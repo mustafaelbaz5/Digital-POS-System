@@ -13,7 +13,7 @@ from .dal_customers import (
     get_all_groups, add_group, update_group, delete_group,
     get_all_customers, get_customers_by_group, get_customer_by_id,
     add_customer, update_customer, adjust_customer_debt,
-    delete_customer, search_customers
+    delete_customer, search_customers, get_export_data,
 )
 from .dal_transactions import (
     add_outbound_transaction, add_inbound_transaction,
