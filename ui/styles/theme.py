@@ -277,6 +277,7 @@ QPushButton {{
     font-family: {FONT['family']};
     border-radius: {BORDER_RADIUS};
     padding: 8px 16px;
+    border: 1px solid transparent; /* Defined in specific IDs */
 }}
 
 #btn_primary {{
@@ -300,9 +301,9 @@ QPushButton {{
 }}
 
 #btn_secondary {{
-    background: {COLORS['bg_button']};
+    background: {COLORS['bg_elevated']};
     color: {COLORS['text_primary']};
-    border: 1px solid {COLORS['border_light']};
+    border: 1px solid {COLORS['border']};
     border-radius: {BORDER_RADIUS};
     padding: 0 20px;
     min-height: {BTN_HEIGHT}px;
@@ -318,7 +319,7 @@ QPushButton {{
     color: {COLORS['text_secondary']};
     border: 1px solid {COLORS['border']};
     border-radius: 8px;
-    padding: 5px 12px;
+    padding: 4px 12px;
     font-size: {FONT['sm']};
 }}
 #btn_ghost:hover {{
@@ -431,6 +432,31 @@ QTabBar::tab:selected {{
 /* ── Dialogs ── */
 QDialog {{
     background: {COLORS['bg_dark']};
+    border: 1px solid {COLORS['border']};
+}}
+
+#dialog_header {{
+    background: {COLORS['bg_elevated']};
+    border-bottom: 1px solid {COLORS['border']};
+    min-height: 50px;
+}}
+
+#dialog_title {{
+    color: {COLORS['text_primary']};
+    font-size: {FONT['lg']};
+    font-weight: bold;
+}}
+
+QMessageBox {{
+    background: {COLORS['bg_dark']};
+}}
+QMessageBox QLabel {{
+    color: {COLORS['text_primary']};
+    font-size: {FONT['md']};
+}}
+QMessageBox QPushButton {{
+    min-width: 100px;
+    min-height: 36px;
 }}
 
 QMenu {{

@@ -16,10 +16,52 @@ from ui.styles.theme import (
     COLORS, FONT, CARD_RADIUS, BORDER_RADIUS, ROW_HEIGHT,
     GAP_XS, GAP_SM, GAP_MD, GAP_LG, GAP_XL, MARGIN_CONTENT
 )
-from ui.components.widgets import StatCard, SectionTitle, ScreenShell, CardGroup, make_divider
+from ui.components.widgets import StatCard, SectionTitle, ScreenShell, CardGroup, make_divider, BaseDialog
 from utils.formatters import fmt_currency, fmt_datetime
 
 import database as db
+
+
+# ══════════════════════════════════════════
+#  Export Success Dialog
+# ══════════════════════════════════════════
+
+class ExportSuccessDialog(BaseDialog):
+    def __init__(self, url: str, parent=None):
+        super().__init__("✅ تم تصدير البيانات", parent)
+        self.url = url
+        self.setFixedWidth(420)
+        self._build_content()
+
+    def _build_content(self):
+        self.body.setSpacing(GAP_MD)
+        
+        info_lbl = QLabel("تم تصدير كل البيانات إلى Google Sheets بنجاح.")
+        info_lbl.setStyleSheet(f"color:{COLORS['text_primary']}; font-size:{FONT['md']};")
+        info_lbl.setWordWrap(True)
+        self.body.addWidget(info_lbl)
+
+        # URL Card
+        card = QFrame()
+        card.setObjectName("card_highlight")
+        cl = QVBoxLayout(card)
+        cl.setContentsMargins(12, 12, 12, 12)
+        
+        url_lbl = QLabel(self.url)
+        url_lbl.setStyleSheet(f"color:{COLORS['accent']}; font-size:{FONT['sm']}; font-family: 'Consolas', monospace;")
+        url_lbl.setWordWrap(True)
+        cl.addWidget(url_lbl)
+        
+        self.body.addWidget(card)
+        
+        # Footer
+        self.add_stretch()
+        copy_btn = self.add_button("📋 نسخ الرابط", self._copy, role="secondary")
+        self.add_button("إغلاق", self.accept, role="primary")
+
+    def _copy(self):
+        QApplication.clipboard().setText(self.url)
+        QMessageBox.information(self, "تم النسخ", "تم نسخ رابط الشيت إلى الحافظة.")
 
 
 class DashboardScreen(ScreenShell):
@@ -247,18 +289,8 @@ class DashboardScreen(ScreenShell):
             url = export_to_sheets(data)
             
             progress.close()
-
-            msg = QMessageBox(self)
-            msg.setWindowTitle("تم التصدير")
-            msg.setText(f"تم تصدير البيانات بنجاح\n\nرابط الشيت:\n{url}")
-            msg.setIcon(QMessageBox.Icon.Information)
-            copy_btn = msg.addButton("نسخ الرابط", QMessageBox.ButtonRole.ActionRole)
-            msg.addButton("إغلاق", QMessageBox.ButtonRole.AcceptRole)
+            ExportSuccessDialog(url, self).exec()
             
-            msg.exec()
-            if msg.clickedButton() == copy_btn:
-                QApplication.clipboard().setText(url)
-                QMessageBox.information(self, "تم النسخ", "تم نسخ الرابط إلى الحافظة")
         except Exception as e:
             if progress: progress.close()
             QMessageBox.critical(self, "خطأ في التصدير", str(e))

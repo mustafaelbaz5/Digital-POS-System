@@ -8,8 +8,9 @@ from PyQt6.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QHeaderView,
     QPushButton, QFrame, QSizePolicy, QScrollArea,
+    QDialog,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from PyQt6.QtGui import QColor
 
 from ui.styles.theme import (
@@ -23,6 +24,73 @@ from ui.styles.theme import (
 RTL = Qt.LayoutDirection.RightToLeft
 AlignLeft  = Qt.AlignmentFlag.AlignLeft  | Qt.AlignmentFlag.AlignVCenter
 AlignCenter = Qt.AlignmentFlag.AlignCenter
+
+
+# ══════════════════════════════════════════════════════
+#  BaseDialog
+# ══════════════════════════════════════════════════════
+
+class BaseDialog(QDialog):
+    """
+    A professional base dialog with Header-Body-Footer structure.
+    Ensures consistent spacing and visibility in dark mode.
+    """
+    def __init__(self, title: str, parent=None):
+        super().__init__(parent)
+        self.setLayoutDirection(RTL)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.FramelessWindowHint)
+        self._build(title)
+
+    def _build(self, title: str):
+        self.root = QVBoxLayout(self)
+        self.root.setContentsMargins(1, 1, 1, 1) # Space for border
+        self.root.setSpacing(0)
+
+        # ─── Header
+        header = QFrame()
+        header.setObjectName("dialog_header")
+        hl = QHBoxLayout(header)
+        hl.setContentsMargins(GAP_MD, 0, GAP_MD, 0)
+        
+        title_lbl = QLabel(title)
+        title_lbl.setObjectName("dialog_title")
+        hl.addWidget(title_lbl)
+        hl.addStretch()
+
+        # Close button (top right in RTL)
+        close_btn = QPushButton("✕")
+        close_btn.setFixedSize(30, 30)
+        close_btn.setStyleSheet(f"color:{COLORS['text_secondary']}; border:none; font-size:16px;")
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.clicked.connect(self.reject)
+        hl.addWidget(close_btn)
+
+        self.root.addWidget(header)
+
+        # ─── Body
+        self.body_w = QWidget()
+        self.body = QVBoxLayout(self.body_w)
+        self.body.setContentsMargins(MARGIN_CARD, MARGIN_CARD, MARGIN_CARD, MARGIN_CARD)
+        self.body.setSpacing(GAP_MD)
+        self.root.addWidget(self.body_w, 1)
+
+        # ─── Footer
+        self.footer_w = QWidget()
+        self.footer = QHBoxLayout(self.footer_w)
+        self.footer.setContentsMargins(MARGIN_CARD, 0, MARGIN_CARD, MARGIN_CARD)
+        self.footer.setSpacing(GAP_SM)
+        self.root.addWidget(self.footer_w)
+
+    def add_button(self, text: str, callback, role="primary") -> QPushButton:
+        btn = QPushButton(text)
+        btn.setObjectName(f"btn_{role}")
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.clicked.connect(callback)
+        self.footer.addWidget(btn)
+        return btn
+
+    def add_stretch(self):
+        self.footer.addStretch()
 
 
 # ══════════════════════════════════════════════════════
@@ -307,6 +375,40 @@ class DataTable(QTableWidget):
             item.setFont(f)
         item.setTextAlignment(align if align else AlignCenter)
         self.setItem(row, col, item)
+
+    def add_action_button(self, row: int, col: int, text: str, callback, role="ghost"):
+        """
+        Singular convenience method for add_action_buttons.
+        """
+        return self.add_action_buttons(row, col, [{'text': text, 'callback': callback, 'role': role}])[0]
+
+    def add_action_buttons(self, row: int, col: int, buttons_data: list):
+        """
+        Adds multiple buttons to a table cell.
+        buttons_data: list of dicts like {'text': '...', 'callback': ..., 'role': 'ghost'}
+        """
+        wrapper = QWidget()
+        wrapper.setStyleSheet("background: transparent; border: none;")
+        layout = QHBoxLayout(wrapper)
+        layout.setContentsMargins(8, 2, 8, 2)
+        layout.setSpacing(GAP_SM)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        btns = []
+        for data in buttons_data:
+            btn = QPushButton(data.get('text', ''))
+            btn.setObjectName(f"btn_{data.get('role', 'ghost')}")
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setMinimumHeight(28)
+            btn.setMaximumHeight(32)
+            btn.setStyleSheet(f"font-size: {FONT['sm']}; padding: 0 12px;")
+            if 'callback' in data:
+                btn.clicked.connect(data['callback'])
+            layout.addWidget(btn)
+            btns.append(btn)
+        
+        self.setCellWidget(row, col, wrapper)
+        return btns
 
     def add_status_badge(self, row: int, col: int, status: str,
                          operation_type: str = "outbound", is_delivered: int = 0):

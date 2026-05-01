@@ -15,7 +15,7 @@ from ui.styles.theme import (
     COLORS, FONT, ROW_HEIGHT, 
     GAP_XS, GAP_SM, GAP_MD, GAP_LG, MARGIN_CARD
 )
-from ui.components.widgets import ScreenShell, make_divider, CardGroup
+from ui.components.widgets import ScreenShell, make_divider, CardGroup, BaseDialog
 from utils.formatters import fmt_currency
 
 import database as db
@@ -25,43 +25,35 @@ import database as db
 #  Platform Actions Dialog
 # ══════════════════════════════════════════
 
-class PlatformActionsDialog(QDialog):
-    """ديالوج العمليات الخاصة بكل منصة"""
+class PlatformActionsDialog(BaseDialog):
+    """ديالوج العمليات الخاصة بكل منصة (Pro Version)"""
 
     def __init__(self, platform: dict, parent=None):
-        super().__init__(parent)
+        super().__init__(f"إجراءات — {platform['name']}", parent)
         self.platform       = platform
         self._result_action = None
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        self.setWindowTitle(f"إجراءات — {platform['name']}")
-        self.setFixedWidth(340)
-        self._build_ui()
+        self.setFixedWidth(380)
+        self._build_content()
 
-    def _build_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 16, 20, 16)
-        layout.setSpacing(10)
-
+    def _build_content(self):
         p      = self.platform
         p_type = p["type"]
 
-        # ── معلومات المنصة
+        # ── Body (Info Card)
         info = QFrame()
         info.setObjectName("card")
         il = QVBoxLayout(info)
-        il.setContentsMargins(14, 10, 14, 10)
-        il.setSpacing(4)
+        il.setContentsMargins(18, 14, 18, 14)
+        il.setSpacing(6)
 
         name_lbl = QLabel(p["name"])
-        name_lbl.setStyleSheet(
-            f"color:{COLORS['text_primary']};font-size:16px;font-weight:bold;"
-        )
+        name_lbl.setStyleSheet(f"color:{COLORS['text_primary']}; font-size:16px; font-weight:bold;")
         name_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         il.addWidget(name_lbl)
 
         bal_color = COLORS["green"] if p.get("balance", 0) > 0 else COLORS["text_muted"]
-        bal_lbl   = QLabel(f"الرصيد الحالي: {fmt_currency(p.get('balance', 0))}")
-        bal_lbl.setStyleSheet(f"color:{bal_color};font-size:13px;font-weight:bold;")
+        bal_lbl   = QLabel(f"💰 الرصيد الحالي: {fmt_currency(p.get('balance', 0))}")
+        bal_lbl.setStyleSheet(f"color:{bal_color}; font-size:14px; font-weight:bold;")
         bal_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         il.addWidget(bal_lbl)
 
@@ -73,40 +65,31 @@ class PlatformActionsDialog(QDialog):
             lim_color = (COLORS["red"]    if pct >= 90 else
                          COLORS["yellow"] if pct >= 70 else
                          COLORS["text_secondary"])
-            lim_lbl = QLabel(f"متبقي من الحد: {fmt_currency(remaining)}  ({pct}%)")
-            lim_lbl.setStyleSheet(f"color:{lim_color};font-size:12px;")
+            lim_lbl = QLabel(f"📉 متبقي من الحد: {fmt_currency(remaining)}  ({pct}%)")
+            lim_lbl.setStyleSheet(f"color:{lim_color}; font-size:13px;")
             lim_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
             il.addWidget(lim_lbl)
 
-        layout.addWidget(info)
-        layout.addWidget(make_divider())
+        self.body.addWidget(info)
+        self.body.addSpacing(GAP_SM)
 
-        # ── أزرار الإجراءات حسب النوع
+        # ── Body (Actions)
         for label, color, bg, handler in self._get_actions(p_type):
             btn = QPushButton(label)
-            btn.setFixedHeight(42)
+            btn.setFixedHeight(44)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            # Custom style for colorful action buttons
             btn.setStyleSheet(
-                f"background:{bg};color:{color};"
-                f"border:1.5px solid {color};border-radius:8px;"
-                f"font-size:14px;font-weight:bold;padding:4px 16px;"
+                f"background:{bg}; color:{color}; border:1.5px solid {color}; border-radius:8px;"
+                f"font-size:14px; font-weight:bold;"
             )
             btn.clicked.connect(handler)
-            layout.addWidget(btn)
+            self.body.addWidget(btn)
 
-        # ── حذف
-        layout.addWidget(make_divider())
-        del_btn = QPushButton("🗑️  حذف المنصة")
-        del_btn.setFixedHeight(38)
-        del_btn.setObjectName("btn_danger")
-        del_btn.clicked.connect(self._delete)
-        layout.addWidget(del_btn)
-
-        close_btn = QPushButton("إغلاق")
-        close_btn.setObjectName("btn_secondary")
-        close_btn.setFixedHeight(36)
-        close_btn.clicked.connect(self.reject)
-        layout.addWidget(close_btn)
+        # ── Footer
+        self.add_stretch()
+        self.add_button("🗑️ حذف المنصة", self._delete, role="danger")
+        self.add_button("إغلاق", self.reject, role="secondary")
 
     def _get_actions(self, p_type: str) -> list:
         actions = [
@@ -503,29 +486,16 @@ class PlatformsScreen(ScreenShell):
 #  Add Platform Dialog
 # ══════════════════════════════════════════
 
-class AddPlatformDialog(QDialog):
+class AddPlatformDialog(BaseDialog):
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        self.setWindowTitle("إضافة منصة جديدة")
-        self.setFixedWidth(400)
-        self._build_ui()
+        super().__init__("➕ إضافة منصة جديدة", parent)
+        self.setMinimumWidth(440)
+        self._build_form()
 
-    def _build_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(16)
-
-        title = QLabel("➕  إضافة منصة جديدة")
-        title.setStyleSheet(
-            f"font-size:15px;color:{COLORS['text_primary']};font-weight:bold;"
-        )
-        title.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(title)
-
+    def _build_form(self):
         form = QFormLayout()
-        form.setSpacing(12)
+        form.setSpacing(GAP_MD)
         form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
 
         self.name_input = QLineEdit()
@@ -553,20 +523,12 @@ class AddPlatformDialog(QDialog):
         self.limit_input.setValue(200000)
         form.addRow(self._limit_label, self.limit_input)
 
-        layout.addLayout(form)
-        layout.addStretch()
+        self.body.addLayout(form)
 
-        btns = QHBoxLayout()
-        btns.setSpacing(8)
-        cancel = QPushButton("إلغاء")
-        cancel.setObjectName("btn_secondary")
-        cancel.clicked.connect(self.reject)
-        save = QPushButton("إضافة ")
-        save.setObjectName("btn_primary")
-        save.clicked.connect(self._save)
-        btns.addWidget(cancel)
-        btns.addWidget(save)
-        layout.addLayout(btns)
+        # Footer
+        self.add_stretch()
+        self.add_button("إلغاء", self.reject, role="secondary")
+        self.add_button("إضافة ✓", self._save, role="primary")
 
         self._on_type_changed(0)
 

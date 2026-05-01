@@ -17,7 +17,7 @@ from ui.styles.theme import (
     MARGIN_CARD, MARGIN_CONTENT
 )
 from ui.components.widgets import (
-    ScreenShell, DataTable, CardGroup, make_divider
+    ScreenShell, DataTable, CardGroup, make_divider, BaseDialog
 )
 from utils.formatters import fmt_currency
 
@@ -185,19 +185,11 @@ class CustomersTab(QWidget):
             self.table.set_cell(row, 5, c.get("notes") or "—", COLORS["text_muted"])
 
             # task 8: prominent statement button
-            btn = QPushButton("  كشف الحساب")
-            btn.setFixedHeight(36)
-            btn.setStyleSheet(
-                f"background:{COLORS['accent']}; color:#fff; border-radius:8px;"
-                f"font-size:{FONT['sm']}; font-weight:bold; padding:0 10px;"
-                f"border:none;"
+            self.table.add_action_button(
+                row, 6, "📊 كشف الحساب", 
+                lambda _, cid=c["id"]: self._open_statement(cid), 
+                role="primary"
             )
-            btn.clicked.connect(lambda _, cid=c["id"]: self._open_statement(cid))
-
-            wrap = QWidget(); wl = QHBoxLayout(wrap)
-            wl.setContentsMargins(6, 4, 6, 4)
-            wl.addWidget(btn)
-            self.table.setCellWidget(row, 6, wrap)
 
         parts = [f"إجمالي: {len(customers)} عميل"]
         if total_owed: parts.append(f"عليهم: {fmt_currency(total_owed)}")
@@ -318,26 +310,10 @@ class GroupsTab(QWidget):
             self.table.set_cell(row, 2, g.get("notes") or "—", COLORS["text_muted"])
 
             # task 10: clear, well-spaced action buttons
-            wrap = QWidget(); wrap.setLayoutDirection(RTL)
-            wl   = QHBoxLayout(wrap)
-            wl.setContentsMargins(GAP_SM, GAP_SM, GAP_SM, GAP_SM)
-            wl.setSpacing(GAP_SM)
-
-            edit_btn = QPushButton("✏️  تعديل")
-            edit_btn.setObjectName("btn_ghost")
-            edit_btn.setFixedHeight(34)
-            edit_btn.setMinimumWidth(80)
-            edit_btn.clicked.connect(lambda _, grp=g: self._edit_group(grp))
-            wl.addWidget(edit_btn)
-
-            report_btn = QPushButton("📊  تقرير")
-            report_btn.setObjectName("btn_ghost")
-            report_btn.setFixedHeight(34)
-            report_btn.setMinimumWidth(80)
-            report_btn.clicked.connect(lambda _, gid=g["id"]: self._show_report(gid))
-            wl.addWidget(report_btn)
-
-            self.table.setCellWidget(row, 3, wrap)
+            self.table.add_action_buttons(row, 3, [
+                {'text': "✏️ تعديل", 'callback': lambda _, grp=g: self._edit_group(grp), 'role': 'secondary'},
+                {'text': "📊 تقرير", 'callback': lambda _, gid=g["id"]: self._show_report(gid), 'role': 'ghost'}
+            ])
 
     def _add_group(self):
         if GroupDialog(self).exec(): self.load_data()
@@ -372,57 +348,47 @@ class GroupsTab(QWidget):
 #  CustomerDialog
 # ══════════════════════════════════════════════════════
 
-class CustomerDialog(QDialog):
+class CustomerDialog(BaseDialog):
 
     def __init__(self, parent=None, customer: dict = None):
-        super().__init__(parent)
+        title = "تعديل عميل" if customer else "➕ إضافة عميل جديد"
+        super().__init__(title, parent)
         self.customer = customer
-        self.setLayoutDirection(RTL)
-        self.setWindowTitle("تعديل عميل" if customer else "إضافة عميل جديد")
-        self.setMinimumWidth(440)
-        self._build()
+        self.setMinimumWidth(460)
+        self._build_form()
         if customer: self._fill()
 
-    def _build(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(GAP_LG, GAP_LG, GAP_LG, GAP_LG)
-        layout.setSpacing(GAP_MD)
-
-        title = QLabel("تعديل عميل" if self.customer else "➕  إضافة عميل جديد")
-        title.setStyleSheet(
-            f"color:{COLORS['text_primary']}; font-size:{FONT['lg']}; font-weight:bold;"
-        )
-        title.setAlignment(ALeft)
-        layout.addWidget(title)
-        layout.addWidget(_make_div())
-
-        form = QFormLayout(); form.setSpacing(GAP_MD)
+    def _build_form(self):
+        form = QFormLayout()
+        form.setSpacing(GAP_MD)
         form.setLabelAlignment(ALeft)
 
-        self.name_input  = QLineEdit(); self.name_input.setPlaceholderText("اسم العميل *")
-        self.phone_input = QLineEdit(); self.phone_input.setPlaceholderText("رقم التليفون")
+        self.name_input  = QLineEdit()
+        self.name_input.setPlaceholderText("اسم العميل *")
+        
+        self.phone_input = QLineEdit()
+        self.phone_input.setPlaceholderText("رقم التليفون")
 
         self.group_combo = QComboBox()
         self.group_combo.addItem("بدون مجموعة", None)
         for g in db.get_all_groups():
             self.group_combo.addItem(g["name"], g["id"])
 
-        self.notes_input = QTextEdit(); self.notes_input.setMaximumHeight(72)
+        self.notes_input = QTextEdit()
+        self.notes_input.setMaximumHeight(80)
         self.notes_input.setPlaceholderText("ملاحظات (اختياري)")
 
         form.addRow("الاسم *:", self.name_input)
         form.addRow("التليفون:", self.phone_input)
         form.addRow("المجموعة:", self.group_combo)
         form.addRow("ملاحظات:", self.notes_input)
-        layout.addLayout(form)
-        layout.addStretch()
-
-        btns = QHBoxLayout(); btns.setSpacing(GAP_SM)
-        cancel = QPushButton("إلغاء"); cancel.setObjectName("btn_secondary")
-        cancel.clicked.connect(self.reject); btns.addWidget(cancel)
-        save = QPushButton("حفظ ✓"); save.setObjectName("btn_primary")
-        save.clicked.connect(self._save); btns.addWidget(save)
-        layout.addLayout(btns)
+        
+        self.body.addLayout(form)
+        
+        # Footer buttons
+        self.add_stretch()
+        self.add_button("إلغاء", self.reject, role="secondary")
+        self.add_button("حفظ ✓", self._save, role="primary")
 
     def _fill(self):
         self.name_input.setText(self.customer.get("name", ""))
@@ -457,52 +423,43 @@ class CustomerDialog(QDialog):
 #  GroupDialog
 # ══════════════════════════════════════════════════════
 
-class GroupDialog(QDialog):
+class GroupDialog(BaseDialog):
 
     def __init__(self, parent=None, group: dict = None):
-        super().__init__(parent)
+        title = "تعديل مجموعة" if group else "➕ إضافة مجموعة جديدة"
+        super().__init__(title, parent)
         self.group = group
-        self.setLayoutDirection(RTL)
-        self.setWindowTitle("تعديل مجموعة" if group else "إضافة مجموعة جديدة")
-        self.setMinimumWidth(380)
-        self._build()
+        self.setMinimumWidth(400)
+        self._build_form()
         if group: self._fill()
 
-    def _build(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(GAP_LG, GAP_LG, GAP_LG, GAP_LG)
-        layout.setSpacing(GAP_MD)
-
-        title = QLabel("تعديل مجموعة" if self.group else "➕  إضافة مجموعة جديدة")
-        title.setStyleSheet(
-            f"color:{COLORS['text_primary']}; font-size:{FONT['lg']}; font-weight:bold;"
-        )
-        title.setAlignment(ALeft)
-        layout.addWidget(title)
-        layout.addWidget(_make_div())
-
-        form = QFormLayout(); form.setSpacing(GAP_MD)
+    def _build_form(self):
+        form = QFormLayout()
+        form.setSpacing(GAP_MD)
         form.setLabelAlignment(ALeft)
 
-        self.name_input   = QLineEdit(); self.name_input.setPlaceholderText("اسم المجموعة *")
+        self.name_input   = QLineEdit()
+        self.name_input.setPlaceholderText("اسم المجموعة *")
+        
         self.leader_combo = QComboBox()
         self.leader_combo.addItem("بدون قائد", None)
         for c in db.get_all_customers():
             self.leader_combo.addItem(c["name"], c["id"])
-        self.notes_input = QTextEdit(); self.notes_input.setMaximumHeight(64)
+            
+        self.notes_input = QTextEdit()
+        self.notes_input.setMaximumHeight(80)
+        self.notes_input.setPlaceholderText("ملاحظات (اختياري)")
 
         form.addRow("الاسم *:", self.name_input)
         form.addRow("القائد:", self.leader_combo)
         form.addRow("ملاحظات:", self.notes_input)
-        layout.addLayout(form)
-        layout.addStretch()
-
-        btns = QHBoxLayout(); btns.setSpacing(GAP_SM)
-        cancel = QPushButton("إلغاء"); cancel.setObjectName("btn_secondary")
-        cancel.clicked.connect(self.reject); btns.addWidget(cancel)
-        save = QPushButton("حفظ ✓"); save.setObjectName("btn_primary")
-        save.clicked.connect(self._save); btns.addWidget(save)
-        layout.addLayout(btns)
+        
+        self.body.addLayout(form)
+        
+        # Footer buttons
+        self.add_stretch()
+        self.add_button("إلغاء", self.reject, role="secondary")
+        self.add_button("حفظ ✓", self._save, role="primary")
 
     def _fill(self):
         self.name_input.setText(self.group.get("name", ""))
