@@ -490,11 +490,21 @@ class TransactionsLogTab(QWidget):
         if ref:
             txns = db.search_by_reference(ref)
         else:
+            is_del = None
+            pay_st = status
+            if status == "delivered":
+                is_del = 1
+                pay_st = None
+            elif status == "not_delivered":
+                is_del = 0
+                pay_st = None
+                
             txns = db.get_transactions(
                 platform_id    = platform_id,
-                payment_status = status,
+                payment_status = pay_st,
                 date_from      = date_from,
                 date_to        = date_to,
+                is_delivered   = is_del,
                 limit          = 1000
             )
         self._render(txns)

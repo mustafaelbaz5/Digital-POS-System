@@ -344,11 +344,16 @@ def get_customer_statement(customer_id: int) -> dict:
 
 def cleanup_paid_transactions(customer_id: int = None) -> int:
     with get_connection() as conn:
+        finished_sql = """
+            (operation_type='outbound' AND payment_status='paid') 
+            OR 
+            (operation_type='inbound' AND is_delivered=1)
+        """
         if customer_id:
             cursor = conn.execute(
-                "DELETE FROM transactions WHERE payment_status='paid' AND customer_id=?", (customer_id,))
+                f"DELETE FROM transactions WHERE customer_id=? AND ({finished_sql})", (customer_id,))
         else:
-            cursor = conn.execute("DELETE FROM transactions WHERE payment_status='paid'")
+            cursor = conn.execute(f"DELETE FROM transactions WHERE {finished_sql}")
         conn.commit()
         return cursor.rowcount
 
@@ -390,14 +395,19 @@ def get_dashboard_stats() -> dict:
 def count_finished_transactions(customer_id: int = None) -> int:
     """عدد العمليات المسددة أو المسلمة القابلة للحذف"""
     with get_connection() as conn:
+        finished_sql = """
+            (operation_type='outbound' AND payment_status='paid') 
+            OR 
+            (operation_type='inbound' AND is_delivered=1)
+        """
         if customer_id:
             row = conn.execute(
-                "SELECT COUNT(*) AS n FROM transactions WHERE payment_status='paid' AND customer_id=?",
+                f"SELECT COUNT(*) AS n FROM transactions WHERE customer_id=? AND ({finished_sql})",
                 (customer_id,)
             ).fetchone()
         else:
             row = conn.execute(
-                "SELECT COUNT(*) AS n FROM transactions WHERE payment_status='paid'"
+                f"SELECT COUNT(*) AS n FROM transactions WHERE {finished_sql}"
             ).fetchone()
         return row["n"] if row else 0
 
