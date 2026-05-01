@@ -56,13 +56,13 @@ class PlatformActionsDialog(QDialog):
         name_lbl.setStyleSheet(
             f"color:{COLORS['text_primary']};font-size:16px;font-weight:bold;"
         )
-        name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        name_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         il.addWidget(name_lbl)
 
         bal_color = COLORS["green"] if p.get("balance", 0) > 0 else COLORS["text_muted"]
         bal_lbl   = QLabel(f"الرصيد الحالي: {fmt_currency(p.get('balance', 0))}")
         bal_lbl.setStyleSheet(f"color:{bal_color};font-size:13px;font-weight:bold;")
-        bal_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        bal_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         il.addWidget(bal_lbl)
 
         if p_type in ("wallet", "instapay"):
@@ -75,7 +75,7 @@ class PlatformActionsDialog(QDialog):
                          COLORS["text_secondary"])
             lim_lbl = QLabel(f"متبقي من الحد: {fmt_currency(remaining)}  ({pct}%)")
             lim_lbl.setStyleSheet(f"color:{lim_color};font-size:12px;")
-            lim_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+            lim_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
             il.addWidget(lim_lbl)
 
         layout.addWidget(info)
@@ -234,7 +234,7 @@ class PlatformRow(QFrame):
             f"background:transparent;border:none;"
         )
         name_lbl.setFixedWidth(180)
-        name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        name_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(name_lbl)
 
         layout.addStretch()
@@ -306,7 +306,7 @@ class PlatformListTab(QWidget):
         sort_group = CardGroup()
         sb = QHBoxLayout()
         sb.setSpacing(GAP_SM)
-        sb.setAlignment(Qt.AlignmentFlag.AlignRight)
+        sb.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         sort_lbl = QLabel("ترتيب:")
         sort_lbl.setStyleSheet(f"color:{COLORS['text_muted']};font-size:12px;")
@@ -351,7 +351,7 @@ class PlatformListTab(QWidget):
         hl.setContentsMargins(16, 0, 16, 0)
         hl.setSpacing(0)
 
-        def hdr(text, width=None, align=Qt.AlignmentFlag.AlignRight):
+        def hdr(text, width=None, align=Qt.AlignmentFlag.AlignLeft):
             lbl = QLabel(text)
             lbl.setStyleSheet(
                 f"color:{COLORS['text_secondary']};font-size:11px;"
@@ -521,12 +521,12 @@ class AddPlatformDialog(QDialog):
         title.setStyleSheet(
             f"font-size:15px;color:{COLORS['text_primary']};font-weight:bold;"
         )
-        title.setAlignment(Qt.AlignmentFlag.AlignRight)
+        title.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(title)
 
         form = QFormLayout()
         form.setSpacing(12)
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
 
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("مثال: فوري، أمان، فودافون كاش")

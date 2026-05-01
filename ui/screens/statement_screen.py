@@ -29,14 +29,14 @@ def info_pill(label: str, value: str, color: str = None) -> QFrame:
     layout.setSpacing(3)
 
     val_lbl = QLabel(value)
-    val_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+    val_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
     val_lbl.setStyleSheet(
         f"color:{color or COLORS['text_primary']};font-size:17px;font-weight:bold;"
     )
     layout.addWidget(val_lbl)
 
     lbl = QLabel(label)
-    lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+    lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
     lbl.setStyleSheet(f"color:{COLORS['text_muted']};font-size:11px;")
     layout.addWidget(lbl)
 
@@ -111,7 +111,7 @@ class CustomerStatementDialog(QDialog):
         info = QVBoxLayout(); info.setSpacing(4)
         name_lbl = QLabel(c.get("name", "—"))
         name_lbl.setStyleSheet(f"color:{COLORS['text_primary']};font-size:18px;font-weight:bold;")
-        name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        name_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         info.addWidget(name_lbl)
 
         sub_row = QHBoxLayout(); sub_row.setSpacing(16)
@@ -129,7 +129,7 @@ class CustomerStatementDialog(QDialog):
         if c.get("notes"):
             notes_lbl = QLabel(f"📝  {c['notes']}")
             notes_lbl.setStyleSheet(f"color:{COLORS['text_muted']};font-size:12px;")
-            notes_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+            notes_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
             info.addWidget(notes_lbl)
 
         layout.addLayout(info)
@@ -475,12 +475,12 @@ class ClientReportDialog(QDialog):
         name_lbl = QLabel(c.get("name", "—"))
         name_lbl.setStyleSheet(
             f"color:{COLORS['text_primary']};font-size:20px;font-weight:bold;")
-        name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        name_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         name_col.addWidget(name_lbl)
         if c.get("phone"):
             ph = QLabel(f"📞  {c['phone']}")
             ph.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:13px;")
-            ph.setAlignment(Qt.AlignmentFlag.AlignRight)
+            ph.setAlignment(Qt.AlignmentFlag.AlignLeft)
             name_col.addWidget(ph)
         id_layout.addLayout(name_col)
         id_layout.addStretch()
@@ -532,7 +532,7 @@ class ClientReportDialog(QDialog):
         lbl.setStyleSheet(
             f"color:{color};font-size:13px;font-weight:bold;"
             f"border-right:3px solid {color};padding-right:8px;")
-        lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         return lbl
 
     def _make_txn_table(self, txns: list, mode: str) -> QFrame:
@@ -552,7 +552,7 @@ class ClientReportDialog(QDialog):
             lbl.setStyleSheet(
                 f"color:{COLORS['text_muted']};font-size:11px;font-weight:bold;"
                 f"border-bottom:1px solid {COLORS['border']};padding-bottom:4px;")
-            lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
             if width:
                 lbl.setFixedWidth(width)
             else:
@@ -569,7 +569,7 @@ class ClientReportDialog(QDialog):
             # التاريخ
             date_lbl = QLabel((t.get("created_at") or "")[:10])
             date_lbl.setStyleSheet(f"color:{COLORS['text_muted']};font-size:12px;")
-            date_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+            date_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
             date_lbl.setFixedWidth(110)
             row.addWidget(date_lbl)
 
@@ -577,7 +577,7 @@ class ClientReportDialog(QDialog):
             service = t.get("service_name") or "—"
             svc_lbl = QLabel(service)
             svc_lbl.setStyleSheet(f"color:{COLORS['text_primary']};font-size:13px;")
-            svc_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+            svc_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
             svc_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
             row.addWidget(svc_lbl)
 
@@ -607,7 +607,7 @@ class ClientReportDialog(QDialog):
         total_row = QHBoxLayout()
         total_lbl = QLabel("الإجمالي:")
         total_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:12px;font-weight:bold;")
-        total_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        total_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         total_row.addStretch()
         total_row.addWidget(total_lbl)
 
@@ -662,12 +662,12 @@ class ClientReportDialog(QDialog):
 
         amt_lbl = QLabel(fmt_currency(abs(net)))
         amt_lbl.setStyleSheet(f"color:{color};font-size:26px;font-weight:bold;")
-        amt_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        amt_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         text_col.addWidget(amt_lbl)
 
         desc_lbl = QLabel(label)
         desc_lbl.setStyleSheet(f"color:{color};font-size:13px;")
-        desc_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        desc_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         text_col.addWidget(desc_lbl)
 
         if total_owed > 0 and total_due > 0:
@@ -675,7 +675,7 @@ class ClientReportDialog(QDialog):
                 f"عليك: {fmt_currency(total_owed)}  —  لك: {fmt_currency(total_due)}"
             )
             breakdown.setStyleSheet(f"color:{COLORS['text_muted']};font-size:11px;")
-            breakdown.setAlignment(Qt.AlignmentFlag.AlignRight)
+            breakdown.setAlignment(Qt.AlignmentFlag.AlignLeft)
             text_col.addWidget(breakdown)
 
         layout.addLayout(text_col)
@@ -831,12 +831,12 @@ class CustomerFacingStatementDialog(QDialog):
             bl.setSpacing(4)
 
             amt_lbl = QLabel(fmt_currency(amount))
-            amt_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+            amt_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
             amt_lbl.setStyleSheet(f"color:{color};font-size:20px;font-weight:bold;border:none;")
             bl.addWidget(amt_lbl)
 
             lbl = QLabel(label)
-            lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
             lbl.setStyleSheet(f"color:{COLORS['text_muted']};font-size:12px;border:none;")
             bl.addWidget(lbl)
 
@@ -884,7 +884,7 @@ class CustomerFacingStatementDialog(QDialog):
         nfl.addStretch()
 
         net_lbl = QLabel(net_text)
-        net_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        net_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         net_lbl.setStyleSheet(
             f"color:{net_color};font-size:22px;font-weight:bold;border:none;"
         )
@@ -972,7 +972,7 @@ class CustomerFacingStatementDialog(QDialog):
 
     def _section_label(self, text: str) -> QLabel:
         lbl = QLabel(text)
-        lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         lbl.setStyleSheet(
             f"color:{COLORS['text_secondary']};font-size:13px;font-weight:bold;"
         )
@@ -1107,7 +1107,7 @@ class _ActionDialog(QDialog):
             f"color:{COLORS['text_secondary']};font-size:12px;"
             f"background:{COLORS['bg_input']};border-radius:8px;padding:10px 14px;"
         )
-        info.setAlignment(Qt.AlignmentFlag.AlignRight)
+        info.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(info)
 
         added_any = False
