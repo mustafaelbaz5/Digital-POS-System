@@ -222,65 +222,100 @@ def _build_customers(spreadsheet, ws, data: dict) -> dict:
 
 
 def _build_groups(spreadsheet, ws, data: dict) -> None:
+    """Sheet 3 — 🏷️ المجموعات : Detailed Group Accounting Ledger."""
     sid = ws.id
     groups = data.get("groups", [])
     rows = []
     reqs = _optimize_view(sid)
+    
+    # Column Widths: Name, Phone, Debit, Credit, Net
     reqs.extend([
-        _col_width(sid, 0, 180), _col_width(sid, 1, 250), _col_width(sid, 2, 120), _col_width(sid, 3, 120)
+        _col_width(sid, 0, 180), # Member Name
+        _col_width(sid, 1, 140), # Phone
+        _col_width(sid, 2, 110), # Debit (عليه)
+        _col_width(sid, 3, 110), # Credit (له)
+        _col_width(sid, 4, 130), # Net (الصافي)
     ])
 
     for g_i, group in enumerate(groups):
-        if g_i > 0: rows.extend([[""]*4, [""]*4])
+        if g_i > 0: rows.extend([[""]*5, [""]*5]) # Block Spacing
         
         g_start = len(rows)
-        rows.append([f"🏷️  مجموعة: {group['name']}", "", "", ""])
-        reqs.append(_merge(sid, g_start, 0, 4))
-        reqs.append(_fmt(sid, g_start, g_start + 1, 0, 4, bold=True, bg="#1B263B", fg="#FFFFFF", font_size=14, align="CENTER"))
+        # 1. Group Header (Merged A:E)
+        rows.append([f"🏷️  مجموعة: {group['name']}", "", "", "", ""])
+        reqs.append(_merge(sid, g_start, 0, 5))
+        reqs.append(_fmt(sid, g_start, g_start + 1, 0, 5, bold=True, bg="#1B263B", fg="#FFFFFF", font_size=14, align="CENTER"))
         reqs.append(_row_height(sid, g_start, 50))
 
-        group_owed = 0.0
-        group_credit = 0.0
+        # 2. Table Header
+        th_idx = len(rows)
+        rows.append(["اسم العضو", "التليفون", "مدين (عليه)", "دائن (له)", "صافي العضو"])
+        reqs.append(_fmt(sid, th_idx, th_idx + 1, 0, 5, bold=True, bg="#415A77", fg="#FFFFFF", align="CENTER"))
+        reqs.append(_row_height(sid, th_idx, 35))
 
+        group_total_owed = 0.0
+        group_total_credit = 0.0
+
+        # 3. Member Rows
         for m_i, member in enumerate(group.get("members", [])):
-            if m_i > 0: rows.append([""]*4)
-            m_idx = len(rows)
-            rows.append([f"👤 {member['name']}", "البيان / الخدمة", "مدين", "دائن"])
-            reqs.append(_fmt(sid, m_idx, m_idx + 1, 0, 1, bold=True, bg="#E0E1DD"))
-            reqs.append(_fmt(sid, m_idx, m_idx + 1, 1, 4, bold=True, bg="#415A77", fg="#FFFFFF"))
-            reqs.append(_row_height(sid, m_idx, 35))
-
+            m_row_idx = len(rows)
+            
+            # Calculate member totals from their transactions
+            m_owed = 0.0
+            m_credit = 0.0
             for t in member.get("transactions", []):
-                tx_idx = len(rows)
                 amt = float(t["amount"] or 0)
-                o, c = (amt, 0) if amt > 0 else (0, abs(amt))
-                group_owed += o; group_credit += c
-                rows.append(["", t["service"], o if o > 0 else "", c if c > 0 else ""])
-                reqs.append(_fmt(sid, tx_idx, tx_idx + 1, 0, 4, bg="#FFFFFF"))
-                reqs.append(_fmt(sid, tx_idx, tx_idx + 1, 2, 3, fg="#D0021B", num_fmt='#,##0.00 "ج"'))
-                reqs.append(_fmt(sid, tx_idx, tx_idx + 1, 3, 4, fg="#008000", num_fmt='#,##0.00 "ج"'))
-                reqs.append(_row_height(sid, tx_idx, 30))
+                if amt > 0: m_owed += amt
+                else:       m_credit += abs(amt)
+            
+            m_net = m_owed - m_credit
+            group_total_owed += m_owed
+            group_total_credit += m_credit
+            
+            rows.append([
+                member["name"], 
+                member.get("phone", ""), 
+                m_owed if m_owed > 0 else "", 
+                m_credit if m_credit > 0 else "", 
+                m_net
+            ])
+            
+            bg = "#F8F9FA" if m_i % 2 == 0 else "#FFFFFF"
+            reqs.append(_fmt(sid, m_row_idx, m_row_idx + 1, 0, 5, bg=bg))
+            reqs.append(_fmt(sid, m_row_idx, m_row_idx + 1, 2, 3, fg="#D0021B", num_fmt='#,##0.00 "ج"'))
+            reqs.append(_fmt(sid, m_row_idx, m_row_idx + 1, 3, 4, fg="#008000", num_fmt='#,##0.00 "ج"'))
+            
+            # Member Net Balance Color
+            m_net_fg = "#D0021B" if m_net > 0 else ("#008000" if m_net < 0 else "#000000")
+            reqs.append(_fmt(sid, m_row_idx, m_row_idx + 1, 4, 5, fg=m_net_fg, bold=True, num_fmt='#,##0.00 "ج"'))
+            reqs.append(_row_height(sid, m_row_idx, 30))
 
-        # Group Footer
+        # 4. Group Footer (Summary)
         f_idx = len(rows)
-        net = group_owed - group_credit
-        status = "مستحق على المجموعة" if net > 0 else "مستحق للمجموعة"
-        net_fg = "#D0021B" if net > 0 else "#008000"
+        group_net = group_total_owed - group_total_credit
+        status = "مستحق على المجموعة" if group_net > 0 else "مستحق للمجموعة"
+        net_fg = "#D0021B" if group_net > 0 else "#008000"
         
-        rows.append(["", "إجمالي المجموعة (مدين):", group_owed, ""])
-        rows.append(["", "إجمالي المجموعة (دائن):", "", group_credit])
-        rows.append(["", f"صافي المجموعة ({status}):", "", abs(net)])
+        rows.append(["", "إجمالي مبالغ المجموعة (عليه):", group_total_owed, "", ""])
+        rows.append(["", "إجمالي مدفوعات المجموعة (له):", "", group_total_credit, ""])
+        rows.append(["", f"الصافي النهائي للمجموعة ({status}):", "", "", group_net])
         
-        reqs.append(_fmt(sid, f_idx, f_idx + 3, 1, 2, bold=True))
+        # Footer Styling
+        reqs.append(_fmt(sid, f_idx, f_idx + 2, 1, 2, bold=True, bg="#E0E1DD"))
         reqs.append(_fmt(sid, f_idx, f_idx + 1, 2, 3, bold=True, fg="#D0021B", num_fmt='#,##0.00 "ج"'))
         reqs.append(_fmt(sid, f_idx + 1, f_idx + 2, 3, 4, bold=True, fg="#008000", num_fmt='#,##0.00 "ج"'))
+        reqs.append(_row_height(sid, f_idx, 35))
+        reqs.append(_row_height(sid, f_idx + 1, 35))
         
-        net_idx = f_idx + 2
-        reqs.append(_merge(sid, net_idx, 1, 3))
-        reqs.append(_fmt(sid, net_idx, net_idx + 1, 1, 4, bold=True, bg="#1B263B", fg="#FFFFFF", align="CENTER"))
-        reqs.append(_fmt(sid, net_idx, net_idx + 1, 3, 4, bold=True, fg=net_fg, num_fmt='#,##0.00 "ج"'))
+        # Net Summary Row
+        net_row = f_idx + 2
+        reqs.append(_merge(sid, net_row, 1, 4))
+        reqs.append(_fmt(sid, net_row, net_row + 1, 1, 5, bold=True, bg="#1B263B", fg="#FFFFFF", align="CENTER"))
+        reqs.append(_fmt(sid, net_row, net_row + 1, 4, 5, bold=True, fg=net_fg, num_fmt='#,##0.00 "ج"', font_size=12))
+        reqs.append(_row_height(sid, net_row, 45))
         
-        reqs.append(_border(sid, g_start, len(rows), 0, 4))
+        # Border for the entire group block
+        reqs.append(_border(sid, g_start, len(rows), 0, 5))
 
     if rows:
         ws.update(values=rows, range_name="A1", value_input_option="USER_ENTERED")
@@ -306,7 +341,7 @@ def export_to_sheets(data: dict) -> str:
 
         ws_summary   = spreadsheet.add_worksheet(_SHEET_NAMES[0], rows=2000, cols=4)
         ws_customers = spreadsheet.add_worksheet(_SHEET_NAMES[1], rows=10000, cols=4)
-        ws_groups    = spreadsheet.add_worksheet(_SHEET_NAMES[2], rows=10000, cols=4)
+        ws_groups    = spreadsheet.add_worksheet(_SHEET_NAMES[2], rows=10000, cols=5)
         if temp: spreadsheet.del_worksheet(temp)
 
         # 2. Build Sheets (Each builder uses 1 update + 1 batch_update)
