@@ -4,7 +4,7 @@
 This is an update to the existing `utils/google_sheets.py` and `database/dal_customers.py`
 already implemented in this project. Read both files fully before changing anything.
 The export is triggered from `ui/screens/dashboard.py` via `_export_to_sheets()`.
-`credentials.json` is in the project root. The Google Sheet is named "حسابات المحل".
+`credentials.json` is in the project root. The Google Sheet is named "الحسابات".
 
 ---
 
