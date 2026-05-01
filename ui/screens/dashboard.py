@@ -182,8 +182,14 @@ class DashboardScreen(ScreenShell):
             cell(7, fmt_currency(profit), color=COLORS["accent"] if profit >= 0 else COLORS["red"])
             
             st = t.get("payment_status", "")
-            st_text = {"cash": "نقدي ", "pending": "مؤجل ⏳", "paid": "مسدد ✓"}.get(st, st)
-            st_color = {"cash": COLORS["green"], "pending": COLORS["yellow"], "paid": COLORS["text_secondary"]}.get(st)
+            if t.get("operation_type") == "inbound":
+                is_del = bool(t.get("is_delivered", 0))
+                st_text = "تم التسليم ✓" if is_del else "لم يسلم ⏳"
+                st_color = COLORS["green"] if is_del else COLORS["yellow"]
+            else:
+                st_text = "مؤجل ⏳" if st == "pending" else "تم السداد ✓"
+                st_color = COLORS["yellow"] if st == "pending" else COLORS["green"]
+            
             cell(8, st_text, color=st_color, bold=True)
 
     def _make_actions_panel(self) -> QFrame:

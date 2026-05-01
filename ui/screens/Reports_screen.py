@@ -303,7 +303,7 @@ class InventoryTab(QWidget):
         platforms = db.get_all_platforms()
 
         period_txns   = db.get_transactions(date_from=date_from, date_to=date_to, limit=5000)
-        period_profit = sum(t.get("profit", 0) or 0 for t in period_txns)
+        period_profit = sum(t.get("profit", 0) or 0 for t in period_txns if t.get("payment_status") != "cash")
 
         self.card_cash.set_value(fmt_currency(stats["cash_vault"]))
         self.card_machines.set_value(fmt_currency(stats["total_machines"]))
@@ -324,7 +324,7 @@ class InventoryTab(QWidget):
         )
 
         all_txns      = db.get_transactions(limit=5000)
-        total_profit  = sum(t.get("profit", 0) or 0 for t in all_txns)
+        total_profit  = sum(t.get("profit", 0) or 0 for t in all_txns if t.get("payment_status") != "cash")
         left_side     = stats["total_balances"] + stats["total_debts"]
         right_side    = budget["main_budget"] + total_profit
         diff          = left_side - right_side
@@ -435,7 +435,9 @@ class TransactionsLogTab(QWidget):
         self.status_filter.setMinimumWidth(120)
         self.status_filter.addItem("كل الحالات", None)
         self.status_filter.addItem("⏳ مؤجل",    "pending")
-        self.status_filter.addItem(" مسدد",    "paid")
+        self.status_filter.addItem(" تم السداد", "paid")
+        self.status_filter.addItem("⏳ لم يسلم", "not_delivered")
+        self.status_filter.addItem(" تم التسليم", "delivered")
         self.status_filter.currentIndexChanged.connect(self.load_data)
         fl.addWidget(self.status_filter)
 

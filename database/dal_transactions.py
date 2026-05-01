@@ -44,7 +44,7 @@ def add_outbound_transaction(
                     (amount_spent, platform_id)
                 )
 
-            if payment_status == "cash":
+            if payment_status == "paid":
                 conn.execute("UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1", (amount_required,))
             elif payment_status == "pending" and customer_id:
                 conn.execute(
@@ -80,16 +80,17 @@ def add_inbound_transaction(
                 INSERT INTO transactions
                     (operation_type, service_name, platform_id, customer_id,
                      amount_spent, amount_required, reference_no, payment_status, is_delivered, notes)
-                VALUES ('inbound', ?, ?, ?, ?, ?, ?, 'cash', ?, ?)
+                VALUES ('inbound', ?, ?, ?, ?, ?, ?, 'paid', ?, ?)
             """, (service_name, wallet_id, customer_id, amount_delivered, amount_received,
                   reference_no, 1 if is_delivered else 0, notes))
             transaction_id = cursor.lastrowid
 
             conn.execute("UPDATE platforms SET balance = balance + ?, monthly_used = monthly_used + ? WHERE id = ?",
                          (amount_received, amount_received, wallet_id))
-            conn.execute("UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1", (amount_delivered,))
-
-            if customer_id and not is_delivered:
+            
+            if is_delivered:
+                conn.execute("UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1", (amount_delivered,))
+            elif customer_id:
                 conn.execute(
                     "UPDATE customers SET total_debt = total_debt - ? WHERE id = ?",
                     (amount_delivered, customer_id)
@@ -116,6 +117,10 @@ def mark_as_delivered(transaction_id: int) -> None:
             if row["is_delivered"]:
                 raise ValueError("تم التسليم مسبقاً")
             conn.execute("UPDATE transactions SET is_delivered = 1 WHERE id = ?", (transaction_id,))
+            
+            # Deduct from cash vault
+            conn.execute("UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1", (row["amount_spent"],))
+            
             if row["customer_id"]:
                 conn.execute(
                     "UPDATE customers SET total_debt = total_debt + ? WHERE id = ?",
@@ -139,6 +144,10 @@ def mark_as_paid(transaction_id: int) -> None:
             if row["payment_status"] != "pending":
                 raise ValueError("العملية ليست في حالة مؤجل")
             conn.execute("UPDATE transactions SET payment_status = 'paid' WHERE id = ?", (transaction_id,))
+            
+            # Add to cash vault
+            conn.execute("UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1", (row["amount_required"],))
+            
             if row["customer_id"]:
                 conn.execute(
                     "UPDATE customers SET total_debt = total_debt - ? WHERE id = ?",
@@ -177,23 +186,23 @@ def update_transaction_status(transaction_id: int, new_status: str) -> None:
             amt = row["amount_required"]
 
             if old_status == "pending" and new_status == "paid":
-                # كان مديوناً → أصبح مسدد → خصم من مديونيته
-                if cid:
-                    conn.execute("UPDATE customers SET total_debt = total_debt - ? WHERE id = ?", (amt, cid))
-            elif old_status == "paid" and new_status == "pending":
-                # كان مسدد → رجع مؤجل → أضف للمديونية
-                if cid:
-                    conn.execute("UPDATE customers SET total_debt = total_debt + ? WHERE id = ?", (amt, cid))
-            elif old_status == "cash" and new_status == "pending":
-                # كان نقدي → رجع مؤجل → خصم من الكاش وأضف للمديونية
-                conn.execute("UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1", (amt,))
-                if cid:
-                    conn.execute("UPDATE customers SET total_debt = total_debt + ? WHERE id = ?", (amt, cid))
-            elif old_status == "pending" and new_status == "cash":
-                # نادر لكن ممكن
+                # كان مديوناً → أصبح مسدد → أضف للكاش وخصم من مديونيته
                 conn.execute("UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1", (amt,))
                 if cid:
                     conn.execute("UPDATE customers SET total_debt = total_debt - ? WHERE id = ?", (amt, cid))
+            elif old_status == "paid" and new_status == "pending":
+                # كان مسدد → رجع مؤجل → خصم من الكاش وأضف للمديونية
+                conn.execute("UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1", (amt,))
+                if cid:
+                    conn.execute("UPDATE customers SET total_debt = total_debt + ? WHERE id = ?", (amt, cid))
+            elif old_status == "cash" and new_status == "pending":
+                # معالجة الحالة القديمة
+                conn.execute("UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1", (amt,))
+                if cid:
+                    conn.execute("UPDATE customers SET total_debt = total_debt + ? WHERE id = ?", (amt, cid))
+            elif old_status == "cash" and new_status == "paid":
+                # كلاهما يؤثر على الكاش، فقط غير الحالة
+                pass
 
             conn.commit()
         except Exception:
@@ -229,19 +238,21 @@ def delete_transaction(transaction_id: int) -> None:
                 if row["p_type"] in ("wallet", "instapay"):
                     conn.execute("UPDATE platforms SET monthly_used = MAX(0, monthly_used - ?) WHERE id = ?", (spent, pid))
                 # عكس تأثير الدفع
-                if status == "cash":
+                if status in ("cash", "paid"):
                     conn.execute("UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1", (req,))
                 elif status == "pending" and cid:
                     conn.execute("UPDATE customers SET total_debt = total_debt - ? WHERE id = ?", (req, cid))
 
             elif op == "inbound":
-                # استرجاع رصيد المحفظة
+                # استرجاع رصيد المحفظة (الذي تم استلامه)
                 conn.execute("UPDATE platforms SET balance = balance - ? WHERE id = ?", (req, pid))
                 conn.execute("UPDATE platforms SET monthly_used = MAX(0, monthly_used - ?) WHERE id = ?", (req, pid))
-                # إعادة الكاش
-                conn.execute("UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1", (spent,))
-                # عكس تأثير العميل
-                if cid and not row["is_delivered"]:
+                
+                if row["is_delivered"]:
+                    # استرداد الكاش للخزنة
+                    conn.execute("UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1", (spent,))
+                elif cid:
+                    # عكس تأثير الرصيد للعميل
                     conn.execute("UPDATE customers SET total_debt = total_debt + ? WHERE id = ?", (spent, cid))
 
             elif op == "commission":
@@ -259,7 +270,7 @@ def delete_transaction(transaction_id: int) -> None:
 def get_transactions(
     customer_id: int = None, platform_id: int = None,
     payment_status: str = None, date_from: str = None,
-    date_to: str = None, limit: int = 500
+    date_to: str = None, is_delivered: int = None, limit: int = 500
 ) -> list[dict]:
     with get_connection() as conn:
         conditions, params = [], []
@@ -273,6 +284,10 @@ def get_transactions(
             conditions.append("DATE(t.created_at) >= ?"); params.append(date_from)
         if date_to:
             conditions.append("DATE(t.created_at) <= ?"); params.append(date_to)
+        if is_delivered is not None:
+            conditions.append("t.is_delivered = ?"); params.append(is_delivered)
+            if is_delivered == 0: # Usually we want not delivered inbounds
+                conditions.append("t.operation_type = 'inbound'")
 
         where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
         rows = conn.execute(f"""
@@ -312,11 +327,11 @@ def get_customer_statement(customer_id: int) -> dict:
 
         totals = conn.execute("""
             SELECT
-                SUM(CASE WHEN payment_status='pending' THEN amount_required ELSE 0 END) AS total_pending,
-                SUM(CASE WHEN payment_status='paid'    THEN amount_required ELSE 0 END) AS total_paid,
-                SUM(CASE WHEN payment_status='cash'    THEN amount_required ELSE 0 END) AS total_cash,
-                SUM(profit) AS total_profit,
-                COUNT(*)    AS total_count
+                SUM(CASE WHEN payment_status='pending' AND operation_type='outbound' THEN amount_required ELSE 0 END) AS total_pending,
+                SUM(CASE WHEN payment_status='paid'    AND operation_type='outbound' THEN amount_required ELSE 0 END) AS total_paid,
+                SUM(CASE WHEN operation_type='inbound' AND is_delivered=0 THEN amount_spent ELSE 0 END) AS total_due,
+                SUM(CASE WHEN payment_status IN ('pending', 'paid') THEN profit ELSE 0 END) AS total_profit,
+                COUNT(*) AS total_count
             FROM transactions WHERE customer_id = ?
         """, (customer_id,)).fetchone()
 
@@ -344,9 +359,17 @@ def get_dashboard_stats() -> dict:
         machines = conn.execute("SELECT COALESCE(SUM(balance),0) AS total FROM platforms WHERE type='machine' AND is_active=1").fetchone()
         wallets  = conn.execute("SELECT COALESCE(SUM(balance),0) AS total FROM platforms WHERE type IN ('wallet','instapay') AND is_active=1").fetchone()
         debts    = conn.execute("SELECT COALESCE(SUM(total_debt),0) AS total FROM customers WHERE is_active=1").fetchone()
-        today_p  = conn.execute("SELECT COALESCE(SUM(profit),0) AS total FROM transactions WHERE DATE(created_at)=DATE('now','localtime')").fetchone()
-        month_p  = conn.execute("SELECT COALESCE(SUM(profit),0) AS total FROM transactions WHERE strftime('%Y-%m',created_at)=strftime('%Y-%m','now','localtime')").fetchone()
-        pending  = conn.execute("SELECT COALESCE(SUM(amount_required),0) AS total FROM transactions WHERE payment_status='pending'").fetchone()
+        today_p  = conn.execute("""
+            SELECT COALESCE(SUM(profit),0) AS total FROM transactions 
+            WHERE DATE(created_at)=DATE('now','localtime') 
+            AND payment_status IN ('pending', 'paid')
+        """).fetchone()
+        month_p  = conn.execute("""
+            SELECT COALESCE(SUM(profit),0) AS total FROM transactions 
+            WHERE strftime('%Y-%m',created_at)=strftime('%Y-%m','now','localtime') 
+            AND payment_status IN ('pending', 'paid')
+        """).fetchone()
+        pending  = conn.execute("SELECT COALESCE(SUM(amount_required),0) AS total FROM transactions WHERE payment_status='pending' AND operation_type='outbound'").fetchone()
 
         total_assets = (machines["total"] or 0) + (wallets["total"] or 0) + (budget["cash_vault"] or 0)
         return {

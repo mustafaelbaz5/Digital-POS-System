@@ -341,6 +341,19 @@ QPushButton {{
     color: white;
 }}
 
+#btn_statement {{
+    background: {COLORS['blue_bg']};
+    color: {COLORS['blue']};
+    border: 1px solid {COLORS['blue_border']};
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: {FONT['sm']};
+}}
+#btn_statement:hover {{
+    background: {COLORS['blue']};
+    color: white;
+}}
+
 /* ── Inputs ── */
 QLineEdit, QTextEdit, QSpinBox, QDoubleSpinBox,
 QComboBox, QDateEdit {{
@@ -447,6 +460,18 @@ QDialog {{
     font-weight: bold;
 }}
 
+#dialog_close_btn {{
+    background: transparent;
+    color: {COLORS['text_secondary']};
+    border: none;
+    font-size: 18px;
+    border-radius: 6px;
+}}
+#dialog_close_btn:hover {{
+    background: {COLORS['red_bg']};
+    color: {COLORS['red']};
+}}
+
 QMessageBox {{
     background: {COLORS['bg_dark']};
 }}
@@ -484,12 +509,11 @@ QMenu::item:selected {{
 def get_status_style(status: str) -> str:
     base = f"border-radius: 6px; padding: 4px 12px; font-size: 11px; font-weight: bold;"
     styles = {
-        "cash":    f"color: {COLORS['green']}; background: {COLORS['green_bg']}; border: 1px solid {COLORS['green_border']}; {base}",
         "pending": f"color: {COLORS['yellow']}; background: {COLORS['yellow_bg']}; border: 1px solid {COLORS['yellow_border']}; {base}",
-        "paid":    f"color: {COLORS['text_secondary']}; background: {COLORS['bg_elevated']}; border: 1px solid {COLORS['border']}; {base}",
+        "paid":    f"color: {COLORS['green']}; background: {COLORS['green_bg']}; border: 1px solid {COLORS['green_border']}; {base}",
     }
     return styles.get(status, "")
 
 
 def get_status_text(status: str) -> str:
-    return {"cash": "نقدي ", "pending": "مؤجل ⏳", "paid": "مسدد ✓"}.get(status, status)
+    return {"pending": "مؤجل ⏳", "paid": "تم السداد ✓"}.get(status, status)

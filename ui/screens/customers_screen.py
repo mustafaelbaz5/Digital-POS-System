@@ -188,7 +188,7 @@ class CustomersTab(QWidget):
             self.table.add_action_button(
                 row, 6, "📊 كشف الحساب", 
                 lambda _, cid=c["id"]: self._open_statement(cid), 
-                role="primary"
+                role="statement"
             )
 
         parts = [f"إجمالي: {len(customers)} عميل"]

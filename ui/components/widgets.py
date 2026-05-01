@@ -59,8 +59,8 @@ class BaseDialog(QDialog):
 
         # Close button (top right in RTL)
         close_btn = QPushButton("✕")
-        close_btn.setFixedSize(30, 30)
-        close_btn.setStyleSheet(f"color:{COLORS['text_secondary']}; border:none; font-size:16px;")
+        close_btn.setObjectName("dialog_close_btn")
+        close_btn.setFixedSize(32, 32)
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.clicked.connect(self.reject)
         hl.addWidget(close_btn)
@@ -390,7 +390,7 @@ class DataTable(QTableWidget):
         wrapper = QWidget()
         wrapper.setStyleSheet("background: transparent; border: none;")
         layout = QHBoxLayout(wrapper)
-        layout.setContentsMargins(8, 2, 8, 2)
+        layout.setContentsMargins(2, 4, 2, 4)
         layout.setSpacing(GAP_SM)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -399,9 +399,9 @@ class DataTable(QTableWidget):
             btn = QPushButton(data.get('text', ''))
             btn.setObjectName(f"btn_{data.get('role', 'ghost')}")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setMinimumHeight(28)
-            btn.setMaximumHeight(32)
-            btn.setStyleSheet(f"font-size: {FONT['sm']}; padding: 0 12px;")
+            btn.setMinimumHeight(34)
+            btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            btn.setStyleSheet(f"padding: 0 8px;") # Tighter padding to show all text
             if 'callback' in data:
                 btn.clicked.connect(data['callback'])
             layout.addWidget(btn)
