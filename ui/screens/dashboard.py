@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QGridLayout, QFrame, QInputDialog, QMessageBox,
     QSizePolicy, QTableWidget, QTableWidgetItem, QHeaderView,
+    QProgressDialog, QApplication
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
@@ -231,15 +232,35 @@ class DashboardScreen(ScreenShell):
     def _export_to_sheets(self):
         self._btn_export.setEnabled(False)
         self._btn_export.setText("جاري التصدير...")
+        
+        # Setup Progress Dialog
+        progress = QProgressDialog("جاري تصدير البيانات إلى Google Sheets...", None, 0, 0, self)
+        progress.setWindowTitle("يرجى الانتظار")
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setCancelButton(None)
+        progress.show()
+        QApplication.processEvents()
+
         try:
             data = db.get_export_data()
             from utils.google_sheets import export_to_sheets
             url = export_to_sheets(data)
-            QMessageBox.information(
-                self, "تم التصدير",
-                f"تم تصدير البيانات بنجاح\n\nرابط الشيت:\n{url}"
-            )
+            
+            progress.close()
+
+            msg = QMessageBox(self)
+            msg.setWindowTitle("تم التصدير")
+            msg.setText(f"تم تصدير البيانات بنجاح\n\nرابط الشيت:\n{url}")
+            msg.setIcon(QMessageBox.Icon.Information)
+            copy_btn = msg.addButton("نسخ الرابط", QMessageBox.ButtonRole.ActionRole)
+            msg.addButton("إغلاق", QMessageBox.ButtonRole.AcceptRole)
+            
+            msg.exec()
+            if msg.clickedButton() == copy_btn:
+                QApplication.clipboard().setText(url)
+                QMessageBox.information(self, "تم النسخ", "تم نسخ الرابط إلى الحافظة")
         except Exception as e:
+            if progress: progress.close()
             QMessageBox.critical(self, "خطأ في التصدير", str(e))
         finally:
             self._btn_export.setEnabled(True)
