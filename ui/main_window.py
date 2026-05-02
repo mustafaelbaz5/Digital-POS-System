@@ -13,7 +13,6 @@ from ui.styles.theme import COLORS, MAIN_STYLE, SIDEBAR_WIDTH
 from ui.screens.dashboard import DashboardScreen
 from ui.screens.platforms_screen import PlatformsScreen
 from ui.screens.customers_screen import CustomersScreen
-from ui.screens.transaction_form import TransactionScreen
 from ui.screens.Reports_screen import ReportsScreen   # تأكد من اسم الملف Reports_screen.py
 
 
@@ -21,7 +20,6 @@ NAV_ITEMS = [
     ("dashboard",   "لوحة التحكم",      DashboardScreen),
     ("platforms",   "المنصات",           PlatformsScreen),
     ("customers",   "العملاء",           CustomersScreen),
-    ("transaction", "إضافة عملية",       TransactionScreen),
     ("reports",     "التقارير والجرد",   ReportsScreen),
 ]
 
@@ -29,7 +27,6 @@ NAV_SYMBOLS = {
     "dashboard":   "◈",
     "platforms":   "◉",
     "customers":   "◎",
-    "transaction": "⊕",
     "reports":     "◑",
 }
 

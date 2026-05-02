@@ -93,8 +93,6 @@ class PlatformActionsDialog(BaseDialog):
 
     def _get_actions(self, p_type: str) -> list:
         actions = [
-            ("➕  إضافة عملية",
-             COLORS["blue"], COLORS["blue_bg"], self._add_transaction),
             ("💰  إيداع للمنصة",
              COLORS["green"], COLORS["green_bg"], self._deposit),
         ]
@@ -109,21 +107,6 @@ class PlatformActionsDialog(BaseDialog):
                 COLORS["blue"], COLORS["blue_bg"], self._edit_limit
             ))
         return actions
-
-    def _add_transaction(self):
-        from ui.screens.transaction_form import TransactionScreen
-        dialog = BaseDialog("إضافة عملية", self)
-        dialog.setMinimumWidth(800)
-        
-        form = TransactionScreen(platform_id=self.platform["id"])
-        form._header.hide()
-        form.transaction_added.connect(self._on_transaction_added)
-        form.close_requested.connect(dialog.accept)
-        dialog.body.addWidget(form)
-        dialog.exec()
-        
-    def _on_transaction_added(self):
-        self._result_action = "refresh"
 
     def _deposit(self):
         p = self.platform
@@ -206,6 +189,7 @@ class PlatformActionsDialog(BaseDialog):
 
 class PlatformRow(QFrame):
     actions_clicked = pyqtSignal(int)
+    add_transaction_clicked = pyqtSignal(int)
 
     def __init__(self, platform: dict, alternate: bool = False, parent=None):
         super().__init__(parent)
@@ -269,6 +253,21 @@ class PlatformRow(QFrame):
         bal_lbl.setFixedWidth(160)
         bal_lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(bal_lbl)
+
+        # زرار إضافة عملية
+        add_btn = QPushButton("➕ إضافة عملية")
+        add_btn.setFixedHeight(30)
+        add_btn.setFixedWidth(110)
+        add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        add_btn.setStyleSheet(
+            f"background:{COLORS['blue_bg']};color:{COLORS['blue']};"
+            f"border:1px solid {COLORS['blue']};border-radius:6px;"
+            f"font-size:13px;padding:2px 10px;font-weight:bold;"
+        )
+        add_btn.clicked.connect(lambda: self.add_transaction_clicked.emit(self.platform_id))
+        layout.addWidget(add_btn)
+
+        layout.addSpacing(8)
 
         # زرار الإجراءات (يسار)
         act_btn = QPushButton("⋮  إجراءات")
@@ -371,6 +370,8 @@ class PlatformListTab(QWidget):
             hl.addStretch()
 
         hl.addWidget(hdr("الرصيد الحالي", 160, Qt.AlignmentFlag.AlignLeft))
+        hl.addWidget(hdr("العمليات", 110))
+        hl.addSpacing(8)
         hl.addWidget(hdr("إجراءات", 100))
         list_layout.addWidget(header)
 
@@ -439,7 +440,14 @@ class PlatformListTab(QWidget):
         for i, p in enumerate(platforms):
             row = PlatformRow(p, alternate=(i % 2 == 1))
             row.actions_clicked.connect(self._open_actions)
+            row.add_transaction_clicked.connect(self._open_transaction_form)
             self._rows_layout.addWidget(row)
+
+    def _open_transaction_form(self, platform_id: int):
+        from ui.screens.transaction_form import TransactionDialog
+        dialog = TransactionDialog(platform_id=platform_id, parent=self)
+        dialog.exec()
+        self.refreshed.emit()
 
     def _open_actions(self, platform_id: int):
         platform = db.get_platform_by_id(platform_id)
