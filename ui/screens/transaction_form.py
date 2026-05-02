@@ -359,6 +359,16 @@ class TransactionDialog(BaseDialog):
                 
         self._build_content()
         self._update_header()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # Auto-focus first input field (Customer Search)
+        try:
+            if hasattr(self, "out_tab"):
+                self.out_tab.customer_combo.setFocus()
+            elif hasattr(self, "in_tab"):
+                self.in_tab.customer_combo.setFocus()
+        except: pass
         
     def _build_content(self):
         if self.platform and self.platform["type"] in ("wallet", "instapay"):

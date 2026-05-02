@@ -397,14 +397,14 @@ QComboBox QAbstractItemView {{
 
 /* ── Table ── */
 QTableWidget {{
-    background: {COLORS['bg_card']};
-    border: 1px solid {COLORS['border']};
+    background: {COLORS['bg_dark']};
+    border: none;
     border-radius: {CARD_RADIUS};
     gridline-color: transparent;
     outline: none;
 }}
 QTableWidget::item {{
-    padding: 12px 18px;
+    padding: 12px 24px;
     border-bottom: 1px solid {COLORS['border']};
 }}
 QTableWidget::item:selected {{
@@ -423,11 +423,10 @@ QHeaderView::section {{
     background: {COLORS['bg_elevated']};
     color: {COLORS['text_secondary']};
     border: none;
-    border-left: 1px solid {COLORS['border']};
-    padding: 12px 18px;
-    font-size: {FONT['xs']};
-    font-weight: bold;
-    text-transform: uppercase;
+    border-bottom: 1px solid {COLORS['border']};
+    padding: 16px 18px;
+    font-size: {FONT['sm']};
+    font-weight: 800;
 }}
 QHeaderView::section:last {{
     border-left: none;

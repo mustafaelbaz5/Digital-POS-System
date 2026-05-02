@@ -69,7 +69,7 @@ class MainWindow(QMainWindow):
         # منطقة المحتوى مع مسافة داخلية على الجانبين
         self.stack = QStackedWidget()
         self.stack.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.stack.setContentsMargins(0, 0, 0, 0)
+        self.stack.setContentsMargins(15, 10, 15, 10)
         main_layout.addWidget(self.stack, 1)
 
     def _build_sidebar(self) -> QWidget:

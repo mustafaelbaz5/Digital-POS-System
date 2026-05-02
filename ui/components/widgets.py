@@ -8,9 +8,9 @@ from PyQt6.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QHeaderView,
     QPushButton, QFrame, QSizePolicy, QScrollArea,
-    QDialog,
+    QDialog, QComboBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
+from PyQt6.QtCore import Qt, pyqtSignal, QSize, QDate
 from PyQt6.QtGui import QColor
 
 from ui.styles.theme import (
@@ -50,7 +50,7 @@ class BaseDialog(QDialog):
         header = QFrame()
         header.setObjectName("dialog_header")
         hl = QHBoxLayout(header)
-        hl.setContentsMargins(GAP_MD, 0, GAP_MD, 0)
+        hl.setContentsMargins(GAP_MD, GAP_MD, GAP_MD, GAP_MD) # Increased top/bottom margins
         
         title_lbl = QLabel(title)
         title_lbl.setObjectName("dialog_title")
@@ -117,6 +117,14 @@ class BaseDialog(QDialog):
             event.accept()
         else:
             super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event):
+        """Re-map Enter/Return to Tab for focus switching"""
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self.focusNextChild()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
 
 # ══════════════════════════════════════════════════════
@@ -466,7 +474,22 @@ class DataTable(QTableWidget):
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setMinimumHeight(34)
             btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-            btn.setStyleSheet(f"padding: 0 8px;") # Tighter padding to show all text
+            # Apply specific in-table styling
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    padding: 0 12px;
+                    border-radius: 6px;
+                    font-size: {FONT['sm']};
+                    font-weight: bold;
+                    background: {COLORS['accent']};
+                    border: 1px solid {COLORS['border']};
+                }}
+                QPushButton:hover {{
+                    background: {COLORS['accent']};
+                    color: white;
+                    border-color: {COLORS['accent']};
+                }}
+            """)
             if 'callback' in data:
                 btn.clicked.connect(data['callback'])
             layout.addWidget(btn)
@@ -616,3 +639,137 @@ def make_section_header(title: str, btn_text: str = None,
         row.addWidget(btn)
 
     return w
+
+
+# ══════════════════════════════════════════════════════
+#  MiniStatCard
+# ══════════════════════════════════════════════════════
+
+class MiniStatCard(QFrame):
+    def __init__(self, title: str, value: str = "—", color: str = None, parent=None):
+        super().__init__(parent)
+        self.setObjectName("card")
+        self.setMinimumWidth(160)
+        self.setMinimumHeight(100)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 14, 18, 14)
+        layout.setSpacing(6)
+
+        title_lbl = QLabel(title)
+        title_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: {FONT['xs']}; font-weight: bold;")
+        title_lbl.setAlignment(AlignLeft)
+        layout.addWidget(title_lbl)
+
+        self._val_lbl = QLabel(value)
+        self._val_lbl.setAlignment(AlignLeft)
+        self._val_lbl.setStyleSheet(
+            f"color: {color or COLORS['text_primary']}; font-size: 20px; font-weight: bold;"
+        )
+        layout.addWidget(self._val_lbl)
+
+    def set_value(self, value: str, color: str = None):
+        self._val_lbl.setText(value)
+        if color:
+            self._val_lbl.setStyleSheet(
+                f"color: {color}; font-size: 20px; font-weight: bold;"
+            )
+
+
+# ══════════════════════════════════════════════════════
+#  DateRangePicker
+# ══════════════════════════════════════════════════════
+
+class DateRangePicker(QFrame):
+    """
+    Unified filter for time periods using action buttons.
+    Supports "All", Today, Yesterday, Week, Month, Last Month.
+    """
+    changed = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("card")
+        self._current_range = (None, None)
+        self._build_ui()
+
+    def _build_ui(self):
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(8)
+
+        lbl = QLabel("📅 الفترة:")
+        lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; font-weight: bold;")
+        layout.addWidget(lbl)
+
+        # Button Options
+        options = [
+            ("الكل", "all"),
+            ("اليوم", "today"),
+            ("أمس", "yesterday"),
+            ("هذا الأسبوع", "week"),
+            ("هذا الشهر", "month"),
+            ("الشهر الماضي", "last_month"),
+        ]
+
+        self.buttons = []
+        for text, val in options:
+            btn = QPushButton(text)
+            btn.setFixedHeight(32)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setCheckable(True)
+            btn.setAutoExclusive(True)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: {COLORS['bg_elevated']};
+                    color: {COLORS['text_secondary']};
+                    border: 1px solid {COLORS['border']};
+                    border-radius: 6px;
+                    padding: 0 16px;
+                    font-size: {FONT['sm']};
+                }}
+                QPushButton:hover {{
+                    background: {COLORS['bg_hover']};
+                }}
+                QPushButton:checked {{
+                    background: {COLORS['accent']};
+                    color: white;
+                    border-color: {COLORS['accent']};
+                }}
+            """)
+            btn.clicked.connect(lambda checked, v=val: self._on_clicked(v))
+            layout.addWidget(btn)
+            self.buttons.append(btn)
+            
+            if val == "all":
+                btn.setChecked(True)
+
+        layout.addStretch()
+
+    def _on_clicked(self, val):
+        today = QDate.currentDate()
+        
+        if val == "all":
+            self._current_range = (None, None)
+        elif val == "today":
+            self._current_range = (today.toString("yyyy-MM-dd"), today.toString("yyyy-MM-dd"))
+        elif val == "yesterday":
+            y = today.addDays(-1)
+            self._current_range = (y.toString("yyyy-MM-dd"), y.toString("yyyy-MM-dd"))
+        elif val == "week":
+            start = today.addDays(-(today.dayOfWeek() % 7))
+            self._current_range = (start.toString("yyyy-MM-dd"), today.toString("yyyy-MM-dd"))
+        elif val == "month":
+            start = QDate(today.year(), today.month(), 1)
+            self._current_range = (start.toString("yyyy-MM-dd"), today.toString("yyyy-MM-dd"))
+        elif val == "last_month":
+            lm = today.addMonths(-1)
+            start = QDate(lm.year(), lm.month(), 1)
+            end = QDate(lm.year(), lm.month(), lm.daysInMonth())
+            self._current_range = (start.toString("yyyy-MM-dd"), end.toString("yyyy-MM-dd"))
+        
+        self.changed.emit()
+
+    def get_range(self):
+        return self._current_range
+

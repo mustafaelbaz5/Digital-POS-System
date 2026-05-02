@@ -15,161 +15,16 @@ from ui.styles.theme import (
     GAP_XS, GAP_SM, GAP_MD, GAP_LG, GAP_XL,
     MARGIN_CONTENT, MARGIN_CARD
 )
-from ui.components.widgets import ScreenShell, DataTable, SectionTitle, make_divider, CardGroup
+from ui.components.widgets import ScreenShell, DataTable, SectionTitle, make_divider, CardGroup, DateRangePicker, MiniStatCard
 from utils.formatters import fmt_currency
 
 import database as db
 
 
-# ══════════════════════════════════════════
-#  Date Range Picker Component
-# ══════════════════════════════════════════
-
-class DateRangePicker(QFrame):
-    """
-    مكون موحد لاختيار الفترة الزمنية مع أزرار سريعة
-    """
-    changed = pyqtSignal()
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setObjectName("card")
-        self._build_ui()
-
-    def _build_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(12)
-
-        # Row 1: Quick Select Buttons
-        quick_layout = QHBoxLayout()
-        quick_layout.setSpacing(8)
-        
-        self.btn_today = self._make_quick_btn("اليوم", "today")
-        self.btn_yesterday = self._make_quick_btn("أمس", "yesterday")
-        self.btn_week = self._make_quick_btn("هذا الأسبوع", "week")
-        self.btn_month = self._make_quick_btn("هذا الشهر", "month")
-        self.btn_last_month = self._make_quick_btn("الشهر الماضي", "last_month")
-        
-        quick_layout.addWidget(self.btn_today)
-        quick_layout.addWidget(self.btn_yesterday)
-        quick_layout.addWidget(self.btn_week)
-        quick_layout.addWidget(self.btn_month)
-        quick_layout.addWidget(self.btn_last_month)
-        quick_layout.addStretch()
-        
-        layout.addLayout(quick_layout)
-
-        # Divider
-        line = QFrame()
-        line.setFrameShape(QFrame.Shape.HLine)
-        line.setStyleSheet(f"background-color: {COLORS['border']}; max-height: 1px;")
-        layout.addWidget(line)
-
-        # Row 2: Custom Date Selectors
-        custom_layout = QHBoxLayout()
-        custom_layout.setSpacing(12)
-
-        from_lbl = QLabel("من:")
-        from_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 12px;")
-        custom_layout.addWidget(from_lbl)
-
-        self.date_from = QDateEdit(QDate.currentDate().addDays(-30))
-        self.date_from.setCalendarPopup(True)
-        self.date_from.setFixedHeight(34)
-        self.date_from.setFixedWidth(120)
-        self.date_from.dateChanged.connect(self._on_custom_changed)
-        custom_layout.addWidget(self.date_from)
-
-        to_lbl = QLabel("إلى:")
-        to_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 12px;")
-        custom_layout.addWidget(to_lbl)
-
-        self.date_to = QDateEdit(QDate.currentDate())
-        self.date_to.setCalendarPopup(True)
-        self.date_to.setFixedHeight(34)
-        self.date_to.setFixedWidth(120)
-        self.date_to.dateChanged.connect(self._on_custom_changed)
-        custom_layout.addWidget(self.date_to)
-        
-        custom_layout.addStretch()
-        layout.addLayout(custom_layout)
-
-    def _make_quick_btn(self, text, val):
-        btn = QPushButton(text)
-        btn.setFixedHeight(28)
-        btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setStyleSheet(
-            f"QPushButton {{ background: {COLORS['bg_elevated']}; color: {COLORS['text_secondary']}; "
-            f"border: 1px solid {COLORS['border']}; border-radius: 6px; padding: 0 12px; font-size: 11px; }}"
-            f"QPushButton:hover {{ background: {COLORS['teal_subtle']}; border-color: {COLORS['teal_primary']}; }}"
-        )
-        btn.clicked.connect(lambda: self._apply_quick(val))
-        return btn
-
-    def _apply_quick(self, val):
-        today = QDate.currentDate()
-        if val == "today":
-            self.date_from.setDate(today)
-            self.date_to.setDate(today)
-        elif val == "yesterday":
-            yesterday = today.addDays(-1)
-            self.date_from.setDate(yesterday)
-            self.date_to.setDate(yesterday)
-        elif val == "week":
-            self.date_from.setDate(today.addDays(-(today.dayOfWeek() % 7)))
-            self.date_to.setDate(today)
-        elif val == "month":
-            self.date_from.setDate(QDate(today.year(), today.month(), 1))
-            self.date_to.setDate(today)
-        elif val == "last_month":
-            last_month = today.addMonths(-1)
-            self.date_from.setDate(QDate(last_month.year(), last_month.month(), 1))
-            self.date_to.setDate(QDate(last_month.year(), last_month.month(), last_month.daysInMonth()))
-        
-        self.changed.emit()
-
-    def _on_custom_changed(self):
-        self.changed.emit()
-
-    def get_range(self):
-        return (self.date_from.date().toString("yyyy-MM-dd"), 
-                self.date_to.date().toString("yyyy-MM-dd"))
 
 
-# ══════════════════════════════════════════
-#  Mini Stat Card (local)
-# ══════════════════════════════════════════
 
-class MiniStatCard(QFrame):
-    def __init__(self, title: str, value: str = "—", color: str = None, parent=None):
-        super().__init__(parent)
-        self.setObjectName("card")
-        self.setMinimumWidth(160)
-        self.setMinimumHeight(100)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 14, 18, 14)
-        layout.setSpacing(6)
-
-        title_lbl = QLabel(title)
-        title_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: {FONT['xs']}; font-weight: bold;")
-        title_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(title_lbl)
-
-        self._val_lbl = QLabel(value)
-        self._val_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self._val_lbl.setStyleSheet(
-            f"color: {color or COLORS['text_primary']}; font-size: 20px; font-weight: bold;"
-        )
-        layout.addWidget(self._val_lbl)
-
-    def set_value(self, value: str, color: str = None):
-        self._val_lbl.setText(value)
-        if color:
-            self._val_lbl.setStyleSheet(
-                f"color: {color}; font-size: 20px; font-weight: bold;"
-            )
 
 
 # ══════════════════════════════════════════
@@ -293,10 +148,6 @@ class InventoryTab(QWidget):
 
     def run_inventory(self):
         date_from, date_to = self.date_picker.get_range()
-
-        if self.date_picker.date_from.date() > self.date_picker.date_to.date():
-            # QMessageBox.warning(self, "تنبيه", "تاريخ البداية يجب أن يكون قبل تاريخ النهاية")
-            return
 
         stats     = db.get_dashboard_stats()
         budget    = db.get_budget()
