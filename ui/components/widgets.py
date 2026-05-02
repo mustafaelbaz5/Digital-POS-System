@@ -407,7 +407,7 @@ class DataTable(QTableWidget):
         self.setShowGrid(False)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.horizontalHeader().setHighlightSections(False)
-        self.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
+        self.verticalHeader().setDefaultSectionSize(70)
 
         # Polish Header
         self.horizontalHeader().setStyleSheet(f"""
@@ -463,7 +463,7 @@ class DataTable(QTableWidget):
         wrapper = QWidget()
         wrapper.setStyleSheet("background: transparent; border: none;")
         layout = QHBoxLayout(wrapper)
-        layout.setContentsMargins(2, 4, 2, 4)
+        layout.setContentsMargins(5, 5, 5, 5) # Specific professional margins
         layout.setSpacing(GAP_SM)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -478,7 +478,7 @@ class DataTable(QTableWidget):
             btn.setStyleSheet(f"""
                 QPushButton {{
                     padding: 0 12px;
-                    border-radius: 6px;
+                    border-radius: 4px;
                     font-size: {FONT['sm']};
                     font-weight: bold;
                     background: {COLORS['accent']};

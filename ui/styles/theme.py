@@ -404,7 +404,7 @@ QTableWidget {{
     outline: none;
 }}
 QTableWidget::item {{
-    padding: 12px 24px;
+    padding: 8px 20px;
     border-bottom: 1px solid {COLORS['border']};
 }}
 QTableWidget::item:selected {{
