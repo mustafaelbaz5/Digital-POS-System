@@ -465,7 +465,7 @@ class PlatformListTab(QWidget):
             
             # Actions
             self.table.add_action_buttons(row, col, [
-                {'text': "➕ إضافة", 'callback': lambda _, pid=p["id"]: self._open_transaction_form(pid), 'role': 'primary'},
+                {'text': "➕ إضافة عملية", 'callback': lambda _, pid=p["id"]: self._open_transaction_form(pid), 'role': 'primary'},
                 {'text': "⚙️ إعدادات", 'callback': lambda _, pid=p["id"]: self._open_actions(pid), 'role': 'secondary'}
             ])
             

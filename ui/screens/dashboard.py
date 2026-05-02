@@ -88,16 +88,16 @@ class DashboardScreen(ScreenShell):
         stats_group.add_layout(self._make_stats_grid())
         c.addWidget(stats_group)
 
-        # ── Section 2: Recent Transactions
+        # ── Section 2: Quick Actions (Moved Up)
+        actions_group = CardGroup("⚡  الإجراءات السريعة")
+        actions_group.add_widget(self._make_actions_panel())
+        c.addWidget(actions_group)
+
+        # ── Section 3: Recent Transactions (Moved Down)
         ops_group = CardGroup("🕒  آخر العمليات")
         self._ops_table = self._make_ops_table()
         ops_group.add_widget(self._ops_table)
         c.addWidget(ops_group)
-
-        # ── Section 3: Quick Actions
-        actions_group = CardGroup("⚡  الإجراءات السريعة")
-        actions_group.add_widget(self._make_actions_panel())
-        c.addWidget(actions_group)
 
         c.addSpacing(GAP_MD)
         c.addStretch()
@@ -201,8 +201,8 @@ class DashboardScreen(ScreenShell):
         row.setSpacing(16)
 
         actions = [
-            ("⊕  إضافة عملية",           "btn_primary",   self._go_to_transaction),
-            ("👤  إضافة عميل",           "btn_secondary", self._add_customer),
+            ("⊕  عملية جديدة",           "btn_primary",   self._go_to_transaction),
+            ("💰  إدارة الميزانية",        "btn_secondary", self._manage_budget),
             ("💵  تعديل الكاش (الخزينة)", "btn_secondary", self._edit_cash),
         ]
 
@@ -236,6 +236,10 @@ class DashboardScreen(ScreenShell):
         self.card_today.set_value(fmt_currency(stats["today_profit"]))
         self.card_month.set_value(fmt_currency(stats["month_profit"]))
         
+        # Update Header with Budget
+        budget_str = fmt_currency(stats["main_budget"])
+        self.set_subtitle(f"{self._today_str()}   |   الميزانية المركزية: {budget_str}")
+
         try:
             from datetime import date
             today_str = date.today().isoformat()
@@ -255,12 +259,20 @@ class DashboardScreen(ScreenShell):
         win = self.window()
         if hasattr(win, "navigate_to"): win.navigate_to("reports")
 
-    def _add_customer(self):
-        from ui.screens.customers_screen import CustomerDialog
-        dlg = CustomerDialog(self)
-        if dlg.exec():
-            self.refresh()
-            QMessageBox.information(self, "تم ", "تم إضافة العميل بنجاح")
+    def _manage_budget(self):
+        current = db.get_budget()["main_budget"]
+        amount, ok = QInputDialog.getDouble(
+            self, "إدارة الميزانية المركزية",
+            f"أدخل رصيد الميزانية المركزية الكلي:\n(الحالي: {fmt_currency(current)})",
+            value=current, min=0, max=100_000_000, decimals=2
+        )
+        if ok:
+            try:
+                db.update_main_budget(amount)
+                self.refresh()
+                QMessageBox.information(self, "تم ", f"تم تحديث الميزانية المركزية إلى {fmt_currency(amount)}")
+            except Exception as e:
+                QMessageBox.critical(self, "خطأ", str(e))
 
     def _edit_cash(self):
         current = db.get_budget()["cash_vault"]

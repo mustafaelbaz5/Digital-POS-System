@@ -48,7 +48,7 @@ class CustomersScreen(ScreenShell):
         self.tabs.addTab(self.customers_tab, "👥  العملاء")
 
         self.groups_tab = GroupsTab()
-        self.tabs.addTab(self.groups_tab, "  المجموعات")
+        self.tabs.addTab(self.groups_tab, "📂  المجموعات")
 
         self.tabs.currentChanged.connect(self._on_tab)
         c.addWidget(self.tabs)
@@ -285,7 +285,7 @@ class GroupsTab(QWidget):
         layout.addSpacing(GAP_SM)
 
         # ── Bottom Layer: Table
-        table_card = CardGroup("📂  قائمة المجموعات")
+        self.table_card = CardGroup("📂  قائمة المجموعات")
 
         cols = [
             ("اسم المجموعة", -1), # Stretch
@@ -304,8 +304,8 @@ class GroupsTab(QWidget):
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         
-        table_card.add_widget(self.table)
-        layout.addWidget(table_card)
+        self.table_card.add_widget(self.table)
+        layout.addWidget(self.table_card)
         layout.addStretch()
 
     def load_data(self):
