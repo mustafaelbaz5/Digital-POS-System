@@ -226,7 +226,7 @@ class CustomerStatementDialog(QDialog):
             
             if t["operation_type"] == "outbound":
                 if t["payment_status"] == "pending":
-                    act_pay = QAction("✅ تحديد كمسدد", self)
+                    act_pay = QAction(" تحديد كمسدد", self)
                     act_pay.triggered.connect(lambda: self._update_status(t["id"], "paid"))
                     menu.addAction(act_pay)
                 else:
@@ -357,7 +357,7 @@ class _ActionDialog(BaseDialog):
         # Status Toggle Button
         if op_type == "outbound":
             curr_status = t.get("payment_status", "pending")
-            btn_text = "✅ تحديد كمسدد" if curr_status == "pending" else "⏳ تحديد كمؤجل"
+            btn_text = " تحديد كمسدد" if curr_status == "pending" else "⏳ تحديد كمؤجل"
             new_status = "paid" if curr_status == "pending" else "pending"
             role = "primary" if curr_status == "pending" else "secondary"
             

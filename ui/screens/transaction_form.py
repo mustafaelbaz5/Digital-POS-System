@@ -52,8 +52,10 @@ class CompactTransactionTab(QWidget):
         
         self.customer_combo = QComboBox()
         self.customer_combo.setEditable(True)
-        self.customer_combo.lineEdit().setPlaceholderText("اختر أو ابحث عن عميل...")
-        self.customer_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.customer_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self.customer_combo.lineEdit().setPlaceholderText("ابحث باسم العميل أو رقم التليفون...")
+        # Style the main line edit
+        self.customer_combo.lineEdit().setStyleSheet(f"padding: 5px; font-size: 14px;")
         row1.addWidget(self.customer_combo, 2)
         
         if not self.is_inbound:
@@ -63,7 +65,7 @@ class CompactTransactionTab(QWidget):
             
             self.payment_combo = QComboBox()
             self.payment_combo.addItem("⏳ مؤجل", "pending")
-            self.payment_combo.addItem("✅ مسدد", "paid")
+            self.payment_combo.addItem(" مسدد", "paid")
             row1.addWidget(self.payment_combo, 1)
         else:
             lbl_d = QLabel("تسليم الكاش:")
@@ -71,7 +73,7 @@ class CompactTransactionTab(QWidget):
             row1.addWidget(lbl_d)
             
             self.delivery_combo = QComboBox()
-            self.delivery_combo.addItem("✅ تم التسليم", True)
+            self.delivery_combo.addItem(" تم التسليم", True)
             self.delivery_combo.addItem("⏳ لم يُسلَّم", False)
             row1.addWidget(self.delivery_combo, 1)
             
@@ -171,8 +173,8 @@ class CompactTransactionTab(QWidget):
 
         # ── Row 4: Custom Date Selector
         row4 = QHBoxLayout()
-        row4.setContentsMargins(0, 10, 0, 10) # Added vertical breathing space
-        row4.setSpacing(8)
+        row4.setContentsMargins(0, 15, 0, 15) # Increased vertical breathing space even more
+        row4.setSpacing(10)
         
         lbl_d = QLabel("تاريخ العملية:")
         lbl_d.setStyleSheet(f"color:{COLORS['text_secondary']}; font-weight:bold; font-size:14px;")
@@ -202,7 +204,7 @@ class CompactTransactionTab(QWidget):
         self.year_combo = QComboBox()
         self.year_combo.addItems([str(i) for i in range(now.year - 2, now.year + 2)])
         self.year_combo.setCurrentText(str(now.year))
-        self.year_combo.setFixedWidth(95) # Expanded width to prevent clipping
+        self.year_combo.setFixedWidth(110) # Expanded width further to ensure no clipping
         self.year_combo.setStyleSheet(date_style)
         row4.addWidget(self.year_combo)
 
@@ -249,29 +251,44 @@ class CompactTransactionTab(QWidget):
     def load_data(self):
         self.customer_combo.clear()
         self.customer_combo.addItem("بدون عميل محدد", None)
+        
+        client_list = []
         for c in db.get_all_customers():
             lbl = c["name"] + (f" ({c['phone']})" if c.get("phone") else "")
             self.customer_combo.addItem(lbl, c["id"])
-            
-        comp_c = self.customer_combo.completer()
-        if comp_c:
-            comp_c.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-            comp_c.setFilterMode(Qt.MatchFlag.MatchContains)
-            popup = comp_c.popup()
-            if popup:
-                popup.setStyleSheet(
-                    f"background-color: {COLORS['bg_input']}; color: {COLORS['text_primary']};"
-                    f"border: 1px solid {COLORS['border']}; font-family: {FONT['family']}; font-size: 14px;"
-                )
-            
-        services = db.get_unique_service_names()
-        comp = QCompleter(services, self)
+            client_list.append(lbl)
+
+        # Non-interruptive Search Logic
+        comp = QCompleter(client_list, self)
         comp.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-        comp.popup().setStyleSheet(
+        comp.setFilterMode(Qt.MatchFlag.MatchContains)
+        comp.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        
+        # Style the Popup
+        popup = comp.popup()
+        popup.setStyleSheet(f"""
+            QAbstractItemView {{
+                background-color: {COLORS['bg_elevated']};
+                color: {COLORS['text_primary']};
+                selection-background-color: {COLORS['accent']};
+                selection-color: white;
+                border: 1px solid {COLORS['border']};
+                font-size: 14px;
+            }}
+        """)
+        
+        self.customer_combo.setCompleter(comp)
+        
+        # Service completer
+        services = db.get_unique_service_names()
+        comp_s = QCompleter(services, self)
+        comp_s.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        comp_s.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        comp_s.popup().setStyleSheet(
             f"background-color: {COLORS['bg_input']}; color: {COLORS['text_primary']};"
             f"border: 1px solid {COLORS['border']}; font-family: {FONT['family']}; font-size: 14px;"
         )
-        self.service_input.setCompleter(comp)
+        self.service_input.setCompleter(comp_s)
 
     def _save(self):
         cid = self.customer_combo.currentData()

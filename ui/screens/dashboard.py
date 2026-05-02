@@ -28,7 +28,7 @@ import database as db
 
 class ExportSuccessDialog(BaseDialog):
     def __init__(self, url: str, parent=None):
-        super().__init__("✅ تم تصدير البيانات", parent)
+        super().__init__(" تم تصدير البيانات", parent)
         self.url = url
         self.setFixedWidth(420)
         self._build_content()
