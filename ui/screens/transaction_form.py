@@ -171,19 +171,23 @@ class CompactTransactionTab(QWidget):
 
         # ── Row 4: Custom Date Selector
         row4 = QHBoxLayout()
+        row4.setContentsMargins(0, 10, 0, 10) # Added vertical breathing space
         row4.setSpacing(8)
         
         lbl_d = QLabel("تاريخ العملية:")
-        lbl_d.setStyleSheet(f"color:{COLORS['text_secondary']}; font-weight:bold;")
+        lbl_d.setStyleSheet(f"color:{COLORS['text_secondary']}; font-weight:bold; font-size:14px;")
         row4.addWidget(lbl_d)
 
         from datetime import datetime
         now = datetime.now()
 
+        date_style = f"font-size: 15px; font-weight: bold; background: {COLORS['bg_hover']}; padding: 2px;"
+
         self.day_combo = QComboBox()
         self.day_combo.addItems([str(i).zfill(2) for i in range(1, 32)])
         self.day_combo.setCurrentText(str(now.day).zfill(2))
-        self.day_combo.setFixedWidth(65)
+        self.day_combo.setFixedWidth(75)
+        self.day_combo.setStyleSheet(date_style)
         row4.addWidget(self.day_combo)
 
         self.month_combo = QComboBox()
@@ -191,26 +195,27 @@ class CompactTransactionTab(QWidget):
         for i, m in enumerate(months):
             self.month_combo.addItem(f"{i+1:02d} - {m}", i+1)
         self.month_combo.setCurrentIndex(now.month - 1)
-        self.month_combo.setFixedWidth(130)
+        self.month_combo.setFixedWidth(145)
+        self.month_combo.setStyleSheet(date_style)
         row4.addWidget(self.month_combo)
 
         self.year_combo = QComboBox()
         self.year_combo.addItems([str(i) for i in range(now.year - 2, now.year + 2)])
         self.year_combo.setCurrentText(str(now.year))
-        self.year_combo.setFixedWidth(80)
+        self.year_combo.setFixedWidth(95) # Expanded width to prevent clipping
+        self.year_combo.setStyleSheet(date_style)
         row4.addWidget(self.year_combo)
 
         row4.addStretch()
         layout.addLayout(row4)
         
-        layout.addStretch()
-        
-        # ── Row 4: Add Button
+        # ── Row 5: Add Button
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         self.save_btn = QPushButton("➕ إضافة العملية (Enter)")
         self.save_btn.setObjectName("btn_primary")
         self.save_btn.setMinimumHeight(44)
+        self.save_btn.setMinimumWidth(180)
         self.save_btn.clicked.connect(self._save)
         btn_row.addWidget(self.save_btn)
         layout.addLayout(btn_row)
@@ -388,7 +393,10 @@ class TransactionDialog(BaseDialog):
         # Clear existing
         while hl.count():
             item = hl.takeAt(0)
-            if item.widget(): item.widget().deleteLater()
+            w = item.widget()
+            if w: 
+                w.setParent(None)
+                w.deleteLater()
         
         # Platform Name
         name_lbl = QLabel(p["name"])
@@ -432,7 +440,8 @@ class TransactionDialog(BaseDialog):
             name_lbl.setStyleSheet(f"color:{COLORS['green']}; font-size:18px; font-weight:bold;")
             QTimer.singleShot(600, lambda: name_lbl.setStyleSheet(f"color:{COLORS['text_primary']}; font-size:18px; font-weight:bold;"))
 
-        # Close Button
+        # Redundant Close Button logic removed to fix double 'X' glitch.
+        # Since we clear the layout, we re-add it only once.
         close_btn = QPushButton("✕")
         close_btn.setObjectName("dialog_close_btn")
         close_btn.setFixedSize(30, 30)

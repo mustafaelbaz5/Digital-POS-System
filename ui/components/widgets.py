@@ -389,7 +389,9 @@ class DataTable(QTableWidget):
                 self.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
             else:
                 self.setColumnWidth(i, w)
-                self.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeMode.Fixed)
+                self.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeMode.Interactive) # Changed from Fixed to allow responsiveness
+        
+        self.horizontalHeader().setStretchLastSection(True)
 
         self.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -398,6 +400,33 @@ class DataTable(QTableWidget):
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.horizontalHeader().setHighlightSections(False)
         self.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
+
+        # Polish Header
+        self.horizontalHeader().setStyleSheet(f"""
+            QHeaderView::section {{
+                background-color: {COLORS['bg_elevated']};
+                color: {COLORS['text_secondary']};
+                padding: 12px;
+                border: none;
+                font-weight: bold;
+                text-align: center;
+            }}
+        """)
+        
+        # Grid Layout centering & padding
+        self.setAlternatingRowColors(True)
+        self.setStyleSheet(f"""
+            QTableWidget {{
+                background-color: transparent;
+                alternate-background-color: {COLORS['bg_hover']};
+                border: none;
+                gridline-color: transparent;
+            }}
+            QTableWidget::item {{
+                padding: 10px;
+                border-bottom: 1px solid {COLORS['border']};
+            }}
+        """)
 
     def set_cell(self, row: int, col: int, text: str,
                  color: str = None, bold: bool = False, align=None):

@@ -15,7 +15,7 @@ from ui.styles.theme import (
     COLORS, FONT, ROW_HEIGHT, 
     GAP_XS, GAP_SM, GAP_MD, GAP_LG, MARGIN_CARD
 )
-from ui.components.widgets import ScreenShell, make_divider, CardGroup, BaseDialog
+from ui.components.widgets import ScreenShell, make_divider, CardGroup, BaseDialog, DataTable
 from utils.formatters import fmt_currency
 
 import database as db
@@ -319,81 +319,74 @@ class PlatformListTab(QWidget):
         sort_lbl.setStyleSheet(f"color:{COLORS['text_muted']};font-size:12px;")
         sb.addWidget(sort_lbl)
 
-        self._sort_mode = "default"   # default | balance_desc | limit_asc | limit_desc
-
-        sort_options = [
-            ("الافتراضي",        "default"),
-            ("الاسم ↑",          "name_asc"),
-            ("الرصيد ↓",         "balance_desc"),
-            ("العمليات ↓",       "count_desc"),
-            ("الحد المتبقي ↓",   "limit_desc"),
-            ("الحد المتبقي ↑",   "limit_asc"),
-        ]
+        self._sort_mode = "default"
         self._sort_btns = {}
-        for label, mode in sort_options:
-            btn = QPushButton(label)
-            btn.setFixedHeight(26)
-            btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.clicked.connect(lambda _, m=mode: self._set_sort(m))
-            self._sort_btns[mode] = btn
-            sb.addWidget(btn)
+        
+        # Sorting Buttons row
+        self.btn_default = QPushButton("الافتراضي")
+        self.btn_default.setFixedHeight(28)
+        self.btn_default.clicked.connect(lambda: self._set_sort("default"))
+        self._sort_btns["default"] = self.btn_default
+        sb.addWidget(self.btn_default)
+
+        self.btn_bal_asc = QPushButton("الرصيد ↑")
+        self.btn_bal_asc.setFixedHeight(28)
+        self.btn_bal_asc.clicked.connect(lambda: self._set_sort("balance_asc"))
+        self._sort_btns["balance_asc"] = self.btn_bal_asc
+        sb.addWidget(self.btn_bal_asc)
+
+        self.btn_bal_desc = QPushButton("الرصيد ↓")
+        self.btn_bal_desc.setFixedHeight(28)
+        self.btn_bal_desc.clicked.connect(lambda: self._set_sort("balance_desc"))
+        self._sort_btns["balance_desc"] = self.btn_bal_desc
+        sb.addWidget(self.btn_bal_desc)
+
+        if self.p_type in ("wallet", "instapay"):
+            self.btn_lim_asc = QPushButton("الحد المتبقي ↑")
+            self.btn_lim_asc.setFixedHeight(28)
+            self.btn_lim_asc.clicked.connect(lambda: self._set_sort("limit_asc"))
+            self._sort_btns["limit_asc"] = self.btn_lim_asc
+            sb.addWidget(self.btn_lim_asc)
+
+            self.btn_lim_desc = QPushButton("الحد المتبقي ↓")
+            self.btn_lim_desc.setFixedHeight(28)
+            self.btn_lim_desc.clicked.connect(lambda: self._set_sort("limit_desc"))
+            self._sort_btns["limit_desc"] = self.btn_lim_desc
+            sb.addWidget(self.btn_lim_desc)
 
         sb.addStretch()
         sort_group.add_layout(sb)
         layout.addWidget(sort_group)
         self._apply_sort_styles()
 
-        # ── List Card
-        list_group = CardGroup()
-        list_layout = QVBoxLayout()
-        list_layout.setSpacing(0)
-        list_layout.setContentsMargins(0, 0, 0, 0)
-
-        # Header
-        header = QFrame()
-        header.setFixedHeight(40)
-        header.setStyleSheet(
-            f"background:{COLORS['bg_elevated']};"
-            f"border-bottom:1px solid {COLORS['border']};"
-        )
-        hl = QHBoxLayout(header)
-        hl.setContentsMargins(16, 0, 16, 0)
-        hl.setSpacing(0)
-
-        def hdr(text, width=None, align=Qt.AlignmentFlag.AlignLeft):
-            lbl = QLabel(text)
-            lbl.setStyleSheet(
-                f"color:{COLORS['text_secondary']};font-size:11px;"
-                f"font-weight:bold;background:transparent;border:none;"
-                f"text-transform: uppercase;"
-            )
-            lbl.setAlignment(align | Qt.AlignmentFlag.AlignVCenter)
-            if width:
-                lbl.setFixedWidth(width)
-            return lbl
-
-        hl.addWidget(hdr("اسم المنصة", 180))
-        hl.addStretch()
-
+        # ── Table Section
+        table_group = CardGroup()
+        
+        cols = [
+            ("اسم المنصة", -1), # Stretch
+            ("الرصيد الحالي", 160),
+            ("العمليات", 100),
+            ("إجراءات", 200)
+        ]
         if self.p_type in ("wallet", "instapay"):
-            hl.addWidget(hdr("المتبقي من الحد", 190))
-            hl.addStretch()
+            cols.insert(1, ("المتبقي من الحد", 190))
 
-        hl.addWidget(hdr("الرصيد الحالي", 160, Qt.AlignmentFlag.AlignLeft))
-        hl.addWidget(hdr("العمليات", 110))
-        hl.addSpacing(8)
-        hl.addWidget(hdr("إجراءات", 100))
-        list_layout.addWidget(header)
-
-        # منطقه الصفوف
-        self._rows_widget = QWidget()
-        self._rows_layout = QVBoxLayout(self._rows_widget)
-        self._rows_layout.setContentsMargins(0, 0, 0, 0)
-        self._rows_layout.setSpacing(0)
-
-        list_layout.addWidget(self._rows_widget)
-        list_group.add_layout(list_layout)
-        layout.addWidget(list_group)
+        self.table = DataTable(cols)
+        self.table.setSortingEnabled(True)
+        # Header Styling
+        self.table.horizontalHeader().setStyleSheet(f"""
+            QHeaderView::section {{
+                background-color: {COLORS['bg_elevated']};
+                color: {COLORS['text_secondary']};
+                padding: 10px;
+                border: none;
+                font-weight: bold;
+                text-align: center;
+            }}
+        """)
+        
+        table_group.add_widget(self.table)
+        layout.addWidget(table_group)
         
         layout.addStretch()
 
@@ -424,41 +417,59 @@ class PlatformListTab(QWidget):
         self._set_sort(mode)
 
     def _sorted(self, platforms: list) -> list:
-        if self._sort_mode == "name_asc":
-            return sorted(platforms, key=lambda p: p.get("name", "").lower())
+        if self._sort_mode == "default":
+            return platforms
         elif self._sort_mode == "balance_desc":
             return sorted(platforms, key=lambda p: p.get("balance", 0), reverse=True)
         elif self._sort_mode == "balance_asc":
             return sorted(platforms, key=lambda p: p.get("balance", 0))
         elif self._sort_mode == "limit_desc":
             return sorted(platforms,
-                key=lambda p: p.get("monthly_limit", 0) - p.get("monthly_used", 0)) # Smallest remaining first (nearest to expiry)
+                key=lambda p: p.get("monthly_limit", 0) - p.get("monthly_used", 0),
+                reverse=True)
+        elif self._sort_mode == "limit_asc":
+            return sorted(platforms,
+                key=lambda p: p.get("monthly_limit", 0) - p.get("monthly_used", 0))
         return platforms
 
     def load(self, platforms: list):
-        self._platforms_data = platforms          # حفظ للـ re-sort
+        self._platforms_data = platforms
         platforms = self._sorted(platforms)
 
-        # مسح القديم
-        while self._rows_layout.count():
-            item = self._rows_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
-        if not platforms:
-            empty = QLabel("لا توجد منصات في هذه الفئة")
-            empty.setStyleSheet(
-                f"color:{COLORS['text_muted']};font-size:13px;padding:28px;"
-            )
-            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._rows_layout.addWidget(empty)
-            return
-
-        for i, p in enumerate(platforms):
-            row = PlatformRow(p, alternate=(i % 2 == 1))
-            row.actions_clicked.connect(self._open_actions)
-            row.add_transaction_clicked.connect(self._open_transaction_form)
-            self._rows_layout.addWidget(row)
+        self.table.setRowCount(0)
+        self.table.setSortingEnabled(False)
+        
+        for p in platforms:
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            
+            # Platform Name
+            self.table.set_cell(row, 0, p["name"], bold=True)
+            
+            col = 1
+            # Monthly Limit (if applicable)
+            if self.p_type in ("wallet", "instapay"):
+                rem = p.get("monthly_limit", 0) - p.get("monthly_used", 0)
+                pct = int(p.get("monthly_used", 0) / p.get("monthly_limit", 1) * 100)
+                color = COLORS["red"] if pct > 90 else COLORS["yellow"] if pct > 70 else COLORS["blue"]
+                self.table.set_cell(row, col, f"{fmt_currency(rem)} ({pct}%)", color=color)
+                col += 1
+                
+            # Current Balance
+            self.table.set_cell(row, col, fmt_currency(p.get("balance", 0)), color=COLORS["green"], bold=True)
+            col += 1
+            
+            # Transactions
+            self.table.set_cell(row, col, str(p.get("transaction_count", 0)))
+            col += 1
+            
+            # Actions
+            self.table.add_action_buttons(row, col, [
+                {'text': "➕ إضافة", 'callback': lambda _, pid=p["id"]: self._open_transaction_form(pid), 'role': 'primary'},
+                {'text': "⚙️ إعدادات", 'callback': lambda _, pid=p["id"]: self._open_actions(pid), 'role': 'secondary'}
+            ])
+            
+        self.table.setSortingEnabled(True)
 
     def _open_transaction_form(self, platform_id: int):
         from ui.screens.transaction_form import TransactionDialog

@@ -35,7 +35,7 @@ class CustomersScreen(ScreenShell):
     open_statement = pyqtSignal(int)
 
     def __init__(self, parent=None):
-        super().__init__("العملاء", "إدارة العملاء والمجموعات")
+        super().__init__("إدارة العملاء والمجموعات", "")
         self._build_content()
 
     def _build_content(self):
@@ -52,33 +52,11 @@ class CustomersScreen(ScreenShell):
 
         self.tabs.currentChanged.connect(self._on_tab)
         c.addWidget(self.tabs)
-        
-        # ── Sticky Header setup
-        self.header_stack = QStackedWidget()
-        self.sticky().addWidget(self.header_stack)
-        
-        # Customers Header
-        self.cust_header = DataTable([
-            ("الاسم",    200), ("التليفون", 130), ("المجموعة", 130),
-            ("عليه 🔴",  120), ("له 🟢",    120), ("ملاحظات",   -1), ("الكشف",    150)
-        ])
-        self.cust_header.setFixedHeight(40)
-        self.cust_header.setRowCount(0)
-        self.header_stack.addWidget(self.cust_header)
-        
-        # Groups Header
-        self.grp_header = DataTable([
-            ("اسم المجموعة", 200), ("القائد", 180), ("ملاحظات", -1), ("إجراءات", 210)
-        ])
-        self.grp_header.setFixedHeight(40)
-        self.grp_header.setRowCount(0)
-        self.header_stack.addWidget(self.grp_header)
 
     def refresh(self):
         self._on_tab(self.tabs.currentIndex())
 
     def _on_tab(self, idx: int):
-        self.header_stack.setCurrentIndex(idx)
         if idx == 0: self.customers_tab.load_data()
         else:        self.groups_tab.load_data()
 
@@ -98,53 +76,55 @@ class CustomersTab(QWidget):
 
     def _build(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, GAP_MD, 0, 0)
-        layout.setSpacing(GAP_LG)
+        layout.setContentsMargins(0, GAP_XS, 0, 0)
+        layout.setSpacing(GAP_MD)
 
-        # ── Toolbar card
-        toolbar_card = CardGroup()
-        tb = QHBoxLayout()
-        tb.setSpacing(GAP_MD)
+        # ── Middle Layer: Add Button & Search
+        tb_row = QHBoxLayout()
+        tb_row.setContentsMargins(GAP_MD, 0, GAP_MD, 0)
+        tb_row.setSpacing(GAP_MD)
 
-        add_btn = QPushButton("＋  إضافة عميل")
+        add_btn = QPushButton("➕ إضافة عميل")
         add_btn.setObjectName("btn_primary")
-        add_btn.setFixedHeight(38)
+        add_btn.setFixedHeight(42)
+        add_btn.setMinimumWidth(160)
         add_btn.clicked.connect(self._add_customer)
-        tb.addWidget(add_btn)
+        tb_row.addWidget(add_btn)
 
-        tb.addStretch()
+        tb_row.addStretch()
 
         self.group_filter = QComboBox()
-        self.group_filter.setFixedHeight(38)
-        self.group_filter.setMinimumWidth(160)
+        self.group_filter.setFixedHeight(42)
+        self.group_filter.setMinimumWidth(200) # Expanded width
+        self.group_filter.setStyleSheet(f"background: {COLORS['bg_hover']}; font-weight: bold; font-size: 14px;")
         self.group_filter.currentIndexChanged.connect(self.load_data)
-        tb.addWidget(self.group_filter)
+        tb_row.addWidget(self.group_filter)
 
         self.search = QLineEdit()
         self.search.setPlaceholderText("🔍  بحث باسم أو تليفون...")
-        self.search.setFixedHeight(38)
-        self.search.setMinimumWidth(240)
+        self.search.setFixedHeight(42)
+        self.search.setMinimumWidth(320)
         self.search.textChanged.connect(self._load_table)
-        tb.addWidget(self.search)
+        tb_row.addWidget(self.search)
 
-        toolbar_card.add_layout(tb)
-        layout.addWidget(toolbar_card)
+        layout.addLayout(tb_row)
+        layout.addSpacing(GAP_SM)
 
-        # ── Table card
+        # ── Bottom Layer: Table Section
         self.table_card = CardGroup("👥  قائمة العملاء")
         layout.addSpacing(GAP_SM)
 
         cols = [
-            ("الاسم",    200),
+            ("الاسم",    -1), # Stretches to fill space
             ("التليفون", 130),
             ("المجموعة", 130),
             ("عليه 🔴",  120),
             ("له 🟢",    120),
-            ("ملاحظات",   -1),
+            ("ملاحظات",   200),
             ("الكشف",    150),
         ]
         self.table = DataTable(cols)
-        self.table.horizontalHeader().setVisible(False) # Sticky header used instead
+        self.table.horizontalHeader().setVisible(True) 
         self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._ctx_menu)
@@ -277,44 +257,44 @@ class GroupsTab(QWidget):
 
     def _build(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, GAP_MD, 0, 0)
-        layout.setSpacing(GAP_LG)
+        layout.setContentsMargins(0, GAP_XS, 0, 0)
+        layout.setSpacing(GAP_MD)
 
-        # ── Toolbar card — task 9: search for groups
-        toolbar_card = CardGroup()
-        tb = QHBoxLayout(); tb.setSpacing(GAP_MD)
+        # ── Middle Layer: Add & Search
+        tb_row = QHBoxLayout()
+        tb_row.setContentsMargins(GAP_MD, 0, GAP_MD, 0)
+        tb_row.setSpacing(GAP_MD)
 
-        add_btn = QPushButton("＋  إضافة مجموعة")
+        add_btn = QPushButton("➕ إضافة مجموعة")
         add_btn.setObjectName("btn_primary")
-        add_btn.setFixedHeight(38)
+        add_btn.setFixedHeight(42)
+        add_btn.setMinimumWidth(180)
         add_btn.clicked.connect(self._add_group)
-        tb.addWidget(add_btn)
+        tb_row.addWidget(add_btn)
 
-        tb.addStretch()
+        tb_row.addStretch()
 
         self.group_search = QLineEdit()
         self.group_search.setPlaceholderText("🔍  بحث باسم المجموعة...")
-        self.group_search.setFixedHeight(38)
-        self.group_search.setMinimumWidth(240)
+        self.group_search.setFixedHeight(42)
+        self.group_search.setMinimumWidth(320)
         self.group_search.textChanged.connect(self._filter)
-        tb.addWidget(self.group_search)
+        tb_row.addWidget(self.group_search)
 
-        toolbar_card.add_layout(tb)
-        layout.addWidget(toolbar_card)
-
+        layout.addLayout(tb_row)
         layout.addSpacing(GAP_SM)
 
-        # ── Table card — task 10: bigger rows + visible buttons
-        table_card = CardGroup("  قائمة المجموعات")
+        # ── Bottom Layer: Table
+        table_card = CardGroup("📂  قائمة المجموعات")
 
         cols = [
-            ("اسم المجموعة", 200),
+            ("اسم المجموعة", -1), # Stretch
             ("القائد",        180),
-            ("ملاحظات",        -1),
+            ("ملاحظات",        200),
             ("إجراءات",       210),
         ]
         self.table = DataTable(cols)
-        self.table.horizontalHeader().setVisible(False)
+        self.table.horizontalHeader().setVisible(True)
         self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._ctx_menu)
@@ -322,9 +302,11 @@ class GroupsTab(QWidget):
         # Full page scroll logic
         self.table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         
         table_card.add_widget(self.table)
         layout.addWidget(table_card)
+        layout.addStretch()
 
     def load_data(self):
         self._all_groups = db.get_all_groups()
@@ -351,13 +333,16 @@ class GroupsTab(QWidget):
 
             # task 10: clear, well-spaced action buttons
             self.table.add_action_buttons(row, 3, [
-                {'text': "✏️ تعديل", 'callback': lambda _, grp=g: self._edit_group(grp), 'role': 'secondary'},
+                {'text': "✏️ تعديل", 'callback': lambda _, g=g: self._edit_group(g), 'role': 'secondary'},
                 {'text': "📊 تقرير", 'callback': lambda _, gid=g["id"]: self._show_report(gid), 'role': 'ghost'}
             ])
             
-        # Full-page scroll height adjustment
-        h = self.table.verticalHeader().length() + 10
-        self.table.setFixedHeight(h)
+        # Update table height to fit all rows (Full-Page Scroll)
+        row_count = len(self._groups)
+        header_height = self.table.horizontalHeader().height() or 40
+        row_height = self.table.verticalHeader().defaultSectionSize()
+        total_height = header_height + (row_count * row_height) + 10
+        self.table.setFixedHeight(total_height)
 
     def _add_group(self):
         if GroupDialog(self).exec(): self.load_data()

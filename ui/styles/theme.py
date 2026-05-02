@@ -371,8 +371,18 @@ QDoubleSpinBox:focus, QComboBox:focus, QDateEdit:focus {{
 }}
 
 QComboBox::drop-down {{
-    border: none;
-    width: 30px;
+    background: {COLORS['bg_hover']};
+    border-left: 1px solid {COLORS['border']};
+    width: 32px;
+    border-top-right-radius: {BORDER_RADIUS};
+    border-bottom-right-radius: {BORDER_RADIUS};
+}}
+QComboBox::down-arrow {{
+    image: none;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid {COLORS['text_secondary']};
+    margin-top: 2px;
 }}
 QComboBox QAbstractItemView {{
     background: {COLORS['bg_elevated']};
