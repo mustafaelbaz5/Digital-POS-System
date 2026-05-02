@@ -117,7 +117,7 @@ class CustomerStatementDialog(QDialog):
         layout.setSpacing(GAP_MD)
         
         t = self._data.get("totals", {})
-        net = t.get("total_pending", 0) - t.get("total_due", 0)
+        net = (t.get("total_pending") or 0) - (t.get("total_due") or 0)
         
         self.card_owed = SummaryCard("إجمالي المطلوب منه", fmt_currency(t.get("total_pending", 0)), COLORS["red"])
         self.card_owned = SummaryCard("إجمالي مبالغ العميل", fmt_currency(t.get("total_due", 0)), COLORS["green"])
@@ -286,7 +286,7 @@ class CustomerStatementDialog(QDialog):
 
     def _refresh_ui(self):
         t = self._data.get("totals", {})
-        net = t.get("total_pending", 0) - t.get("total_due", 0)
+        net = (t.get("total_pending") or 0) - (t.get("total_due") or 0)
         
         self.card_owed.set_value(fmt_currency(t.get("total_pending", 0)))
         self.card_owned.set_value(fmt_currency(t.get("total_due", 0)))

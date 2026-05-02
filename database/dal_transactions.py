@@ -327,10 +327,10 @@ def get_customer_statement(customer_id: int) -> dict:
 
         totals = conn.execute("""
             SELECT
-                SUM(CASE WHEN payment_status='pending' AND operation_type='outbound' THEN amount_required ELSE 0 END) AS total_pending,
-                SUM(CASE WHEN payment_status='paid'    AND operation_type='outbound' THEN amount_required ELSE 0 END) AS total_paid,
-                SUM(CASE WHEN operation_type='inbound' AND is_delivered=0 THEN amount_spent ELSE 0 END) AS total_due,
-                SUM(CASE WHEN payment_status IN ('pending', 'paid') THEN profit ELSE 0 END) AS total_profit,
+                COALESCE(SUM(CASE WHEN payment_status='pending' AND operation_type='outbound' THEN amount_required ELSE 0 END), 0) AS total_pending,
+                COALESCE(SUM(CASE WHEN payment_status='paid'    AND operation_type='outbound' THEN amount_required ELSE 0 END), 0) AS total_paid,
+                COALESCE(SUM(CASE WHEN operation_type='inbound' AND is_delivered=0 THEN amount_spent ELSE 0 END), 0) AS total_due,
+                COALESCE(SUM(CASE WHEN payment_status IN ('pending', 'paid') THEN profit ELSE 0 END), 0) AS total_profit,
                 COUNT(*) AS total_count
             FROM transactions WHERE customer_id = ?
         """, (customer_id,)).fetchone()
