@@ -652,12 +652,14 @@ class CleanupTab(QWidget):
     def _cleanup_single(self):
         cid = self.customer_combo.currentData()
         if not cid: return
-        if QMessageBox.question(self, "تأكيد", "حذف العمليات المسددة لهذا العميل؟") == QMessageBox.StandardButton.Yes:
+        if QMessageBox.question(self, "تأكيد", "حذف العمليات المسددة لهذا العميل؟",
+                                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
             db.cleanup_paid_transactions(cid)
             self._refresh_stat()
 
     def _cleanup_all(self):
-        if QMessageBox.warning(self, "تحذير", "حذف جميع العمليات المسددة؟ لا يمكن التراجع!") == QMessageBox.StandardButton.Yes:
+        if QMessageBox.warning(self, "تحذير", "حذف جميع العمليات المسددة؟ لا يمكن التراجع!",
+                               QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
             db.cleanup_paid_transactions()
             self._refresh_stat()
 
