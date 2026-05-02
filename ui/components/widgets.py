@@ -164,6 +164,13 @@ class ScreenShell(QWidget):
 
         root.addWidget(self._header)
 
+        # Sticky area (fixed between header and scroll content)
+        self._sticky_w = QWidget()
+        self._sticky_l = QVBoxLayout(self._sticky_w)
+        self._sticky_l.setContentsMargins(MARGIN_CONTENT, 0, MARGIN_CONTENT, 0)
+        self._sticky_l.setSpacing(0)
+        root.addWidget(self._sticky_w)
+
         # ─── Scrollable content
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -183,6 +190,9 @@ class ScreenShell(QWidget):
 
     def content(self) -> QVBoxLayout:
         return self._content_l
+
+    def sticky(self) -> QVBoxLayout:
+        return self._sticky_l
 
     def set_subtitle(self, text: str):
         if hasattr(self, "_sub_lbl"):

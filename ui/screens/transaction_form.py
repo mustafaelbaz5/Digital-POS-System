@@ -11,11 +11,20 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QLocale, QDate
 from PyQt6.QtGui import QGuiApplication
 
-from ui.styles.theme import COLORS, FONT
-from ui.components.widgets import BaseDialog
+from ui.styles.theme import COLORS, FONT, CARD_RADIUS
+from ui.components.widgets import BaseDialog, make_divider
 from utils.formatters import fmt_currency
 
 import database as db
+
+class FocusSpinBox(QDoubleSpinBox):
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        QTimer.singleShot(0, self.selectAll)
+
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        QTimer.singleShot(0, self.selectAll)
 
 class CompactTransactionTab(QWidget):
     transaction_added = pyqtSignal()
@@ -80,14 +89,14 @@ class CompactTransactionTab(QWidget):
         self.service_input.setPlaceholderText("اسم الخدمة...")
         row2.addWidget(self.service_input, 2)
         
-        self.amount_spent = QDoubleSpinBox()
+        self.amount_spent = FocusSpinBox()
         loc = QLocale(QLocale.Language.English)
         self.amount_spent.setLocale(loc)
         self.amount_spent.setGroupSeparatorShown(True)
         self.amount_spent.setRange(0, 999999)
         self.amount_spent.setDecimals(2)
         self.amount_spent.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
-        self.amount_spent.setStyleSheet(f"font-weight:bold; color:{COLORS['accent']}; font-size:16px;")
+        self.amount_spent.setStyleSheet(f"font-weight:bold; color:{COLORS['accent']}; font-size:18px; padding: 4px;")
         self.amount_spent.valueChanged.connect(self._update_profit)
         
         if not self.is_inbound:
@@ -96,26 +105,26 @@ class CompactTransactionTab(QWidget):
             row2.addWidget(lbl_a1)
             row2.addWidget(self.amount_spent, 1)
             
-            self.amount_req = QDoubleSpinBox()
+            self.amount_req = FocusSpinBox()
             self.amount_req.setLocale(loc)
             self.amount_req.setGroupSeparatorShown(True)
             self.amount_req.setRange(0, 999999)
             self.amount_req.setDecimals(2)
             self.amount_req.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
-            self.amount_req.setStyleSheet(f"font-weight:bold; color:{COLORS['accent']}; font-size:16px;")
+            self.amount_req.setStyleSheet(f"font-weight:bold; color:{COLORS['accent']}; font-size:18px; padding: 4px;")
             self.amount_req.valueChanged.connect(self._update_profit)
             lbl_a2 = QLabel("المطلوب:")
             lbl_a2.setStyleSheet(f"color:{COLORS['text_secondary']};")
             row2.addWidget(lbl_a2)
             row2.addWidget(self.amount_req, 1)
         else:
-            self.amount_req = QDoubleSpinBox() # used for received
+            self.amount_req = FocusSpinBox() # used for received
             self.amount_req.setLocale(loc)
             self.amount_req.setGroupSeparatorShown(True)
             self.amount_req.setRange(0, 999999)
             self.amount_req.setDecimals(2)
             self.amount_req.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
-            self.amount_req.setStyleSheet(f"font-weight:bold; color:{COLORS['accent']}; font-size:16px;")
+            self.amount_req.setStyleSheet(f"font-weight:bold; color:{COLORS['accent']}; font-size:18px; padding: 4px;")
             self.amount_req.valueChanged.connect(self._update_profit)
             lbl_a1 = QLabel("المستلم:")
             lbl_a1.setStyleSheet(f"color:{COLORS['text_secondary']};")
@@ -137,20 +146,9 @@ class CompactTransactionTab(QWidget):
         profit_layout.addWidget(self.profit_lbl)
         layout.addLayout(profit_layout)
         
-        # ── Row 3: Date, Reference & Notes
+        # ── Row 3: Reference & Notes
         row3 = QHBoxLayout()
         row3.setSpacing(8)
-        
-        lbl_date = QLabel("التاريخ:")
-        lbl_date.setStyleSheet(f"color:{COLORS['text_secondary']};")
-        row3.addWidget(lbl_date)
-        
-        self.date_edit = QDateEdit()
-        self.date_edit.setCalendarPopup(True)
-        self.date_edit.setDate(QDate.currentDate())
-        self.date_edit.setDisplayFormat("yyyy-MM-dd")
-        self.date_edit.setFixedWidth(110)
-        row3.addWidget(self.date_edit)
 
         lbl_r = QLabel("المرجع:")
         lbl_r.setStyleSheet(f"color:{COLORS['text_secondary']};")
@@ -158,7 +156,7 @@ class CompactTransactionTab(QWidget):
         
         self.ref_input = QLineEdit()
         self.ref_input.setPlaceholderText("اختياري...")
-        self.ref_input.setFixedWidth(100)
+        self.ref_input.setFixedWidth(120)
         row3.addWidget(self.ref_input)
         
         lbl_n = QLabel("ملاحظات:")
@@ -166,10 +164,44 @@ class CompactTransactionTab(QWidget):
         row3.addWidget(lbl_n)
         
         self.notes_input = QLineEdit()
-        self.notes_input.setPlaceholderText("ملاحظات سريعة...")
-        row3.addWidget(self.notes_input, 1)
+        self.notes_input.setPlaceholderText("ملاحظات إضافية...")
+        row3.addWidget(self.notes_input)
         
         layout.addLayout(row3)
+
+        # ── Row 4: Custom Date Selector
+        row4 = QHBoxLayout()
+        row4.setSpacing(8)
+        
+        lbl_d = QLabel("تاريخ العملية:")
+        lbl_d.setStyleSheet(f"color:{COLORS['text_secondary']}; font-weight:bold;")
+        row4.addWidget(lbl_d)
+
+        from datetime import datetime
+        now = datetime.now()
+
+        self.day_combo = QComboBox()
+        self.day_combo.addItems([str(i).zfill(2) for i in range(1, 32)])
+        self.day_combo.setCurrentText(str(now.day).zfill(2))
+        self.day_combo.setFixedWidth(65)
+        row4.addWidget(self.day_combo)
+
+        self.month_combo = QComboBox()
+        months = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
+        for i, m in enumerate(months):
+            self.month_combo.addItem(f"{i+1:02d} - {m}", i+1)
+        self.month_combo.setCurrentIndex(now.month - 1)
+        self.month_combo.setFixedWidth(130)
+        row4.addWidget(self.month_combo)
+
+        self.year_combo = QComboBox()
+        self.year_combo.addItems([str(i) for i in range(now.year - 2, now.year + 2)])
+        self.year_combo.setCurrentText(str(now.year))
+        self.year_combo.setFixedWidth(80)
+        row4.addWidget(self.year_combo)
+
+        row4.addStretch()
+        layout.addLayout(row4)
         
         layout.addStretch()
         
@@ -196,15 +228,7 @@ class CompactTransactionTab(QWidget):
         # Adjust tab order for date
         self.setTabOrder(self.service_input, self.amount_spent)
         self.setTabOrder(self.amount_spent, self.amount_req)
-        self.setTabOrder(self.amount_req, self.date_edit)
-        self.setTabOrder(self.date_edit, self.ref_input)
-        
-        # Enter-to-focus for rapid entry
-        self.customer_combo.lineEdit().returnPressed.connect(self.service_input.setFocus)
-        if not self.is_inbound:
-            self.service_input.returnPressed.connect(self.amount_spent.setFocus)
-        else:
-            self.service_input.returnPressed.connect(self.amount_req.setFocus)
+        self.setTabOrder(self.amount_req, self.save_btn)
 
     def _update_profit(self):
         spent = self.amount_spent.value()
@@ -259,8 +283,10 @@ class CompactTransactionTab(QWidget):
         # Use current time with selected date
         from datetime import datetime
         now_time = datetime.now().strftime("%H:%M:%S")
-        txn_date_str = self.date_edit.date().toString("yyyy-MM-dd")
-        created_at = f"{txn_date_str} {now_time}"
+        y = self.year_combo.currentText()
+        m = self.month_combo.currentData()
+        d = self.day_combo.currentText()
+        created_at = f"{y}-{m:02d}-{d} {now_time}"
 
         try:
             if not self.is_inbound:
@@ -288,10 +314,10 @@ class CompactTransactionTab(QWidget):
                 
             self.transaction_added.emit()
             
-            # Continuous Flow Reset
             self.amount_spent.setValue(0)
             self.amount_req.setValue(0)
             self.ref_input.clear()
+            # notes_input is cleared but date/client/service persist
             self.notes_input.clear()
             
             if not self.is_inbound:
@@ -352,13 +378,64 @@ class TransactionDialog(BaseDialog):
 
     def _update_header(self, pulse=False):
         p = db.get_platform_by_id(self.platform_id)
-        if p:
-            self.platform = p
-            title_lbl = self.findChild(QLabel, "dialog_title")
-            if title_lbl:
-                title_lbl.setText(f"{p['name']}  |  الرصيد: {fmt_currency(p['balance'])}")
-                if pulse:
-                    title_lbl.setStyleSheet(f"color:{COLORS['green']}; font-weight:bold; font-size:18px;")
-                    QTimer.singleShot(500, lambda: title_lbl.setStyleSheet(f"color:{COLORS['text_primary']}; font-weight:bold; font-size:16px;"))
-                else:
-                    title_lbl.setStyleSheet(f"color:{COLORS['text_primary']}; font-weight:bold; font-size:16px;")
+        if not p: return
+        self.platform = p
+        
+        header_frame = self.findChild(QFrame, "dialog_header")
+        if not header_frame: return
+        hl = header_frame.layout()
+        
+        # Clear existing
+        while hl.count():
+            item = hl.takeAt(0)
+            if item.widget(): item.widget().deleteLater()
+        
+        # Platform Name
+        name_lbl = QLabel(p["name"])
+        name_lbl.setObjectName("header_name")
+        name_lbl.setStyleSheet(f"color:{COLORS['text_primary']}; font-size:18px; font-weight:bold;")
+        hl.addWidget(name_lbl)
+        hl.addSpacing(20)
+        
+        # Balance Badge
+        bal_badge = QLabel(f" رصيد: {fmt_currency(p.get('balance',0))} ")
+        bal_badge.setObjectName("header_bal")
+        bal_badge.setStyleSheet(f"""
+            background: {COLORS['green_bg']}; color: {COLORS['green']}; 
+            border: 1px solid {COLORS['green']}; border-radius: 12px;
+            padding: 2px 12px; font-weight: bold; font-size: 13px;
+        """)
+        hl.addWidget(bal_badge)
+        
+        # Limit Badge
+        if p["type"] in ("wallet", "instapay"):
+            hl.addSpacing(10)
+            used = p.get("monthly_used", 0)
+            limit = p.get("monthly_limit", 200000)
+            rem = limit - used
+            pct = int(used / limit * 100) if limit else 0
+            lim_color = COLORS["red"] if pct > 90 else COLORS["yellow"] if pct > 70 else COLORS["blue"]
+            lim_bg = COLORS["red_bg"] if pct > 90 else COLORS["yellow_bg"] if pct > 70 else COLORS["blue_bg"]
+            
+            lim_badge = QLabel(f" المتبقي: {fmt_currency(rem)} ({pct}%) ")
+            lim_badge.setObjectName("header_limit")
+            lim_badge.setStyleSheet(f"""
+                background: {lim_bg}; color: {lim_color}; 
+                border: 1px solid {lim_color}; border-radius: 12px;
+                padding: 2px 12px; font-weight: bold; font-size: 13px;
+            """)
+            hl.addWidget(lim_badge)
+            
+        hl.addStretch()
+        
+        if pulse:
+            name_lbl.setStyleSheet(f"color:{COLORS['green']}; font-size:18px; font-weight:bold;")
+            QTimer.singleShot(600, lambda: name_lbl.setStyleSheet(f"color:{COLORS['text_primary']}; font-size:18px; font-weight:bold;"))
+
+        # Close Button
+        close_btn = QPushButton("✕")
+        close_btn.setObjectName("dialog_close_btn")
+        close_btn.setFixedSize(30, 30)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.clicked.connect(self.reject)
+        hl.addWidget(close_btn)

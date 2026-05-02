@@ -464,15 +464,15 @@ QDialog {{
     background: transparent;
     color: {COLORS['text_secondary']};
     border: none;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: bold;
-    border-radius: 4px;
+    border-radius: 15px;
     padding: 0;
     margin: 0;
 }}
 #dialog_close_btn:hover {{
-    background: {COLORS['red']};
-    color: white;
+    background: {COLORS['red_bg']};
+    color: {COLORS['red']};
 }}
 
 QMessageBox {{

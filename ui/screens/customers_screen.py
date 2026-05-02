@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QLineEdit, QComboBox, QTextEdit,
     QDialog, QFormLayout, QMessageBox, QTabWidget,
-    QMenu, QFrame, QSizePolicy
+    QMenu, QFrame, QSizePolicy, QStackedWidget
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction
@@ -52,11 +52,33 @@ class CustomersScreen(ScreenShell):
 
         self.tabs.currentChanged.connect(self._on_tab)
         c.addWidget(self.tabs)
+        
+        # ── Sticky Header setup
+        self.header_stack = QStackedWidget()
+        self.sticky().addWidget(self.header_stack)
+        
+        # Customers Header
+        self.cust_header = DataTable([
+            ("الاسم",    200), ("التليفون", 130), ("المجموعة", 130),
+            ("عليه 🔴",  120), ("له 🟢",    120), ("ملاحظات",   -1), ("الكشف",    150)
+        ])
+        self.cust_header.setFixedHeight(40)
+        self.cust_header.setRowCount(0)
+        self.header_stack.addWidget(self.cust_header)
+        
+        # Groups Header
+        self.grp_header = DataTable([
+            ("اسم المجموعة", 200), ("القائد", 180), ("ملاحظات", -1), ("إجراءات", 210)
+        ])
+        self.grp_header.setFixedHeight(40)
+        self.grp_header.setRowCount(0)
+        self.header_stack.addWidget(self.grp_header)
 
     def refresh(self):
         self._on_tab(self.tabs.currentIndex())
 
     def _on_tab(self, idx: int):
+        self.header_stack.setCurrentIndex(idx)
         if idx == 0: self.customers_tab.load_data()
         else:        self.groups_tab.load_data()
 
@@ -108,10 +130,9 @@ class CustomersTab(QWidget):
         toolbar_card.add_layout(tb)
         layout.addWidget(toolbar_card)
 
-        # ── Table card — task 7: clear space between toolbar and table
+        # ── Table card
+        self.table_card = CardGroup("👥  قائمة العملاء")
         layout.addSpacing(GAP_SM)
-
-        table_card = CardGroup("👥  قائمة العملاء")
 
         cols = [
             ("الاسم",    200),
@@ -123,20 +144,26 @@ class CustomersTab(QWidget):
             ("الكشف",    150),
         ]
         self.table = DataTable(cols)
-        # task 8: taller rows
+        self.table.horizontalHeader().setVisible(False) # Sticky header used instead
         self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._ctx_menu)
-        table_card.add_widget(self.table)
+        
+        # Disable internal scroll
+        self.table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        
+        self.table_card.add_widget(self.table)
 
         self.total_lbl = QLabel("")
         self.total_lbl.setStyleSheet(
             f"color:{COLORS['text_muted']}; font-size:{FONT['xs']}; padding:{GAP_SM}px 0;"
         )
         self.total_lbl.setAlignment(ALeft)
-        table_card.add_widget(self.total_lbl)
+        self.table_card.add_widget(self.total_lbl)
 
-        layout.addWidget(table_card)
+        layout.addWidget(self.table_card)
 
     def load_data(self):
         current = self.group_filter.currentData()
@@ -195,6 +222,13 @@ class CustomersTab(QWidget):
         if total_owed: parts.append(f"عليهم: {fmt_currency(total_owed)}")
         if total_due:  parts.append(f"لهم: {fmt_currency(total_due)}")
         self.total_lbl.setText("  ·  ".join(parts))
+        
+        # Update table height to fit all rows (Full-Page Scroll)
+        row_count = len(customers)
+        header_height = self.table.horizontalHeader().height()
+        row_height = self.table.verticalHeader().defaultSectionSize()
+        total_height = header_height + (row_count * row_height) + 10
+        self.table.setFixedHeight(total_height)
 
     def _add_customer(self):
         if CustomerDialog(self).exec(): self.load_data()
@@ -280,9 +314,15 @@ class GroupsTab(QWidget):
             ("إجراءات",       210),
         ]
         self.table = DataTable(cols)
+        self.table.horizontalHeader().setVisible(False)
         self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._ctx_menu)
+        
+        # Full page scroll logic
+        self.table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        
         table_card.add_widget(self.table)
         layout.addWidget(table_card)
 
@@ -314,6 +354,10 @@ class GroupsTab(QWidget):
                 {'text': "✏️ تعديل", 'callback': lambda _, grp=g: self._edit_group(grp), 'role': 'secondary'},
                 {'text': "📊 تقرير", 'callback': lambda _, gid=g["id"]: self._show_report(gid), 'role': 'ghost'}
             ])
+            
+        # Full-page scroll height adjustment
+        h = self.table.verticalHeader().length() + 10
+        self.table.setFixedHeight(h)
 
     def _add_group(self):
         if GroupDialog(self).exec(): self.load_data()
