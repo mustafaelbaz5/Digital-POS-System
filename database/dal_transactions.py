@@ -8,7 +8,8 @@ from database.schema import get_connection
 def add_outbound_transaction(
     platform_id: int, customer_id: int, service_name: str,
     amount_spent: float, amount_required: float, payment_status: str,
-    reference_no: str = "", is_card: bool = False, notes: str = ""
+    reference_no: str = "", is_card: bool = False, notes: str = "",
+    created_at: str = None
 ) -> int:
     with get_connection() as conn:
         try:
@@ -18,13 +19,21 @@ def add_outbound_transaction(
             if row["balance"] < amount_spent:
                 raise ValueError(f"رصيد غير كافٍ - الرصيد الحالي: {row['balance']:.2f} ج")
 
-            cursor = conn.execute("""
+            sql = """
                 INSERT INTO transactions
                     (operation_type, service_name, platform_id, customer_id,
-                     amount_spent, amount_required, reference_no, is_card, payment_status, notes)
-                VALUES ('outbound', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (service_name, platform_id, customer_id, amount_spent, amount_required,
-                  reference_no, 1 if is_card else 0, payment_status, notes))
+                     amount_spent, amount_required, reference_no, is_card, payment_status, notes
+                     {date_col})
+                VALUES ('outbound', ?, ?, ?, ?, ?, ?, ?, ?, ? {date_val})
+            """
+            date_col = ", created_at" if created_at else ""
+            date_val = ", ?" if created_at else ""
+            params = [service_name, platform_id, customer_id, amount_spent, amount_required,
+                      reference_no, 1 if is_card else 0, payment_status, notes]
+            if created_at:
+                params.append(created_at)
+
+            cursor = conn.execute(sql.format(date_col=date_col, date_val=date_val), params)
             transaction_id = cursor.lastrowid
 
             conn.execute("UPDATE platforms SET balance = balance - ? WHERE id = ?", (amount_spent, platform_id))
@@ -63,6 +72,7 @@ def add_inbound_transaction(
     wallet_id: int, customer_id: int, service_name: str,
     amount_received: float, amount_delivered: float,
     reference_no: str = "", notes: str = "", is_delivered: bool = False,
+    created_at: str = None
 ) -> int:
     with get_connection() as conn:
         try:
@@ -76,13 +86,21 @@ def add_inbound_transaction(
             if budget["cash_vault"] < amount_delivered:
                 raise ValueError(f"الكاش غير كافٍ - الكاش الحالي: {budget['cash_vault']:.2f} ج")
 
-            cursor = conn.execute("""
+            sql = """
                 INSERT INTO transactions
                     (operation_type, service_name, platform_id, customer_id,
-                     amount_spent, amount_required, reference_no, payment_status, is_delivered, notes)
-                VALUES ('inbound', ?, ?, ?, ?, ?, ?, 'paid', ?, ?)
-            """, (service_name, wallet_id, customer_id, amount_delivered, amount_received,
-                  reference_no, 1 if is_delivered else 0, notes))
+                     amount_spent, amount_required, reference_no, payment_status, is_delivered, notes
+                     {date_col})
+                VALUES ('inbound', ?, ?, ?, ?, ?, ?, 'paid', ?, ? {date_val})
+            """
+            date_col = ", created_at" if created_at else ""
+            date_val = ", ?" if created_at else ""
+            params = [service_name, wallet_id, customer_id, amount_delivered, amount_received,
+                      reference_no, 1 if is_delivered else 0, notes]
+            if created_at:
+                params.append(created_at)
+
+            cursor = conn.execute(sql.format(date_col=date_col, date_val=date_val), params)
             transaction_id = cursor.lastrowid
 
             conn.execute("UPDATE platforms SET balance = balance + ?, monthly_used = monthly_used + ? WHERE id = ?",
@@ -159,50 +177,70 @@ def mark_as_paid(transaction_id: int) -> None:
             raise
 
 
-def update_transaction_status(transaction_id: int, new_status: str) -> None:
+def update_transaction_status(transaction_id: int, new_val) -> None:
     """
-    تغيير حالة عملية صادرة بين pending و paid مع تصحيح التأثيرات المالية
+    تغيير حالة عملية (صادرة: pending/paid | واردة: 0/1 للـ is_delivered)
+    مع تصحيح التأثيرات المالية
     """
-    if new_status not in ("pending", "paid"):
-        raise ValueError("الحالة يجب أن تكون pending أو paid")
     with get_connection() as conn:
         try:
-            row = conn.execute(
-                "SELECT customer_id, amount_required, payment_status, operation_type FROM transactions WHERE id = ?",
-                (transaction_id,)
-            ).fetchone()
+            row = conn.execute("""
+                SELECT customer_id, amount_spent, amount_required, payment_status, is_delivered, operation_type 
+                FROM transactions WHERE id = ?
+            """, (transaction_id,)).fetchone()
+            
             if not row:
                 raise ValueError("العملية غير موجودة")
-            if row["operation_type"] != "outbound":
-                raise ValueError("تغيير الحالة للعمليات الصادرة فقط")
-
-            old_status = row["payment_status"]
-            if old_status == new_status:
-                return
-
-            conn.execute("UPDATE transactions SET payment_status = ? WHERE id = ?", (new_status, transaction_id))
-
+            
+            op_type = row["operation_type"]
             cid = row["customer_id"]
-            amt = row["amount_required"]
 
-            if old_status == "pending" and new_status == "paid":
-                # كان مديوناً → أصبح مسدد → أضف للكاش وخصم من مديونيته
-                conn.execute("UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1", (amt,))
-                if cid:
-                    conn.execute("UPDATE customers SET total_debt = total_debt - ? WHERE id = ?", (amt, cid))
-            elif old_status == "paid" and new_status == "pending":
-                # كان مسدد → رجع مؤجل → خصم من الكاش وأضف للمديونية
-                conn.execute("UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1", (amt,))
-                if cid:
-                    conn.execute("UPDATE customers SET total_debt = total_debt + ? WHERE id = ?", (amt, cid))
-            elif old_status == "cash" and new_status == "pending":
-                # معالجة الحالة القديمة
-                conn.execute("UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1", (amt,))
-                if cid:
-                    conn.execute("UPDATE customers SET total_debt = total_debt + ? WHERE id = ?", (amt, cid))
-            elif old_status == "cash" and new_status == "paid":
-                # كلاهما يؤثر على الكاش، فقط غير الحالة
-                pass
+            if op_type == "outbound":
+                if new_val not in ("pending", "paid"):
+                    raise ValueError("الحالة يجب أن تكون pending أو paid")
+                
+                old_status = row["payment_status"]
+                if old_status == new_val:
+                    return
+
+                amt = row["amount_required"]
+                
+                # تحديث الحالة
+                conn.execute("UPDATE transactions SET payment_status = ? WHERE id = ?", (new_val, transaction_id))
+
+                if old_status == "pending" and new_val == "paid":
+                    # مديونية -> كاش
+                    conn.execute("UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1", (amt,))
+                    if cid:
+                        conn.execute("UPDATE customers SET total_debt = total_debt - ? WHERE id = ?", (amt, cid))
+                elif old_status == "paid" and new_val == "pending":
+                    # كاش -> مديونية
+                    conn.execute("UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1", (amt,))
+                    if cid:
+                        conn.execute("UPDATE customers SET total_debt = total_debt + ? WHERE id = ?", (amt, cid))
+
+            elif op_type == "inbound":
+                new_is_del = int(new_val)
+                old_is_del = int(row["is_delivered"])
+                
+                if old_is_del == new_is_del:
+                    return
+
+                amt = row["amount_spent"] # المبلغ الذي يُسلم للعميل
+                
+                # تحديث الحالة
+                conn.execute("UPDATE transactions SET is_delivered = ? WHERE id = ?", (new_is_del, transaction_id))
+
+                if old_is_del == 0 and new_is_del == 1:
+                    # لم يُسلم -> تم التسليم (خصم من الكاش)
+                    conn.execute("UPDATE budget SET cash_vault = cash_vault - ? WHERE id = 1", (amt,))
+                    if cid:
+                        conn.execute("UPDATE customers SET total_debt = total_debt + ? WHERE id = ?", (amt, cid))
+                elif old_is_del == 1 and new_is_del == 0:
+                    # تم التسليم -> تراجع للم تُسلم (إضافة للكاش)
+                    conn.execute("UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1", (amt,))
+                    if cid:
+                        conn.execute("UPDATE customers SET total_debt = total_debt - ? WHERE id = ?", (amt, cid))
 
             conn.commit()
         except Exception:

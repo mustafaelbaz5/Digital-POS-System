@@ -250,9 +250,17 @@ class PlatformRow(QFrame):
             f"color:{bal_color};font-size:15px;font-weight:bold;"
             f"background:transparent;border:none;"
         )
-        bal_lbl.setFixedWidth(160)
+        bal_lbl.setFixedWidth(140)
         bal_lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(bal_lbl)
+
+        # عدد العمليات
+        count = p.get("transaction_count", 0)
+        count_lbl = QLabel(f"🔢 {count}")
+        count_lbl.setStyleSheet(f"color:{COLORS['text_muted']};font-size:12px;")
+        count_lbl.setFixedWidth(60)
+        count_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(count_lbl)
 
         # زرار إضافة عملية
         add_btn = QPushButton("➕ إضافة عملية")
@@ -315,7 +323,9 @@ class PlatformListTab(QWidget):
 
         sort_options = [
             ("الافتراضي",        "default"),
+            ("الاسم ↑",          "name_asc"),
             ("الرصيد ↓",         "balance_desc"),
+            ("العمليات ↓",       "count_desc"),
             ("الحد المتبقي ↓",   "limit_desc"),
             ("الحد المتبقي ↑",   "limit_asc"),
         ]
@@ -407,8 +417,12 @@ class PlatformListTab(QWidget):
             )
 
     def _sorted(self, platforms: list) -> list:
-        if self._sort_mode == "balance_desc":
+        if self._sort_mode == "name_asc":
+            return sorted(platforms, key=lambda p: p.get("name", "").lower())
+        elif self._sort_mode == "balance_desc":
             return sorted(platforms, key=lambda p: p.get("balance", 0), reverse=True)
+        elif self._sort_mode == "count_desc":
+            return sorted(platforms, key=lambda p: p.get("transaction_count", 0), reverse=True)
         elif self._sort_mode == "limit_desc":
             return sorted(platforms,
                 key=lambda p: p.get("monthly_limit", 0) - p.get("monthly_used", 0),

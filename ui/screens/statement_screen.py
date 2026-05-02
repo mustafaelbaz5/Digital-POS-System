@@ -255,15 +255,7 @@ class CustomerStatementDialog(QDialog):
 
     def _update_status(self, tid: int, val):
         try:
-            if isinstance(val, int): # is_delivered
-                if val == 1:
-                    db.mark_as_delivered(tid)
-                else:
-                    # Generic toggle handling
-                    db.mark_as_delivered(tid) 
-            else: # payment_status
-                db.update_transaction_status(tid, val)
-            
+            db.update_transaction_status(tid, val)
             self._load_data()
             self._refresh_ui()
         except Exception as e:

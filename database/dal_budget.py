@@ -49,19 +49,24 @@ def adjust_cash(delta: float) -> None:
 
 def get_all_platforms(platform_type: str = None) -> list[dict]:
     """
-    جلب كل المنصات النشطة
+    جلب كل المنصات النشطة مع عدد العمليات
     platform_type: 'machine' | 'wallet' | 'instapay' | None (الكل)
     """
     with get_connection() as conn:
+        query = """
+            SELECT p.*, COUNT(t.id) as transaction_count
+            FROM platforms p
+            LEFT JOIN transactions t ON t.platform_id = p.id
+            WHERE p.is_active = 1
+        """
+        params = []
         if platform_type:
-            rows = conn.execute(
-                "SELECT * FROM platforms WHERE is_active = 1 AND type = ? ORDER BY name",
-                (platform_type,)
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT * FROM platforms WHERE is_active = 1 ORDER BY type, name"
-            ).fetchall()
+            query += " AND p.type = ?"
+            params.append(platform_type)
+        
+        query += " GROUP BY p.id ORDER BY p.name"
+        
+        rows = conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
 
 

@@ -5,9 +5,10 @@ transaction_form.py — شاشة إضافة العمليات (Compact Pro Zero-S
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QLineEdit, QComboBox,
-    QTabWidget, QDoubleSpinBox, QMessageBox, QFrame, QCompleter, QDialog
+    QTabWidget, QDoubleSpinBox, QMessageBox, QFrame, QCompleter, QDialog,
+    QDateEdit
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QLocale
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QLocale, QDate
 from PyQt6.QtGui import QGuiApplication
 
 from ui.styles.theme import COLORS, FONT
@@ -136,17 +137,28 @@ class CompactTransactionTab(QWidget):
         profit_layout.addWidget(self.profit_lbl)
         layout.addLayout(profit_layout)
         
-        # ── Row 3: Reference & Notes
+        # ── Row 3: Date, Reference & Notes
         row3 = QHBoxLayout()
         row3.setSpacing(8)
         
+        lbl_date = QLabel("التاريخ:")
+        lbl_date.setStyleSheet(f"color:{COLORS['text_secondary']};")
+        row3.addWidget(lbl_date)
+        
+        self.date_edit = QDateEdit()
+        self.date_edit.setCalendarPopup(True)
+        self.date_edit.setDate(QDate.currentDate())
+        self.date_edit.setDisplayFormat("yyyy-MM-dd")
+        self.date_edit.setFixedWidth(110)
+        row3.addWidget(self.date_edit)
+
         lbl_r = QLabel("المرجع:")
         lbl_r.setStyleSheet(f"color:{COLORS['text_secondary']};")
         row3.addWidget(lbl_r)
         
         self.ref_input = QLineEdit()
         self.ref_input.setPlaceholderText("اختياري...")
-        self.ref_input.setFixedWidth(120)
+        self.ref_input.setFixedWidth(100)
         row3.addWidget(self.ref_input)
         
         lbl_n = QLabel("ملاحظات:")
@@ -171,20 +183,21 @@ class CompactTransactionTab(QWidget):
         btn_row.addWidget(self.save_btn)
         layout.addLayout(btn_row)
 
-        self.setTabOrder(self.customer_combo, self.service_input)
-        if not self.is_inbound:
-            self.setTabOrder(self.service_input, self.amount_spent)
-            self.setTabOrder(self.amount_spent, self.amount_req)
-            self.setTabOrder(self.amount_req, self.payment_combo)
-            self.setTabOrder(self.payment_combo, self.ref_input)
-        else:
-            self.setTabOrder(self.service_input, self.amount_req)
-            self.setTabOrder(self.amount_req, self.amount_spent)
-            self.setTabOrder(self.amount_spent, self.delivery_combo)
-            self.setTabOrder(self.delivery_combo, self.ref_input)
-            
         self.setTabOrder(self.ref_input, self.notes_input)
         self.setTabOrder(self.notes_input, self.save_btn)
+        
+        # Enter-to-focus for rapid entry
+        self.customer_combo.lineEdit().returnPressed.connect(self.service_input.setFocus)
+        if not self.is_inbound:
+            self.service_input.returnPressed.connect(self.amount_spent.setFocus)
+        else:
+            self.service_input.returnPressed.connect(self.amount_req.setFocus)
+        
+        # Adjust tab order for date
+        self.setTabOrder(self.service_input, self.amount_spent)
+        self.setTabOrder(self.amount_spent, self.amount_req)
+        self.setTabOrder(self.amount_req, self.date_edit)
+        self.setTabOrder(self.date_edit, self.ref_input)
         
         # Enter-to-focus for rapid entry
         self.customer_combo.lineEdit().returnPressed.connect(self.service_input.setFocus)
@@ -243,7 +256,12 @@ class CompactTransactionTab(QWidget):
         if spent <= 0 and req <= 0: QMessageBox.warning(self, "تنبيه", "أدخل المبلغ"); return
         
         pid = self.platform["id"]
-        
+        # Use current time with selected date
+        from datetime import datetime
+        now_time = datetime.now().strftime("%H:%M:%S")
+        txn_date_str = self.date_edit.date().toString("yyyy-MM-dd")
+        created_at = f"{txn_date_str} {now_time}"
+
         try:
             if not self.is_inbound:
                 status = self.payment_combo.currentData()
@@ -253,7 +271,8 @@ class CompactTransactionTab(QWidget):
                 db.add_outbound_transaction(
                     platform_id=pid, customer_id=cid, service_name=service,
                     amount_spent=spent, amount_required=req, payment_status=status,
-                    reference_no=ref, is_card=False, notes=notes
+                    reference_no=ref, is_card=False, notes=notes,
+                    created_at=created_at
                 )
             else:
                 is_del = self.delivery_combo.currentData()
@@ -263,7 +282,8 @@ class CompactTransactionTab(QWidget):
                 db.add_inbound_transaction(
                     wallet_id=pid, customer_id=cid, service_name=service,
                     amount_received=req, amount_delivered=spent,
-                    reference_no=ref, notes=notes, is_delivered=is_del
+                    reference_no=ref, notes=notes, is_delivered=is_del,
+                    created_at=created_at
                 )
                 
             self.transaction_added.emit()
