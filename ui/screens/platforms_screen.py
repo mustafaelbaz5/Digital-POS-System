@@ -257,7 +257,7 @@ class PlatformRow(QFrame):
         # زرار إضافة عملية
         add_btn = QPushButton("➕ إضافة عملية")
         add_btn.setFixedHeight(30)
-        add_btn.setFixedWidth(110)
+        add_btn.setFixedWidth(130)
         add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         add_btn.setStyleSheet(
             f"background:{COLORS['blue_bg']};color:{COLORS['blue']};"
