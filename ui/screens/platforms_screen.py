@@ -93,6 +93,8 @@ class PlatformActionsDialog(BaseDialog):
 
     def _get_actions(self, p_type: str) -> list:
         actions = [
+            ("➕  إضافة عملية",
+             COLORS["blue"], COLORS["blue_bg"], self._add_transaction),
             ("💰  إيداع للمنصة",
              COLORS["green"], COLORS["green_bg"], self._deposit),
         ]
@@ -107,6 +109,21 @@ class PlatformActionsDialog(BaseDialog):
                 COLORS["blue"], COLORS["blue_bg"], self._edit_limit
             ))
         return actions
+
+    def _add_transaction(self):
+        from ui.screens.transaction_form import TransactionScreen
+        dialog = BaseDialog("إضافة عملية", self)
+        dialog.setMinimumWidth(800)
+        
+        form = TransactionScreen(platform_id=self.platform["id"])
+        form._header.hide()
+        form.transaction_added.connect(self._on_transaction_added)
+        form.close_requested.connect(dialog.accept)
+        dialog.body.addWidget(form)
+        dialog.exec()
+        
+    def _on_transaction_added(self):
+        self._result_action = "refresh"
 
     def _deposit(self):
         p = self.platform

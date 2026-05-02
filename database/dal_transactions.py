@@ -429,3 +429,10 @@ def search_by_reference(reference_no: str) -> list[dict]:
             LIMIT 200
         """, (f"%{reference_no}%",)).fetchall()
         return [dict(r) for r in rows]
+
+
+def get_unique_service_names() -> list[str]:
+    """استرجاع قائمة بأسماء الخدمات الفريدة لاستخدامها في الإكمال التلقائي"""
+    with get_connection() as conn:
+        rows = conn.execute("SELECT DISTINCT service_name FROM transactions WHERE service_name IS NOT NULL AND service_name != ''").fetchall()
+        return [r["service_name"] for r in rows]

@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QLineEdit, QComboBox, QTextEdit,
     QTabWidget, QCheckBox, QDoubleSpinBox,
-    QMessageBox, QFrame
+    QMessageBox, QFrame, QCompleter
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -163,9 +163,11 @@ class DeliveryStatusSelector(QFrame):
 
 class OutboundTab(QWidget):
     transaction_added = pyqtSignal()
+    close_requested = pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, platform_id=None, parent=None):
         super().__init__(parent)
+        self.platform_id = platform_id
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self._all_customers = []
         self._build_ui()
@@ -264,10 +266,20 @@ class OutboundTab(QWidget):
 
         layout.addStretch()
 
+        layout.addStretch()
+
+        self.add_another_cb = QCheckBox("إضافة عملية أخرى")
+        self.add_another_cb.setStyleSheet(f"color:{COLORS['text_primary']};font-weight:bold;font-size:14px;")
+
         save_btn = QPushButton("  حفظ العملية الصادرة")
         save_btn.setObjectName("btn_primary"); save_btn.setFixedHeight(46)
         save_btn.clicked.connect(self._save)
-        layout.addWidget(save_btn)
+
+        btn_row = QHBoxLayout()
+        btn_row.addWidget(self.add_another_cb)
+        btn_row.addStretch()
+        btn_row.addWidget(save_btn)
+        layout.addLayout(btn_row)
 
     def load_data(self):
         self.platform_combo.clear()
@@ -278,9 +290,25 @@ class OutboundTab(QWidget):
             self.platform_combo.addItem(
                 f"{icon} {p['name']}  ({fmt_currency(p['balance'])})", p["id"]
             )
+            
+        if self.platform_id:
+            idx = self.platform_combo.findData(self.platform_id)
+            if idx >= 0:
+                self.platform_combo.setCurrentIndex(idx)
+                self.platform_combo.setEnabled(False)
+
         self._all_customers = db.get_all_customers()
         self._fill_customers(self._all_customers)
         self._update_balance()
+
+        services = db.get_unique_service_names()
+        completer = QCompleter(services, self)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.popup().setStyleSheet(
+            f"background-color: {COLORS['bg_input']}; color: {COLORS['text_primary']};"
+            f"border: 1px solid {COLORS['border']}; font-family: {FONT}; font-size: 14px;"
+        )
+        self.service_input.setCompleter(completer)
 
     def _fill_customers(self, customers):
         self.customer_combo.clear()
@@ -328,11 +356,27 @@ class OutboundTab(QWidget):
             QMessageBox.information(self, "تم ",
                 f"تم تسجيل العملية\nالربح: {fmt_currency(req - spent)}\n"
                 f"الحالة: {'مؤجل ⏳' if status == 'pending' else 'تم السداد '}")
-            self._reset(); self.transaction_added.emit()
+            if self.add_another_cb.isChecked():
+                self._reset_partial()
+                self.transaction_added.emit()
+            else:
+                self._reset()
+                self.transaction_added.emit()
+                self.close_requested.emit()
         except ValueError as e:
             QMessageBox.warning(self, "تعذّر تنفيذ العملية", str(e))
         except Exception as e:
             QMessageBox.critical(self, "خطأ", str(e))
+
+    def _reset_partial(self):
+        self.amount_spent.setValue(0.01)
+        self.amount_required.setValue(0.01)
+        self.ref_input.clear()
+        self.is_card_check.setChecked(False)
+        self.notes_input.clear()
+        self.status_selector.set_value("pending")
+        # Keep customer search clear to avoid mixing up customers if needed, or keep it. Let's keep it.
+        self.amount_spent.setFocus()
 
     def _reset(self):
         self.service_input.clear(); self.amount_spent.setValue(0.01)
@@ -348,9 +392,11 @@ class OutboundTab(QWidget):
 
 class InboundTab(QWidget):
     transaction_added = pyqtSignal()
+    close_requested = pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, platform_id=None, parent=None):
         super().__init__(parent)
+        self.platform_id = platform_id
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self._all_customers = []
         self._build_ui()
@@ -443,10 +489,20 @@ class InboundTab(QWidget):
 
         layout.addStretch()
 
+        layout.addStretch()
+
+        self.add_another_cb = QCheckBox("إضافة عملية أخرى")
+        self.add_another_cb.setStyleSheet(f"color:{COLORS['text_primary']};font-weight:bold;font-size:14px;")
+
         save_btn = QPushButton("  حفظ العملية الواردة")
         save_btn.setObjectName("btn_primary"); save_btn.setFixedHeight(46)
         save_btn.clicked.connect(self._save)
-        layout.addWidget(save_btn)
+
+        btn_row = QHBoxLayout()
+        btn_row.addWidget(self.add_another_cb)
+        btn_row.addStretch()
+        btn_row.addWidget(save_btn)
+        layout.addLayout(btn_row)
 
     def _make_info_bar(self) -> QFrame:
         frame = QFrame(); frame.setObjectName("card"); frame.setFixedHeight(46)
@@ -466,9 +522,25 @@ class InboundTab(QWidget):
             icon = "💳" if w["type"] == "wallet" else "🔷"
             pct = int(w.get("monthly_used", 0) / max(w.get("monthly_limit", 1), 1) * 100)
             self.wallet_combo.addItem(f"{icon} {w['name']}  ({fmt_currency(w['balance'])})  — {pct}%", w["id"])
+            
+        if self.platform_id:
+            idx = self.wallet_combo.findData(self.platform_id)
+            if idx >= 0:
+                self.wallet_combo.setCurrentIndex(idx)
+                self.wallet_combo.setEnabled(False)
+
         self._all_customers = db.get_all_customers()
         self._fill_customers(self._all_customers)
         self._update_wallet_info()
+
+        services = db.get_unique_service_names()
+        completer = QCompleter(services, self)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.popup().setStyleSheet(
+            f"background-color: {COLORS['bg_input']}; color: {COLORS['text_primary']};"
+            f"border: 1px solid {COLORS['border']}; font-family: {FONT}; font-size: 14px;"
+        )
+        self.service_input.setCompleter(completer)
 
     def _fill_customers(self, customers):
         self.customer_combo.clear()
@@ -524,11 +596,25 @@ class InboundTab(QWidget):
                         f"\n⏳ {fmt_currency(delivered)} مسجلة كمستحقة للعميل"
             QMessageBox.information(self, "تم ",
                 f"تم تسجيل الاستلام\nالربح: {fmt_currency(received - delivered)}{extra}")
-            self._reset(); self.transaction_added.emit()
+            if self.add_another_cb.isChecked():
+                self._reset_partial()
+                self.transaction_added.emit()
+            else:
+                self._reset()
+                self.transaction_added.emit()
+                self.close_requested.emit()
         except ValueError as e:
             QMessageBox.warning(self, "تعذّر تنفيذ العملية", str(e))
         except Exception as e:
             QMessageBox.critical(self, "خطأ", str(e))
+
+    def _reset_partial(self):
+        self.amount_received.setValue(0.01)
+        self.amount_delivered.setValue(0.01)
+        self.ref_input.clear()
+        self.notes_input.clear()
+        self.delivery_selector.reset()
+        self.amount_received.setFocus()
 
     def _reset(self):
         self.service_input.clear(); self.amount_received.setValue(0.01)
@@ -543,21 +629,32 @@ class InboundTab(QWidget):
 
 class TransactionScreen(ScreenShell):
     transaction_added = pyqtSignal()
+    close_requested = pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, platform_id=None, parent=None):
         super().__init__("إضافة عملية", "شحن صادر أو استلام وارد")
+        self.platform_id = platform_id
         self._build_content()
 
     def _build_content(self):
         c = self.content(); c.setContentsMargins(0, 0, 0, 0)
         self.tabs = QTabWidget()
-        self.outbound_tab = OutboundTab()
+        self.outbound_tab = OutboundTab(platform_id=self.platform_id)
         self.outbound_tab.transaction_added.connect(self._on_added)
+        self.outbound_tab.close_requested.connect(self.close_requested.emit)
         self.tabs.addTab(self.outbound_tab, "📤  شحن صادر")
-        self.inbound_tab = InboundTab()
+        self.inbound_tab = InboundTab(platform_id=self.platform_id)
         self.inbound_tab.transaction_added.connect(self._on_added)
+        self.inbound_tab.close_requested.connect(self.close_requested.emit)
         self.tabs.addTab(self.inbound_tab, "📥  استلام وارد")
         c.addWidget(self.tabs)
+        
+        if self.platform_id:
+            p = db.get_platform_by_id(self.platform_id)
+            if p and p["type"] != "machine":
+                # For wallets and instapay, Inbound might be more common, or just leave it.
+                # User usually adds Outbound for machines. We can default to outbound.
+                pass
 
     def refresh(self):
         self.outbound_tab.load_data()
