@@ -92,6 +92,32 @@ class BaseDialog(QDialog):
     def add_stretch(self):
         self.footer.addStretch()
 
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            header = self.findChild(QFrame, "dialog_header")
+            if header and header.geometry().contains(event.pos()):
+                self._is_dragging = True
+                self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                event.accept()
+            else:
+                super().mousePressEvent(event)
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if getattr(self, '_is_dragging', False):
+            self.move(event.globalPosition().toPoint() - self._drag_pos)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if getattr(self, '_is_dragging', False):
+            self._is_dragging = False
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
+
 
 # ══════════════════════════════════════════════════════
 #  ScreenShell

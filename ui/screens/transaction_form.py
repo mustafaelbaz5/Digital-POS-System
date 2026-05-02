@@ -185,6 +185,13 @@ class CompactTransactionTab(QWidget):
             
         self.setTabOrder(self.ref_input, self.notes_input)
         self.setTabOrder(self.notes_input, self.save_btn)
+        
+        # Enter-to-focus for rapid entry
+        self.customer_combo.lineEdit().returnPressed.connect(self.service_input.setFocus)
+        if not self.is_inbound:
+            self.service_input.returnPressed.connect(self.amount_spent.setFocus)
+        else:
+            self.service_input.returnPressed.connect(self.amount_req.setFocus)
 
     def _update_profit(self):
         spent = self.amount_spent.value()
@@ -265,6 +272,7 @@ class CompactTransactionTab(QWidget):
             self.amount_spent.setValue(0)
             self.amount_req.setValue(0)
             self.ref_input.clear()
+            self.notes_input.clear()
             
             if not self.is_inbound:
                 self.amount_spent.setFocus()
