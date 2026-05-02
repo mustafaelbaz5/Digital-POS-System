@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QFrame, QSizePolicy, QScrollArea,
     QDialog, QComboBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize, QDate
+from PyQt6.QtCore import Qt, pyqtSignal, QSize, QDate, QTimer
 from PyQt6.QtGui import QColor
 
 from ui.styles.theme import (
@@ -772,4 +772,55 @@ class DateRangePicker(QFrame):
 
     def get_range(self):
         return self._current_range
+
+
+# ══════════════════════════════════════════════════════
+#  Toast Notification
+# ══════════════════════════════════════════════════════
+
+class Toast(QLabel):
+    """
+    A non-intrusive, self-closing notification message.
+    """
+    def __init__(self, parent, message: str, type: str = "success"):
+        # We use parent.window() to ensure it floats over everything in the dialog/window
+        super().__init__(parent.window())
+        self.setText(message)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        bg = COLORS.get(type, COLORS["accent"])
+        if type == "success": bg = COLORS["green"]
+        if type == "danger" or type == "error": bg = COLORS["red"]
+
+        self.setStyleSheet(f"""
+            QLabel {{
+                background-color: {bg};
+                color: white;
+                border-radius: 20px;
+                padding: 12px 24px;
+                font-weight: bold;
+                font-size: 14px;
+                border: 2px solid rgba(255, 255, 255, 0.2);
+            }}
+        """)
+        
+        self.adjustSize()
+        self.show()
+        self._position()
+        
+        # Auto-close timer
+        QTimer.singleShot(2000, self.deleteLater)
+
+    def _position(self):
+        parent = self.parent()
+        if parent:
+            # Position at bottom center of the window
+            rect = parent.rect()
+            x = (rect.width() - self.width()) // 2
+            y = rect.height() - self.height() - 40
+            self.move(x, y)
+
+def show_toast(parent, message: str, type: str = "success"):
+    Toast(parent, message, type)
+
 

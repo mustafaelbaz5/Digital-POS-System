@@ -12,7 +12,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QLocale, QDate
 from PyQt6.QtGui import QGuiApplication
 
 from ui.styles.theme import COLORS, FONT, CARD_RADIUS
-from ui.components.widgets import BaseDialog, make_divider
+from ui.components.widgets import BaseDialog, make_divider, show_toast
 from utils.formatters import fmt_currency
 
 import database as db
@@ -335,6 +335,7 @@ class CompactTransactionTab(QWidget):
                 )
                 
             self.transaction_added.emit()
+            show_toast(self, "تمت إضافة العملية بنجاح", type="success")
             
             self.amount_spent.setValue(0)
             self.amount_req.setValue(0)
@@ -348,7 +349,7 @@ class CompactTransactionTab(QWidget):
                 self.amount_req.setFocus()
                 
         except Exception as e:
-            QMessageBox.critical(self, "خطأ", str(e))
+            show_toast(self, f"خطأ: {str(e)}", type="danger")
 
 
 class TransactionDialog(BaseDialog):
