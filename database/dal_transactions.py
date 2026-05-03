@@ -396,6 +396,20 @@ def cleanup_paid_transactions(customer_id: int = None) -> int:
         return cursor.rowcount
 
 
+def cleanup_transactions_before(cutoff_date: str) -> int:
+    """حذف العمليات المسددة والمسلمة حتى تاريخ معين"""
+    with get_connection() as conn:
+        finished_sql = """
+            ((operation_type='outbound' AND payment_status='paid') 
+            OR 
+            (operation_type='inbound' AND is_delivered=1))
+            AND DATE(created_at) <= ?
+        """
+        cursor = conn.execute(f"DELETE FROM transactions WHERE {finished_sql}", (cutoff_date,))
+        conn.commit()
+        return cursor.rowcount
+
+
 def get_dashboard_stats() -> dict:
     with get_connection() as conn:
         budget  = conn.execute("SELECT main_budget, cash_vault FROM budget WHERE id=1").fetchone()

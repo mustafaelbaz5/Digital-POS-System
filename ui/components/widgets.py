@@ -482,15 +482,7 @@ class DataTable(QTableWidget):
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setMinimumHeight(34)
             btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-            # Apply specific in-table styling
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    padding: 0 12px;
-                    border-radius: 6px;
-                    font-size: {FONT['sm']};
-                    font-weight: bold;
-                }}
-            """)
+
             if 'callback' in data:
                 btn.clicked.connect(data['callback'])
             layout.addWidget(btn)

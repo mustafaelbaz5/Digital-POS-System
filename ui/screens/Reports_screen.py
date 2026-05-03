@@ -15,7 +15,7 @@ from ui.styles.theme import (
     GAP_XS, GAP_SM, GAP_MD, GAP_LG, GAP_XL,
     MARGIN_CONTENT, MARGIN_CARD
 )
-from ui.components.widgets import ScreenShell, DataTable, SectionTitle, make_divider, CardGroup, DateRangePicker, MiniStatCard
+from ui.components.widgets import ScreenShell, DataTable, SectionTitle, make_divider, CardGroup, DateRangePicker, MiniStatCard, BaseDialog, Toast
 from utils.formatters import fmt_currency
 
 import database as db
@@ -423,6 +423,42 @@ class TransactionsLogTab(QWidget):
                 QMessageBox.critical(self, "خطأ", str(e))
 
 
+class CleanupByDateDialog(BaseDialog):
+    def __init__(self, parent=None):
+        super().__init__("تنظيف حسب التاريخ", parent)
+        self.setFixedWidth(400)
+        self.selected_date = None
+        self._build_content()
+
+    def _build_content(self):
+        self.body.setSpacing(16)
+
+        warning_lbl = QLabel("سيتم حذف جميع العمليات المنتهية حتى هذا التاريخ. لا يمكن التراجع عن هذه الخطوة.")
+        warning_lbl.setStyleSheet(f"color: {COLORS['red']}; font-size: {FONT['md']}; font-weight: bold;")
+        warning_lbl.setWordWrap(True)
+        self.body.addWidget(warning_lbl)
+
+        date_layout = QHBoxLayout()
+        date_lbl = QLabel("تاريخ النهاية:")
+        date_lbl.setStyleSheet(f"color: {COLORS['text_primary']}; font-weight: bold;")
+        date_layout.addWidget(date_lbl)
+
+        self.date_edit = QDateEdit()
+        self.date_edit.setCalendarPopup(True)
+        self.date_edit.setDate(QDate.currentDate())
+        date_layout.addWidget(self.date_edit)
+
+        self.body.addLayout(date_layout)
+
+        self.add_stretch()
+        self.add_button("إلغاء", self.reject, role="secondary")
+        self.add_button("تأكيد الحذف", self._confirm, role="danger")
+
+    def _confirm(self):
+        self.selected_date = self.date_edit.date().toString("yyyy-MM-dd")
+        self.accept()
+
+
 class CleanupTab(QWidget):
 
     def __init__(self, parent=None):
@@ -478,6 +514,11 @@ class CleanupTab(QWidget):
         clean_btn.clicked.connect(self._cleanup_single)
         btn_row.addWidget(clean_btn)
         
+        clean_date_btn = QPushButton("📅  تنظيف حسب التاريخ")
+        clean_date_btn.setObjectName("btn_secondary")
+        clean_date_btn.clicked.connect(self._cleanup_by_date)
+        btn_row.addWidget(clean_date_btn)
+        
         btn_row.addStretch()
         
         clean_all_btn = QPushButton("🗑️  تنظيف الكل")
@@ -508,11 +549,21 @@ class CleanupTab(QWidget):
             db.cleanup_paid_transactions(cid)
             self._refresh_stat()
 
+    def _cleanup_by_date(self):
+        dialog = CleanupByDateDialog(self)
+        if dialog.exec() and dialog.selected_date:
+            if QMessageBox.warning(self, "تأكيد نهائي", "هل أنت متأكد من حذف العمليات المنتهية حتى هذا التاريخ؟ لا يمكن التراجع!", 
+                                   QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
+                count = db.cleanup_transactions_before(dialog.selected_date)
+                self._refresh_stat()
+                Toast(self.window(), f"تم تنظيف {count} عملية قديمة بنجاح", type="success").show()
+
     def _cleanup_all(self):
         if QMessageBox.warning(self, "تحذير", "حذف جميع العمليات المسددة؟ لا يمكن التراجع!",
                                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
-            db.cleanup_paid_transactions()
+            count = db.cleanup_paid_transactions()
             self._refresh_stat()
+            Toast(self.window(), f"تم تنظيف {count} عملية بنجاح", type="success").show()
 
 
 # ══════════════════════════════════════════
