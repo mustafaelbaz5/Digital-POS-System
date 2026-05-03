@@ -337,16 +337,19 @@ class CompactTransactionTab(QWidget):
             self.transaction_added.emit()
             show_toast(self, "تمت إضافة العملية بنجاح", type="success")
             
+            # Reset Fields
             self.amount_spent.setValue(0)
             self.amount_req.setValue(0)
             self.ref_input.clear()
-            # notes_input is cleared but date/client/service persist
             self.notes_input.clear()
             
-            if not self.is_inbound:
-                self.amount_spent.setFocus()
-            else:
-                self.amount_req.setFocus()
+            # Reset Selections (as requested)
+            self.service_input.clear()
+            self.customer_combo.setCurrentIndex(0) # Back to "بدون عميل محدد"
+            self.customer_combo.setEditText("")    # Clear search text
+            
+            # Return focus to Client Search for rapid next entry
+            self.customer_combo.setFocus()
                 
         except Exception as e:
             show_toast(self, f"خطأ: {str(e)}", type="danger")

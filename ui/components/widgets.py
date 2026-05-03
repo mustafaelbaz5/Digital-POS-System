@@ -463,7 +463,7 @@ class DataTable(QTableWidget):
         wrapper = QWidget()
         wrapper.setStyleSheet("background: transparent; border: none;")
         layout = QHBoxLayout(wrapper)
-        layout.setContentsMargins(5, 5, 5, 5) # Specific professional margins
+        layout.setContentsMargins(5, 2, 5, 2) # Specific professional margins
         layout.setSpacing(GAP_SM)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -483,11 +483,6 @@ class DataTable(QTableWidget):
                     font-weight: bold;
                     background: {COLORS['accent']};
                     border: 1px solid {COLORS['border']};
-                }}
-                QPushButton:hover {{
-                    background: {COLORS['accent']};
-                    color: white;
-                    border-color: {COLORS['accent']};
                 }}
             """)
             if 'callback' in data:
@@ -727,9 +722,6 @@ class DateRangePicker(QFrame):
                     border-radius: 6px;
                     padding: 0 16px;
                     font-size: {FONT['sm']};
-                }}
-                QPushButton:hover {{
-                    background: {COLORS['bg_hover']};
                 }}
                 QPushButton:checked {{
                     background: {COLORS['accent']};

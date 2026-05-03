@@ -156,8 +156,10 @@ QScrollBar::handle:vertical {{
     border-radius: 3px;
     min-height: 40px;
 }}
-QScrollBar::handle:vertical:hover {{
-    background: {COLORS['border_light']};
+QScrollBar::handle:vertical {{
+    background: {COLORS['border']};
+    border-radius: 3px;
+    min-height: 40px;
 }}
 QScrollBar::add-line:vertical,
 QScrollBar::sub-line:vertical {{ height: 0; }}
@@ -171,8 +173,10 @@ QScrollBar::handle:horizontal {{
     border-radius: 3px;
     min-width: 40px;
 }}
-QScrollBar::handle:horizontal:hover {{
-    background: {COLORS['border_light']};
+QScrollBar::handle:horizontal {{
+    background: {COLORS['border']};
+    border-radius: 3px;
+    min-width: 40px;
 }}
 
 /* ── Sidebar ── */
@@ -206,11 +210,6 @@ QScrollBar::handle:horizontal:hover {{
     font-size: {FONT['md']};
     margin: 2px 8px;
 }}
-#nav_btn:hover {{
-    background: {COLORS['bg_button']};
-    color: {COLORS['text_primary']};
-    border-color: {COLORS['border_light']};
-}}
 #nav_btn[active="true"] {{
     background: {COLORS['accent_dim']};
     color: {COLORS['accent']};
@@ -242,18 +241,11 @@ QScrollBar::handle:horizontal:hover {{
     border: 1px solid {COLORS['border']};
     border-radius: {CARD_RADIUS};
 }}
-#card:hover {{
-    border-color: {COLORS['border_light']};
-    background: {COLORS['bg_elevated']};
-}}
 
 #stat_card {{
     background: {COLORS['bg_card']};
     border: 1px solid {COLORS['border']};
     border-radius: {CARD_RADIUS};
-}}
-#stat_card:hover {{
-    border-color: {COLORS['accent']};
 }}
 
 #card_highlight {{
@@ -290,10 +282,6 @@ QPushButton {{
     font-weight: bold;
     font-size: {FONT['md']};
 }}
-#btn_primary:hover {{ 
-    background: {COLORS['accent_hover']}; 
-    border-color: {COLORS['accent_hover']};
-}}
 #btn_primary:disabled {{
     background: {COLORS['border']};
     color: {COLORS['text_muted']};
@@ -309,10 +297,6 @@ QPushButton {{
     min-height: {BTN_HEIGHT}px;
     font-size: {FONT['md']};
 }}
-#btn_secondary:hover {{
-    background: {COLORS['bg_hover']};
-    border-color: {COLORS['accent']};
-}}
 
 #btn_ghost {{
     background: {COLORS['bg_elevated']};
@@ -321,11 +305,6 @@ QPushButton {{
     border-radius: 8px;
     padding: 4px 12px;
     font-size: {FONT['sm']};
-}}
-#btn_ghost:hover {{
-    background: {COLORS['bg_button']};
-    color: {COLORS['text_primary']};
-    border-color: {COLORS['border_light']};
 }}
 
 #btn_danger {{
@@ -336,10 +315,6 @@ QPushButton {{
     min-height: {BTN_HEIGHT}px;
     font-weight: bold;
 }}
-#btn_danger:hover {{
-    background: {COLORS['red']};
-    color: white;
-}}
 
 #btn_statement {{
     background: {COLORS['blue_bg']};
@@ -348,10 +323,6 @@ QPushButton {{
     border-radius: 8px;
     font-weight: bold;
     font-size: {FONT['sm']};
-}}
-#btn_statement:hover {{
-    background: {COLORS['blue']};
-    color: white;
 }}
 
 /* ── Inputs ── */
@@ -410,9 +381,6 @@ QTableWidget::item {{
 QTableWidget::item:selected {{
     background: {COLORS['bg_hover']};
     color: {COLORS['accent']};
-}}
-QTableWidget::item:hover {{
-    background: {COLORS['bg_hover']};
 }}
 QHeaderView {{
     background: {COLORS['bg_elevated']};
@@ -478,10 +446,6 @@ QDialog {{
     border-radius: 15px;
     padding: 0;
     margin: 0;
-}}
-#dialog_close_btn:hover {{
-    background: {COLORS['red_bg']};
-    color: {COLORS['red']};
 }}
 
 QMessageBox {{
