@@ -60,11 +60,6 @@ class CustomersScreen(ScreenShell):
         if idx == 0: self.customers_tab.load_data()
         else:        self.groups_tab.load_data()
 
-
-# ══════════════════════════════════════════════════════
-#  CustomersTab
-# ══════════════════════════════════════════════════════
-
 class CustomersTab(QWidget):
     open_statement = pyqtSignal(int)
 
@@ -81,7 +76,7 @@ class CustomersTab(QWidget):
 
         # ── Middle Layer: Add Button & Search
         tb_row = QHBoxLayout()
-        tb_row.setContentsMargins(GAP_MD, 0, GAP_MD, 0)
+        tb_row.setContentsMargins(0, 0, 0, 0)
         tb_row.setSpacing(GAP_MD)
 
         add_btn = QPushButton("➕ إضافة عميل")
@@ -110,9 +105,11 @@ class CustomersTab(QWidget):
         layout.addLayout(tb_row)
         layout.addSpacing(GAP_SM)
 
-        # ── Bottom Layer: Table Section
-        self.table_card = CardGroup("👥  قائمة العملاء")
-        layout.addSpacing(GAP_SM)
+        # # ── Bottom Layer: Table Section
+        # from ui.components.widgets import SectionTitle
+        # self.table_title = SectionTitle("👥  قائمة العملاء")
+        # layout.addWidget(self.table_title)
+        # layout.addSpacing(GAP_SM)
 
         cols = [
             ("الاسم",    -1), # Stretches to fill space
@@ -134,16 +131,14 @@ class CustomersTab(QWidget):
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         
-        self.table_card.add_widget(self.table)
+        layout.addWidget(self.table)
 
         self.total_lbl = QLabel("")
         self.total_lbl.setStyleSheet(
-            f"color:{COLORS['text_muted']}; font-size:{FONT['xs']}; padding:{GAP_SM}px 0;"
+            f"color:{COLORS['text_muted']}; font-size:{FONT['xs']}; padding:{GAP_SM}px {GAP_MD}px;"
         )
         self.total_lbl.setAlignment(ALeft)
-        self.table_card.add_widget(self.total_lbl)
-
-        layout.addWidget(self.table_card)
+        layout.addWidget(self.total_lbl)
 
     def load_data(self):
         current = self.group_filter.currentData()
@@ -204,11 +199,7 @@ class CustomersTab(QWidget):
         self.total_lbl.setText("  ·  ".join(parts))
         
         # Update table height to fit all rows (Full-Page Scroll)
-        row_count = len(customers)
-        header_height = self.table.horizontalHeader().height()
-        row_height = self.table.verticalHeader().defaultSectionSize()
-        total_height = header_height + (row_count * row_height) + 10
-        self.table.setFixedHeight(total_height)
+        self.table.setMinimumHeight(self.table.verticalHeader().length() + self.table.horizontalHeader().height() + 2)
 
     def _add_customer(self):
         if CustomerDialog(self).exec(): self.load_data()
@@ -262,7 +253,7 @@ class GroupsTab(QWidget):
 
         # ── Middle Layer: Add & Search
         tb_row = QHBoxLayout()
-        tb_row.setContentsMargins(GAP_MD, 0, GAP_MD, 0)
+        tb_row.setContentsMargins(0, 0, 0, 0)
         tb_row.setSpacing(GAP_MD)
 
         add_btn = QPushButton("➕ إضافة مجموعة")
@@ -284,9 +275,6 @@ class GroupsTab(QWidget):
         layout.addLayout(tb_row)
         layout.addSpacing(GAP_SM)
 
-        # ── Bottom Layer: Table
-        self.table_card = CardGroup("📂  قائمة المجموعات")
-
         cols = [
             ("اسم المجموعة", -1), # Stretch
             ("القائد",        180),
@@ -304,9 +292,7 @@ class GroupsTab(QWidget):
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         
-        self.table_card.add_widget(self.table)
-        layout.addWidget(self.table_card)
-        layout.addStretch()
+        layout.addWidget(self.table)
 
     def load_data(self):
         self._all_groups = db.get_all_groups()
@@ -334,15 +320,11 @@ class GroupsTab(QWidget):
             # task 10: clear, well-spaced action buttons
             self.table.add_action_buttons(row, 3, [
                 {'text': "✏️ تعديل", 'callback': lambda _, g=g: self._edit_group(g), 'role': 'secondary'},
-                {'text': "📊 تقرير", 'callback': lambda _, gid=g["id"]: self._show_report(gid), 'role': 'ghost'}
+                {'text': "📊 تقرير", 'callback': lambda _, gid=g["id"]: self._show_report(gid), 'role': 'statement'}
             ])
             
         # Update table height to fit all rows (Full-Page Scroll)
-        row_count = len(self._groups)
-        header_height = self.table.horizontalHeader().height() or 40
-        row_height = self.table.verticalHeader().defaultSectionSize()
-        total_height = header_height + (row_count * row_height) + 10
-        self.table.setFixedHeight(total_height)
+        self.table.setMinimumHeight(self.table.verticalHeader().length() + self.table.horizontalHeader().height() + 2)
 
     def _add_group(self):
         if GroupDialog(self).exec(): self.load_data()

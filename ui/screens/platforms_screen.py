@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QDialog, QFormLayout, QLineEdit,
     QComboBox, QMessageBox, QDoubleSpinBox, QFrame,
-    QTabWidget, QInputDialog
+    QTabWidget, QInputDialog, QSizePolicy
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -306,11 +306,10 @@ class PlatformListTab(QWidget):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(GAP_MD, GAP_MD, GAP_MD, GAP_MD)
+        layout.setContentsMargins(0, GAP_MD, 0, 0)
         layout.setSpacing(GAP_MD)
 
-        # ── Toolbar Card
-        sort_group = CardGroup()
+        # ── Toolbar
         sb = QHBoxLayout()
         sb.setSpacing(GAP_SM)
         sb.setAlignment(Qt.AlignmentFlag.AlignLeft)
@@ -355,13 +354,11 @@ class PlatformListTab(QWidget):
             sb.addWidget(self.btn_lim_desc)
 
         sb.addStretch()
-        sort_group.add_layout(sb)
-        layout.addWidget(sort_group)
+        layout.addLayout(sb)
         self._apply_sort_styles()
 
         # ── Table Section
-        table_group = CardGroup()
-        
+
         cols = [
             ("اسم المنصة", -1), # Stretch
             ("الرصيد الحالي", 160),
@@ -385,10 +382,13 @@ class PlatformListTab(QWidget):
             }}
         """)
         
-        table_group.add_widget(self.table)
-        layout.addWidget(table_group)
+        # Disable internal scroll for Full-Page Scroll
+        self.table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         
-        layout.addStretch()
+        layout.addWidget(self.table)
+
 
     def _set_sort(self, mode: str):
         self._sort_mode = mode
@@ -470,6 +470,9 @@ class PlatformListTab(QWidget):
             ])
             
         self.table.setSortingEnabled(True)
+        # Update table height to fit all rows (Full-Page Scroll)
+        self.table.setMinimumHeight(self.table.verticalHeader().length() + self.table.horizontalHeader().height() + 2)
+
 
     def _open_transaction_form(self, platform_id: int):
         from ui.screens.transaction_form import TransactionDialog

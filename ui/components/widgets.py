@@ -426,13 +426,21 @@ class DataTable(QTableWidget):
         self.setStyleSheet(f"""
             QTableWidget {{
                 background-color: transparent;
-                alternate-background-color: {COLORS['bg_hover']};
+                alternate-background-color: {COLORS['bg_elevated']}40; /* Very subtle alternate */
                 border: none;
                 gridline-color: transparent;
             }}
             QTableWidget::item {{
-                padding: 10px;
-                border-bottom: 1px solid {COLORS['border']};
+                padding: 12px;
+                border-bottom: 1px solid {COLORS['border']}40;
+                color: {COLORS['text_primary']};
+            }}
+            QTableWidget::item:hover {{
+                background-color: {COLORS['bg_hover']}80;
+            }}
+            QTableWidget::item:selected {{
+                background-color: {COLORS['bg_hover']};
+                color: {COLORS['accent']};
             }}
         """)
 
@@ -478,11 +486,9 @@ class DataTable(QTableWidget):
             btn.setStyleSheet(f"""
                 QPushButton {{
                     padding: 0 12px;
-                    border-radius: 4px;
+                    border-radius: 6px;
                     font-size: {FONT['sm']};
                     font-weight: bold;
-                    background: {COLORS['accent']};
-                    border: 1px solid {COLORS['border']};
                 }}
             """)
             if 'callback' in data:

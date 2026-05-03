@@ -127,7 +127,7 @@ GAP_LG = 24
 GAP_XL = 32
 
 # Standard Margins
-MARGIN_CONTENT = 32
+MARGIN_CONTENT = 20
 MARGIN_CARD    = 20
 
 
@@ -282,6 +282,12 @@ QPushButton {{
     font-weight: bold;
     font-size: {FONT['md']};
 }}
+#btn_primary:hover {{
+    background: {COLORS['accent_hover']};
+}}
+#btn_primary:pressed {{
+    background: {COLORS['accent_dim']};
+}}
 #btn_primary:disabled {{
     background: {COLORS['border']};
     color: {COLORS['text_muted']};
@@ -297,6 +303,13 @@ QPushButton {{
     min-height: {BTN_HEIGHT}px;
     font-size: {FONT['md']};
 }}
+#btn_secondary:hover {{
+    background: {COLORS['bg_hover']};
+    border-color: {COLORS['border_light']};
+}}
+#btn_secondary:pressed {{
+    background: {COLORS['bg_dark']};
+}}
 
 #btn_ghost {{
     background: {COLORS['bg_elevated']};
@@ -305,6 +318,10 @@ QPushButton {{
     border-radius: 8px;
     padding: 4px 12px;
     font-size: {FONT['sm']};
+}}
+#btn_ghost:hover {{
+    background: {COLORS['bg_hover']};
+    color: {COLORS['text_primary']};
 }}
 
 #btn_danger {{
@@ -317,12 +334,19 @@ QPushButton {{
 }}
 
 #btn_statement {{
-    background: {COLORS['blue_bg']};
-    color: {COLORS['blue']};
-    border: 1px solid {COLORS['blue_border']};
-    border-radius: 8px;
+    background: #0969DA; /* Professional Blue */
+    color: #ffffff;
+    border: 1px solid #0969DA;
+    border-radius: 6px;
     font-weight: bold;
     font-size: {FONT['sm']};
+}}
+#btn_statement:hover {{
+    background: #0550AE;
+    border-color: #0550AE;
+}}
+#btn_statement:pressed {{
+    background: #0A3069;
 }}
 
 /* ── Inputs ── */
@@ -402,9 +426,8 @@ QHeaderView::section:last {{
 
 /* ── Tabs ── */
 QTabWidget::pane {{
-    background: {COLORS['bg_dark']};
-    border: 1px solid {COLORS['border']};
-    border-radius: {CARD_RADIUS};
+    background: transparent;
+    border: none;
     top: -1px;
 }}
 QTabBar::tab {{
