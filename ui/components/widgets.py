@@ -436,10 +436,10 @@ class DataTable(QTableWidget):
                 color: {COLORS['text_primary']};
             }}
             QTableWidget::item:hover {{
-                background-color: {COLORS['bg_hover']}80;
+                background-color: transparent;
             }}
             QTableWidget::item:selected {{
-                background-color: {COLORS['bg_hover']};
+                background-color: transparent;
                 color: {COLORS['accent']};
             }}
         """)
@@ -481,8 +481,9 @@ class DataTable(QTableWidget):
             btn = QPushButton(data.get('text', ''))
             btn.setObjectName(f"btn_{data.get('role', 'ghost')}")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setMinimumHeight(28)
-            btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            btn.setMinimumHeight(24)
+            btn.setMinimumWidth(80)
+            btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
 
             if 'callback' in data:
                 btn.clicked.connect(data['callback'])

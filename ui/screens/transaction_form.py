@@ -230,7 +230,6 @@ class CompactTransactionTab(QWidget):
 
     def load_data(self):
         self.customer_combo.clear()
-        self.customer_combo.addItem("بدون عميل محدد", None)
         
         client_list = []
         for c in db.get_all_customers():
@@ -278,6 +277,7 @@ class CompactTransactionTab(QWidget):
         ref = self.ref_input.text().strip()
         notes = self.notes_input.text().strip()
         
+        if not cid: QMessageBox.warning(self, "تنبيه", "يجب اختيار العميل لإتمام العملية."); return
         if not service: QMessageBox.warning(self, "تنبيه", "أدخل اسم الخدمة"); return
         if spent <= 0 and req <= 0: QMessageBox.warning(self, "تنبيه", "أدخل المبلغ"); return
         

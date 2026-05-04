@@ -510,8 +510,8 @@ def get_opening_balance(platform_id: int, date_str: str) -> float:
         opening = (current_balance
                    + out["total"]           # re-add what was spent
                    - inb["total"]           # remove what was received
-                   + comm["total"]          # re-add commissions
-                   + legacy_comm["total"]   # re-add legacy commissions
+                   - comm["total"]          # remove commissions (since they were added)
+                   - legacy_comm["total"]   # remove legacy commissions
                    - deps["total"])         # remove deposits
 
         return opening
@@ -528,7 +528,7 @@ def get_closing_balance(platform_id: int, date_str: str) -> float:
                + stats["total_deposits"]
                + stats["total_inbound"]
                - stats["total_outbound"]
-               - stats["total_commission"])
+               + stats["total_commission"])
     return closing
 
 
@@ -547,12 +547,20 @@ def add_manual_commission(platform_id: int, amount: float, date_str: str, notes:
                 raise ValueError("المنصة غير موجودة")
             if platform["type"] != "machine":
                 raise ValueError("العمولة اليدوية متاحة للماكينات فقط")
-            if platform["balance"] < amount:
-                raise ValueError(
-                    f"رصيد الماكينة غير كافٍ — الرصيد: {platform['balance']:,.2f} ج"
-                )
 
-            created_at = f"{date_str} 23:59:00"
+            # Enforce single daily commission
+            existing = conn.execute("""
+                SELECT id FROM transactions 
+                WHERE platform_id = ? AND DATE(created_at) = ? AND operation_type = 'manual_commission'
+                LIMIT 1
+            """, (platform_id, date_str)).fetchone()
+            
+            if existing:
+                raise ValueError("تم إضافة عمولة لهذه الماكينة بالفعل في هذا التاريخ.")
+
+            from datetime import datetime
+            now_time = datetime.now().strftime("%H:%M:%S")
+            created_at = f"{date_str} {now_time}"
 
             cursor = conn.execute("""
                 INSERT INTO transactions
@@ -561,10 +569,11 @@ def add_manual_commission(platform_id: int, amount: float, date_str: str, notes:
                 VALUES ('manual_commission', 'عمولة يدوية', ?, NULL, ?, 0, 'paid', ?, ?)
             """, (platform_id, amount, notes, created_at))
 
-            # Deduct from machine balance
-            conn.execute("UPDATE platforms SET balance = balance - ? WHERE id = ?", (amount, platform_id))
-            # Add to cash vault
-            conn.execute("UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1", (amount,))
+            # Add to machine balance (Commission is now treated as an addition)
+            conn.execute("UPDATE platforms SET balance = balance + ? WHERE id = ?", (amount, platform_id))
+            # Optional: If commission is "earned profit" that stays in the machine, we don't necessarily add to cash vault here 
+            # unless the user wants to track it as cash on hand. But typically, adding to machine is enough.
+            # conn.execute("UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1", (amount,))
 
             conn.commit()
             return cursor.lastrowid

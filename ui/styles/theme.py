@@ -351,13 +351,19 @@ QPushButton {{
 
 /* ── In-Table Buttons (Static) ── */
 QTableWidget QPushButton {{
-    border-radius: 4px;
-    padding: 2px 8px;
+    border-radius: 6px;
+    padding: 2px 10px;
     font-weight: bold;
-    font-size: {FONT['sm']};
-    border: 1px solid {COLORS['border_light']};
+    font-size: 10px;
+    min-height: 22px;
+    border: 2px solid {COLORS['border_light']};
     background-color: {COLORS['bg_hover']};
     color: {COLORS['text_primary']};
+}}
+
+QTableWidget QPushButton:hover {{
+    background-color: {COLORS['bg_hover']};
+    border: 2px solid {COLORS['border_light']};
 }}
 
 QTableWidget #btn_ghost, QTableWidget #btn_ghost:hover, QTableWidget #btn_ghost:pressed {{
