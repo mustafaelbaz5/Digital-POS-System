@@ -250,7 +250,6 @@ class DashboardScreen(ScreenShell):
         row.setSpacing(16)
 
         actions = [
-            ("⊕  عملية جديدة", "btn_primary", self._go_to_transaction),
             ("💰  إدارة الميزانية", "btn_secondary", self._manage_budget),
             ("💵  تعديل الكاش (الخزينة)", "btn_secondary", self._edit_cash),
         ]
@@ -305,10 +304,6 @@ class DashboardScreen(ScreenShell):
 
         self._fill_ops_table()
 
-    def _go_to_transaction(self):
-        win = self.window()
-        if hasattr(win, "navigate_to"):
-            win.navigate_to("transaction")
 
     def _go_to_reports(self):
         win = self.window()
