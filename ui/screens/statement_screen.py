@@ -52,11 +52,31 @@ class SummaryCard(QFrame):
 
         self.lbl = QLabel(label)
         self.lbl.setStyleSheet(
-            f"color: {COLORS['text_secondary']}; font-size: {FONT['sm']};"
+            f"color: {COLORS['text_secondary']}; font-size: {FONT['sm']}; text-transform: uppercase; letter-spacing: 1px;"
         )
         self.lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.lbl)
 
+    def set_featured(self, is_featured: bool):
+        if is_featured:
+            self.setStyleSheet(f"""
+                QFrame#summary_card {{
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {COLORS['bg_elevated']}, stop:1 {COLORS['bg_hover']});
+                    border: 2px solid {COLORS['accent']};
+                    border-radius: {CARD_RADIUS};
+                }}
+            """)
+            self.val_lbl.setStyleSheet(
+                f"color: {COLORS['accent']}; font-size: 32px; font-weight: 900;"
+            )
+        else:
+            self.setStyleSheet(f"""
+                QFrame#summary_card {{
+                    background: {COLORS['bg_elevated']};
+                    border: 1px solid {COLORS['border']};
+                    border-radius: {CARD_RADIUS};
+                }}
+            """)
     def set_value(self, value: str):
         self.val_lbl.setText(value)
 
@@ -73,7 +93,7 @@ class CustomerStatementDialog(QDialog):
         self.customer_id = customer_id
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.setWindowTitle("كشف حساب العميل")
-        self.setMinimumSize(1100, 750)
+        self.setMinimumSize(1300, 850)
 
         self._load_data()
         self._build_ui()
@@ -144,10 +164,12 @@ class CustomerStatementDialog(QDialog):
             "إجمالي مبالغ العميل", fmt_currency(t.get("total_due", 0)), COLORS["green"]
         )
         self.card_net = SummaryCard(
-            "الصافي النهائي",
+            "الصافي النهائي (المطلوب)",
             fmt_currency(net),
             COLORS["accent"] if net >= 0 else COLORS["red"],
         )
+        self.card_net.set_featured(True)
+        
         self.card_count = SummaryCard(
             "عدد العمليات", str(t.get("total_count", 0)), COLORS["blue"]
         )
@@ -182,10 +204,12 @@ class CustomerStatementDialog(QDialog):
         cols = [
             ("التاريخ", 150),
             ("النوع", 100),
-            ("الخدمة", 180),
-            ("المنصة", 120),
-            ("المرجع", 100),
-            ("المبلغ", 100),
+            ("الخدمة", 160),
+            ("المنصة", 110),
+            ("المرجع", 90),
+            ("المصروف", 100),
+            ("المطلوب", 100),
+            ("الربح", 100),
             ("الحالة", 110),
             ("ملاحظات", -1),
             ("الإجراءات", 100),
@@ -236,9 +260,17 @@ class CustomerStatementDialog(QDialog):
             ref = "🃏 كارت" if t.get("is_card") else (t.get("reference_no") or "—")
             self.table.set_cell(row, 4, ref, color=COLORS["text_muted"])
 
-            # Amount
-            amt = t.get("amount_required") if is_out else t.get("amount_spent")
-            self.table.set_cell(row, 5, fmt_currency(amt), bold=True)
+            # Spent (المصروف)
+            spent = t.get("amount_spent", 0)
+            self.table.set_cell(row, 5, fmt_currency(spent), color=COLORS["text_secondary"])
+
+            # Required (المطلوب)
+            req = t.get("amount_required", 0)
+            self.table.set_cell(row, 6, fmt_currency(req), bold=True)
+
+            # Profit (الربح)
+            profit = t.get("profit", 0)
+            self.table.set_cell(row, 7, fmt_currency(profit), color=COLORS["cyan"] if profit >= 0 else COLORS["red"])
 
             # Status
             if is_out:
@@ -250,19 +282,19 @@ class CustomerStatementDialog(QDialog):
                 st_text = "تم التسليم ✓" if is_del else "لم يسلم ⏳"
                 st_color = COLORS["green"] if is_del else COLORS["yellow"]
 
-            self.table.set_cell(row, 6, st_text, color=st_color, bold=True)
+            self.table.set_cell(row, 8, st_text, color=st_color, bold=True)
 
             # Notes
             self.table.set_cell(
                 row,
-                7,
+                9,
                 t.get("notes") or "—",
                 color=COLORS["text_muted"],
                 align=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
             )
 
             # Actions
-            self._add_actions_button(row, 8, t)
+            self._add_actions_button(row, 10, t)
 
     def _add_actions_button(self, row: int, col: int, t: dict):
         btn = QPushButton("⋮ إجراءات")
@@ -352,8 +384,9 @@ class CustomerStatementDialog(QDialog):
         self.card_owed.set_value(fmt_currency(t.get("total_pending", 0)))
         self.card_owned.set_value(fmt_currency(t.get("total_due", 0)))
         self.card_net.set_value(fmt_currency(net))
+        # Keep it special and larger than other cards
         self.card_net.val_lbl.setStyleSheet(
-            f"color: {COLORS['accent'] if net >= 0 else COLORS['red']}; font-size: {FONT['xl']}; font-weight: bold;"
+            f"color: {COLORS['accent'] if net >= 0 else COLORS['red']}; font-size: 32px; font-weight: 900;"
         )
         self.card_count.set_value(str(t.get("total_count", 0)))
 
