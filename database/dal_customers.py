@@ -3,7 +3,7 @@ Data Access Layer - Customers & Groups
 طبقة الوصول للبيانات - العملاء والمجموعات
 """
 
-from database.schema import get_connection
+from database.connection import get_connection
 
 
 # ══════════════════════════════════════════

@@ -3,7 +3,7 @@ Data Access Layer - Budget & Platforms
 طبقة الوصول للبيانات - الميزانية والمنصات
 """
 
-from database.schema import get_connection
+from database.connection import get_connection
 
 
 # ══════════════════════════════════════════
@@ -254,6 +254,15 @@ def reset_wallet_limit_if_needed(wallet_id: int) -> bool:
             conn.commit()
             return True
         return False
+
+
+def update_platform_limit(platform_id: int, new_limit: float) -> None:
+    """تحديث الحد الشهري لمنصة محفظة أو انستا باي."""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE platforms SET monthly_limit = ? WHERE id = ?", (new_limit, platform_id)
+        )
+        conn.commit()
 
 
 def delete_platform(platform_id: int) -> None:

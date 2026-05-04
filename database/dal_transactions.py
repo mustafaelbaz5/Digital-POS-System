@@ -2,7 +2,7 @@
 dal_transactions.py — Transactions DAL
 """
 
-from database.schema import get_connection
+from database.connection import get_connection
 
 
 def add_outbound_transaction(

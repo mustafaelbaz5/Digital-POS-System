@@ -24,7 +24,7 @@ from ui.components.widgets import (
     BaseDialog,
     CardGroup,
     DataTable,
-    DateRangePicker,
+    DateRangeWidget,
     MiniStatCard,
     ScreenShell,
     Toast,
@@ -50,7 +50,7 @@ class InventoryTab(QWidget):
         layout.setSpacing(GAP_LG)
 
         # ── Date range filter bar
-        self.date_picker = DateRangePicker()
+        self.date_picker = DateRangeWidget()
         self.date_picker.changed.connect(self.run_inventory)
         layout.addWidget(self.date_picker)
 
@@ -316,7 +316,7 @@ class TransactionsLogTab(QWidget):
         layout.setSpacing(GAP_LG)
 
         # ── Date picker (first section)
-        self.date_picker = DateRangePicker()
+        self.date_picker = DateRangeWidget()
         self.date_picker.changed.connect(self.load_data)
         layout.addWidget(self.date_picker)
 
@@ -414,7 +414,7 @@ class TransactionsLogTab(QWidget):
         self._render(txns)
 
     def _render(self, transactions: list):
-        from ui.screens.statement_screen import make_txn_actions
+        from ui.components.misc import make_txn_actions
 
         self.table.clear_rows()
         self.table.setRowCount(len(transactions))

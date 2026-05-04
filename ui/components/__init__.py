@@ -1,6 +1,5 @@
 """
-ui/components/widgets.py — backward-compat re-exports
-Import from here still works; prefer importing from ui.components directly.
+ui/components/__init__.py — re-exports all shared widgets
 """
 from ui.components.base import BaseDialog, ScreenShell
 from ui.components.cards import CardGroup, StatCard, MiniStatCard, PlatformCard

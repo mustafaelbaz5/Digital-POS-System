@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 
 import database as db
 from ui.components.widgets import BaseDialog, DataTable
-from ui.styles.theme import CARD_RADIUS, COLORS, FONT, GAP_LG, GAP_MD, GAP_SM
+from ui.styles.theme import CARD_RADIUS, COLORS, FONT, GAP_LG, GAP_MD
 from utils.formatters import fmt_currency
 
 # ══════════════════════════════════════════
@@ -358,125 +358,6 @@ class CustomerStatementDialog(QDialog):
         self.card_count.set_value(str(t.get("total_count", 0)))
 
         self._fill_table()
-
-
-# ══════════════════════════════════════════
-#  Reports Screen Support
-# ══════════════════════════════════════════
-
-
-def make_txn_actions(t: dict, on_status_change, on_delete) -> QWidget:
-    """
-    يرجع QWidget فيه زرار "إجراءات" يفتح _ActionDialog.
-    (Shared with Reports screen)
-    """
-    btn = QPushButton("⋮ إجراءات")
-    btn.setObjectName("btn_ghost")
-    btn.setFixedHeight(26)
-    btn.setCursor(Qt.CursorShape.PointingHandCursor)
-    btn.setStyleSheet(f"font-size: {FONT['sm']}; padding: 0 12px;")
-
-    def _open():
-        parent_widget = btn.window()
-        dlg = _ActionDialog(t, on_status_change, on_delete, parent_widget)
-        dlg.exec()
-
-    btn.clicked.connect(_open)
-
-    wrap = QWidget()
-    wrap.setObjectName("cell_wrapper_2")
-    wrap.setStyleSheet("#cell_wrapper_2 { background: transparent; border: none; }")
-    wl = QHBoxLayout(wrap)
-    wl.setContentsMargins(2, 4, 2, 4)
-    wl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    wl.addWidget(btn)
-    return wrap
-
-
-class _ActionDialog(BaseDialog):
-    """
-    حوار صغير يعرض خيارات تعديل أو حذف العملية.
-    """
-
-    def __init__(self, t: dict, on_status_change, on_delete, parent=None):
-        super().__init__("إجراءات العملية", parent)
-        self._t = t
-        self._on_status_change = on_status_change
-        self._on_delete = on_delete
-        self.setMinimumWidth(380)
-        self._build_content()
-
-    def _build_content(self):
-        t = self._t
-        op_type = t.get("operation_type", "outbound")
-
-        # Info Card
-        card = QFrame()
-        card.setObjectName("card")
-        cl = QVBoxLayout(card)
-        cl.setContentsMargins(16, 12, 16, 12)
-
-        service_lbl = QLabel(f"🛠️ {t.get('service_name', 'عملية بدون اسم')}")
-        service_lbl.setStyleSheet(
-            f"color:{COLORS['text_primary']}; font-size:15px; font-weight:bold;"
-        )
-        cl.addWidget(service_lbl)
-
-        amt_lbl = QLabel(
-            f"💰 المبلغ المطلوب: {fmt_currency(t.get('amount_required', 0))}"
-        )
-        amt_lbl.setStyleSheet(f"color:{COLORS['accent']}; font-weight:bold;")
-        cl.addWidget(amt_lbl)
-
-        self.body.addWidget(card)
-        self.body.addSpacing(GAP_SM)
-
-        # Status Toggle Button
-        if op_type == "outbound":
-            curr_status = t.get("payment_status", "pending")
-            btn_text = " تحديد كمسدد" if curr_status == "pending" else "⏳ تحديد كمؤجل"
-            new_status = "paid" if curr_status == "pending" else "pending"
-            role = "primary" if curr_status == "pending" else "secondary"
-
-            s_btn = QPushButton(btn_text)
-            s_btn.setObjectName(f"btn_{role}")
-            s_btn.setFixedHeight(44)
-            s_btn.clicked.connect(lambda: self._do_status(new_status))
-            self.body.addWidget(s_btn)
-
-        else:  # inbound
-            is_del = t.get("is_delivered", 0)
-            btn_text = "🤝 تحديد كتم التسليم" if not is_del else "⏳ تحديد كـ لم يُسلّم"
-            new_val = 1 if not is_del else 0
-            role = "primary" if not is_del else "secondary"
-
-            d_btn = QPushButton(btn_text)
-            d_btn.setObjectName(f"btn_{role}")
-            d_btn.setFixedHeight(44)
-            d_btn.clicked.connect(lambda: self._do_status(new_val))
-            self.body.addWidget(d_btn)
-
-        # Footer
-        self.add_stretch()
-        self.add_button("🗑️ حذف العملية", self._do_delete, role="danger")
-        self.add_button("إغلاق", self.reject, role="secondary")
-
-    def _do_status(self, val):
-        self.accept()
-        self._on_status_change(self._t["id"], val)
-
-    def _do_delete(self):
-        if (
-            QMessageBox.question(
-                self,
-                "تأكيد الحذف",
-                "⚠️ حذف العملية وعكس تأثيرها المالي؟ لا يمكن التراجع.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            == QMessageBox.StandardButton.Yes
-        ):
-            self.accept()
-            self._on_delete(self._t["id"])
 
 
 # ══════════════════════════════════════════

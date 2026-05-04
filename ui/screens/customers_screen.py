@@ -589,11 +589,3 @@ class GroupDialog(BaseDialog):
             QMessageBox.critical(self, "خطأ", str(e))
 
 
-# ── local helpers ──────────────────────────────────────
-
-
-def _make_div() -> QFrame:
-    f = QFrame()
-    f.setFrameShape(QFrame.Shape.HLine)
-    f.setStyleSheet(f"background:{COLORS['border']}; max-height:1px; border:none;")
-    return f

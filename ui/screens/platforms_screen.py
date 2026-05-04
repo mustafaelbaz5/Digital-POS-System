@@ -2,11 +2,9 @@
 platforms_screen.py — شاشة إدارة المنصات (Daily Financial Closing Model)
 """
 
-from PyQt6.QtCore import QDate, Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QCalendarWidget,
     QComboBox,
-    QDialog,
     QDoubleSpinBox,
     QFormLayout,
     QFrame,
@@ -24,218 +22,9 @@ from PyQt6.QtWidgets import (
 )
 
 import database as db
-from ui.components.widgets import BaseDialog, DataTable, ScreenShell
+from ui.components.widgets import BaseDialog, DataTable, SingleDateWidget, ScreenShell
 from ui.styles.theme import COLORS, GAP_LG, GAP_MD, GAP_SM
 from utils.formatters import fmt_currency
-
-
-# ══════════════════════════════════════════
-#  Date Header Widget
-# ══════════════════════════════════════════
-
-class DateHeaderWidget(QFrame):
-    dateChanged = pyqtSignal()
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.current_date = QDate.currentDate()
-        self.setObjectName("date_header_widget")
-        self.setFixedHeight(44)
-        self.setStyleSheet(f"""
-            QFrame#date_header_widget {{
-                background: {COLORS['bg_elevated']};
-                border: 1px solid {COLORS['border_light']};
-                border-radius: 8px;
-            }}
-        """)
-
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(4, 0, 4, 0)
-        layout.setSpacing(0)
-
-        # ← زرار السابق
-        self._btn_prev = self._arrow_btn("‹")
-        self._btn_prev.clicked.connect(self._go_prev)
-        layout.addWidget(self._btn_prev)
-
-        # نص التاريخ — قابل للضغط لفتح الـ calendar
-        self._date_lbl = QLabel()
-        self._date_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._date_lbl.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._date_lbl.setToolTip("اضغط لفتح التقويم")
-        self._date_lbl.setStyleSheet(
-            f"color:{COLORS['text_primary']}; font-size:13px; "
-            f"font-weight:bold; background:transparent; border:none; padding:0 10px;"
-        )
-        self._date_lbl.mousePressEvent = lambda e: self._open_calendar()
-        layout.addWidget(self._date_lbl, 1)
-
-        # → زرار التالي
-        self._btn_next = self._arrow_btn("›")
-        self._btn_next.clicked.connect(self._go_next)
-        layout.addWidget(self._btn_next)
-
-        self._update_label()
-
-    def _arrow_btn(self, text: str) -> QPushButton:
-        btn = QPushButton(text)
-        btn.setFixedSize(36, 36)
-        btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setStyleSheet(f"""
-            QPushButton {{
-                background: transparent;
-                border: none;
-                color: {COLORS['text_secondary']};
-                font-size: 18px;
-                font-weight: bold;
-                border-radius: 6px;
-            }}
-            QPushButton:hover {{
-                background: {COLORS['bg_hover']};
-                color: {COLORS['accent']};
-            }}
-        """)
-        return btn
-
-    def _update_label(self):
-        today = QDate.currentDate()
-        if self.current_date == today:
-            label = "اليوم"
-        elif self.current_date == today.addDays(-1):
-            label = "أمس"
-        else:
-            label = self.current_date.toString("dd / MM / yyyy")
-        self._date_lbl.setText(label)
-
-        # disable next إذا وصلنا لليوم
-        self._btn_next.setEnabled(self.current_date < today)
-        self._btn_next.setStyleSheet(self._btn_next.styleSheet())
-
-    def _go_prev(self):
-        self.setDate(self.current_date.addDays(-1))
-
-    def _go_next(self):
-        if self.current_date < QDate.currentDate():
-            self.setDate(self.current_date.addDays(1))
-
-    def _open_calendar(self):
-        from PyQt6.QtCore import QLocale
-        
-        dialog = QDialog(self.window())
-        dialog.setWindowTitle("اختر التاريخ")
-        dialog.setFixedSize(320, 420) # Slightly taller for two rows
-        dialog.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        dialog.setStyleSheet(f"""
-            QDialog {{ background: {COLORS['bg_elevated']}; }}
-            QCalendarWidget QAbstractItemView {{
-                background: {COLORS['bg_dark']};
-                color: {COLORS['text_primary']};
-                selection-background-color: {COLORS['accent']};
-                selection-color: white;
-                border: 1px solid {COLORS['border_light']};
-                border-radius: 8px;
-            }}
-            /* Header for the grid (days of week) */
-            QCalendarWidget QWidget {{
-                alternate-background-color: transparent;
-            }}
-        """)
-
-        cal = QCalendarWidget()
-        cal.setSelectedDate(self.current_date)
-        cal.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
-        cal.setGridVisible(False)
-        cal.setNavigationBarVisible(False) # Hide the built-in month/year controls
-
-        # ── Shared Style for nav buttons
-        nav_btn_style = f"""
-            QPushButton {{
-                background: {COLORS['bg_elevated']}; border: 1px solid {COLORS['border_light']};
-                color: {COLORS['text_primary']}; font-size: 16px; font-weight: bold; border-radius: 6px;
-            }}
-            QPushButton:hover {{
-                background: {COLORS['bg_hover']}; border-color: {COLORS['accent']}; color: {COLORS['accent']};
-            }}
-        """
-        label_style = f"color:{COLORS['text_primary']}; font-size:14px; font-weight:bold; background:transparent;"
-
-        # ── Year Navigation
-        year_lbl = QLabel()
-        year_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        year_lbl.setStyleSheet(label_style)
-
-        def _refresh_year(): year_lbl.setText(str(cal.selectedDate().year()))
-        
-        btn_y_prev = QPushButton("‹")
-        btn_y_next = QPushButton("›")
-        for b in (btn_y_prev, btn_y_next): 
-            b.setFixedSize(36, 32)
-            b.setStyleSheet(nav_btn_style)
-            b.setCursor(Qt.CursorShape.PointingHandCursor)
-
-        btn_y_prev.clicked.connect(lambda: cal.setSelectedDate(cal.selectedDate().addYears(-1)))
-        btn_y_next.clicked.connect(lambda: cal.setSelectedDate(cal.selectedDate().addYears(1)))
-
-        year_row = QHBoxLayout()
-        year_row.addWidget(btn_y_prev) # Backward (Right in RTL)
-        year_row.addWidget(year_lbl, 1)
-        year_row.addWidget(btn_y_next) # Forward (Left in RTL)
-
-        # ── Month Navigation
-        month_lbl = QLabel()
-        month_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        month_lbl.setStyleSheet(label_style)
-
-        def _refresh_month():
-            m_idx = cal.selectedDate().month()
-            month_lbl.setText(QLocale().monthName(m_idx))
-
-        btn_m_prev = QPushButton("‹")
-        btn_m_next = QPushButton("›")
-        for b in (btn_m_prev, btn_m_next):
-            b.setFixedSize(36, 32)
-            b.setStyleSheet(nav_btn_style)
-            b.setCursor(Qt.CursorShape.PointingHandCursor)
-
-        btn_m_prev.clicked.connect(lambda: cal.setSelectedDate(cal.selectedDate().addMonths(-1)))
-        btn_m_next.clicked.connect(lambda: cal.setSelectedDate(cal.selectedDate().addMonths(1)))
-
-        month_row = QHBoxLayout()
-        month_row.addWidget(btn_m_prev) # Backward (Right in RTL)
-        month_row.addWidget(month_lbl, 1)
-        month_row.addWidget(btn_m_next) # Forward (Left in RTL)
-
-        # Sync labels on any change
-        def _sync():
-            _refresh_year()
-            _refresh_month()
-        cal.selectionChanged.connect(_sync)
-        _sync()
-
-        confirm_btn = QPushButton("تأكيد ✓")
-        confirm_btn.setObjectName("btn_primary")
-        confirm_btn.setFixedHeight(40)
-        confirm_btn.clicked.connect(dialog.accept)
-
-        dl = QVBoxLayout(dialog)
-        dl.setContentsMargins(20, 20, 20, 20)
-        dl.setSpacing(12)
-        dl.addLayout(year_row)
-        dl.addLayout(month_row)
-        dl.addWidget(cal)
-        dl.addSpacing(4)
-        dl.addWidget(confirm_btn)
-
-        if dialog.exec():
-            self.setDate(cal.selectedDate())
-
-    def date(self) -> QDate:
-        return self.current_date
-
-    def setDate(self, d: QDate):
-        self.current_date = d
-        self._update_label()
-        self.dateChanged.emit()
 
 
 # ══════════════════════════════════════════
@@ -536,13 +325,7 @@ class PlatformMoreDialog(BaseDialog):
         )
         if ok:
             try:
-                from database.schema import get_connection
-                with get_connection() as conn:
-                    conn.execute(
-                        "UPDATE platforms SET monthly_limit = ? WHERE id = ?",
-                        (amount, self.platform["id"]),
-                    )
-                    conn.commit()
+                db.update_platform_limit(self.platform["id"], amount)
                 self.refresh_data()
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
@@ -736,12 +519,12 @@ class PlatformsScreen(ScreenShell):
         self._build_content()
 
     def get_selected_date(self) -> str:
-        return self._date_edit.date().toString("yyyy-MM-dd")
+        return self._date_widget.get_date()
 
     def _build_content(self):
-        self._date_edit = DateHeaderWidget()
-        self._date_edit.dateChanged.connect(self.refresh)
-        self.add_action(self._date_edit)
+        self._date_widget = SingleDateWidget()
+        self._date_widget.changed.connect(self.refresh)
+        self.add_action(self._date_widget)
 
         add_btn = QPushButton("＋  إضافة منصة")
         add_btn.setObjectName("btn_primary")
@@ -771,7 +554,7 @@ class PlatformsScreen(ScreenShell):
 
     def refresh(self):
         platforms = db.get_all_platforms()
-        date_str  = self.get_selected_date()
+        date_str = self.get_selected_date()
         for p in platforms:
             # We keep the real balance from p["balance"] as requested
             p["transaction_count"] = db.get_platform_day_stats(p["id"], date_str)["txn_count"]
