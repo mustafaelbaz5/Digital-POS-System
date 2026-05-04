@@ -1,294 +1,161 @@
 """
-platforms_screen.py — شاشة إدارة المنصات (UI جديد)
-تابات (ماكينات / محافظ / انستا باي) + صفوف جدول بدل كروت
+platforms_screen.py — شاشة إدارة المنصات (Daily Financial Closing Model)
 """
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QDialog, QFormLayout, QLineEdit,
     QComboBox, QMessageBox, QDoubleSpinBox, QFrame,
-    QTabWidget, QInputDialog, QSizePolicy
+    QTabWidget, QInputDialog, QSizePolicy, QDateEdit,
+    QScrollArea
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QDate
 
 from ui.styles.theme import (
     COLORS, FONT, ROW_HEIGHT, 
     GAP_XS, GAP_SM, GAP_MD, GAP_LG, MARGIN_CARD
 )
-from ui.components.widgets import ScreenShell, make_divider, CardGroup, BaseDialog, DataTable
+from ui.components.widgets import ScreenShell, make_divider, CardGroup, BaseDialog, DataTable, SectionTitle, Toast
 from utils.formatters import fmt_currency
 
 import database as db
 
 
 # ══════════════════════════════════════════
-#  Platform Actions Dialog
+#  Platform More Dialog (Daily Insights)
 # ══════════════════════════════════════════
 
-class PlatformActionsDialog(BaseDialog):
-    """ديالوج العمليات الخاصة بكل منصة (Pro Version)"""
+class PlatformMoreDialog(BaseDialog):
+    """نافذة المزيد — رؤية يومية مالية للمنصة"""
 
-    def __init__(self, platform: dict, parent=None):
-        super().__init__(f"إجراءات — {platform['name']}", parent)
-        self.platform       = platform
+    def __init__(self, platform: dict, date_str: str, parent=None):
+        super().__init__(f"📊 المزيد — {platform['name']}", parent)
+        self.platform = platform
+        self.date_str = date_str
         self._result_action = None
-        self.setFixedWidth(380)
+        self.setMinimumWidth(580)
         self._build_content()
 
     def _build_content(self):
-        p      = self.platform
+        p = self.platform
+        pid = p["id"]
+        d = self.date_str
         p_type = p["type"]
 
-        # ── Body (Info Card)
-        info = QFrame()
-        info.setObjectName("card")
-        il = QVBoxLayout(info)
-        il.setContentsMargins(18, 14, 18, 14)
-        il.setSpacing(6)
+        stats = db.get_platform_day_stats(pid, d)
+        opening = db.get_opening_balance(pid, d)
+        closing = db.get_closing_balance(pid, d)
+        after_ops = opening + stats["total_deposits"] + stats["total_inbound"] - stats["total_outbound"]
 
-        name_lbl = QLabel(p["name"])
-        name_lbl.setStyleSheet(f"color:{COLORS['text_primary']}; font-size:16px; font-weight:bold;")
-        name_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        il.addWidget(name_lbl)
+        # ── Financial Summary
+        info = QFrame(); info.setObjectName("card")
+        il = QVBoxLayout(info); il.setContentsMargins(18, 14, 18, 14); il.setSpacing(8)
 
-        bal_color = COLORS["green"] if p.get("balance", 0) > 0 else COLORS["text_muted"]
-        bal_lbl   = QLabel(f"💰 الرصيد الحالي: {fmt_currency(p.get('balance', 0))}")
-        bal_lbl.setStyleSheet(f"color:{bal_color}; font-size:14px; font-weight:bold;")
-        bal_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        il.addWidget(bal_lbl)
+        def _row(label, value, color=COLORS["text_primary"], bold=False):
+            r = QHBoxLayout()
+            lbl = QLabel(label); lbl.setStyleSheet(f"color:{COLORS['text_secondary']}; font-size:14px;")
+            r.addWidget(lbl); r.addStretch()
+            w = "bold" if bold else "normal"
+            val = QLabel(fmt_currency(value)); val.setStyleSheet(f"color:{color}; font-size:15px; font-weight:{w};")
+            r.addWidget(val); il.addLayout(r)
 
-        if p_type in ("wallet", "instapay"):
-            used      = p.get("monthly_used", 0)
-            limit     = p.get("monthly_limit", 200000)
-            remaining = limit - used
-            pct       = min(100, int(used / limit * 100)) if limit else 0
-            lim_color = (COLORS["red"]    if pct >= 90 else
-                         COLORS["yellow"] if pct >= 70 else
-                         COLORS["text_secondary"])
-            lim_lbl = QLabel(f"📉 متبقي من الحد: {fmt_currency(remaining)}  ({pct}%)")
-            lim_lbl.setStyleSheet(f"color:{lim_color}; font-size:13px;")
-            lim_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-            il.addWidget(lim_lbl)
-
+        _row("📂 رصيد البداية", opening, COLORS["blue"], True)
+        _row("📊 عدد العمليات", stats["txn_count"])
+        _row("📤 إجمالي المصروف", stats["total_outbound"], COLORS["red"])
+        _row("📥 إجمالي الوارد", stats["total_inbound"], COLORS["green"])
+        _row("💰 إيداعات", stats["total_deposits"], COLORS["purple"])
+        div = QFrame(); div.setFixedHeight(1); div.setStyleSheet(f"background:{COLORS['border']};"); il.addWidget(div)
+        _row("⚙️ الرصيد بعد العمليات", after_ops, COLORS["yellow"], True)
+        _row("📊 العمولات", stats["total_commission"], COLORS["cyan"])
+        div2 = QFrame(); div2.setFixedHeight(1); div2.setStyleSheet(f"background:{COLORS['border']};"); il.addWidget(div2)
+        _row("🏁 الرصيد النهائي", closing, COLORS["accent"], True)
         self.body.addWidget(info)
-        self.body.addSpacing(GAP_SM)
 
-        # ── Body (Actions)
-        for label, color, bg, handler in self._get_actions(p_type):
-            btn = QPushButton(label)
-            btn.setFixedHeight(44)
-            btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            # Custom style for colorful action buttons
-            btn.setStyleSheet(
-                f"background:{bg}; color:{color}; border:1.5px solid {color}; border-radius:8px;"
-                f"font-size:14px; font-weight:bold;"
-            )
-            btn.clicked.connect(handler)
-            self.body.addWidget(btn)
-
-        # ── Footer
-        self.add_stretch()
-        self.add_button("🗑️ حذف المنصة", self._delete, role="danger")
-        self.add_button("إغلاق", self.reject, role="secondary")
-
-    def _get_actions(self, p_type: str) -> list:
-        actions = [
-            ("💰  إيداع للمنصة",
-             COLORS["green"], COLORS["green_bg"], self._deposit),
-        ]
+        # ── Manual Commission (Machines only)
         if p_type == "machine":
-            actions.append((
-                "📊  تسجيل عمولة يومية",
-                COLORS["yellow"], COLORS["yellow_bg"], self._commission
-            ))
+            cf = QFrame(); cf.setObjectName("card")
+            cl = QVBoxLayout(cf); cl.setContentsMargins(18, 14, 18, 14); cl.setSpacing(8)
+            cl.addWidget(QLabel("💵 تسجيل عمولة يدوية"))
+            cr = QHBoxLayout()
+            self.comm_input = QDoubleSpinBox()
+            self.comm_input.setRange(0, 999999); self.comm_input.setDecimals(2); self.comm_input.setSuffix("  ج")
+            self.comm_input.setMinimumHeight(36); cr.addWidget(self.comm_input, 2)
+            cb = QPushButton("✓ تسجيل"); cb.setObjectName("btn_primary"); cb.setMinimumHeight(36)
+            cb.clicked.connect(self._save_commission); cr.addWidget(cb, 1)
+            cl.addLayout(cr); self.body.addWidget(cf)
+
+        # ── Quick Actions
+        af = QFrame(); af.setObjectName("card")
+        al = QHBoxLayout(af); al.setContentsMargins(18, 10, 18, 10); al.setSpacing(8)
+        dep = QPushButton("💰 إيداع"); dep.setObjectName("btn_secondary"); dep.setMinimumHeight(36)
+        dep.clicked.connect(self._deposit); al.addWidget(dep)
         if p_type in ("wallet", "instapay"):
-            actions.append((
-                "✏️  تعديل الحد الشهري",
-                COLORS["blue"], COLORS["blue_bg"], self._edit_limit
-            ))
-        return actions
+            lb = QPushButton("✏️ تعديل الحد"); lb.setObjectName("btn_secondary"); lb.setMinimumHeight(36)
+            lb.clicked.connect(self._edit_limit); al.addWidget(lb)
+        db_btn = QPushButton("🗑️ حذف"); db_btn.setObjectName("btn_danger"); db_btn.setMinimumHeight(36)
+        db_btn.clicked.connect(self._delete); al.addWidget(db_btn)
+        self.body.addWidget(af)
+
+        # ── Daily Transactions
+        txns = db.get_platform_transactions_for_date(pid, d)
+        if txns:
+            self.body.addWidget(QLabel(f"📋 عمليات اليوم ({len(txns)})"))
+            cols = [("الوقت", 80), ("النوع", 80), ("الخدمة", -1), ("العميل", -1), ("المبلغ", 100), ("الحالة", 80)]
+            table = DataTable(cols); table.setRowCount(len(txns))
+            op_map = {"outbound": "📤 صادر", "inbound": "📥 وارد", "manual_commission": "💵 عمولة"}
+            for row, t in enumerate(txns):
+                table.set_cell(row, 0, (t.get("created_at") or "")[-8:-3], color=COLORS["text_muted"])
+                table.set_cell(row, 1, op_map.get(t.get("operation_type", ""), "—"))
+                table.set_cell(row, 2, t.get("service_name") or "—")
+                table.set_cell(row, 3, t.get("customer_name") or "—", color=COLORS["text_secondary"])
+                table.set_cell(row, 4, fmt_currency(t.get("amount_spent", 0)), bold=True)
+                st = t.get("payment_status", "")
+                table.set_cell(row, 5, "مسدد" if st == "paid" else "مؤجل", color=COLORS["green"] if st == "paid" else COLORS["yellow"])
+            h = table.horizontalHeader().height() + len(txns) * 50 + 4
+            table.setMinimumHeight(min(h, 300)); table.setMaximumHeight(min(h, 300))
+            self.body.addWidget(table)
+
+        self.add_stretch(); self.add_button("إغلاق", self.reject, role="secondary")
+
+    def _save_commission(self):
+        amount = self.comm_input.value()
+        if amount <= 0: QMessageBox.warning(self, "تنبيه", "أدخل مبلغ العمولة"); return
+        try:
+            db.add_manual_commission(self.platform["id"], amount, self.date_str)
+            self._result_action = "refresh"; self.accept()
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ", str(e))
 
     def _deposit(self):
-        p = self.platform
-        amount, ok = QInputDialog.getDouble(
-            self, "إيداع",
-            f"المبلغ المراد إيداعه في [{p['name']}]:\n"
-            f"الرصيد الحالي: {fmt_currency(p.get('balance', 0))}",
-            min=0.01, decimals=2
-        )
+        amount, ok = QInputDialog.getDouble(self, "إيداع", f"المبلغ:", min=0.01, decimals=2)
         if ok and amount > 0:
             try:
-                db.deposit_to_platform(p["id"], amount)
-                QMessageBox.information(self, "تم ", f"تم إيداع {fmt_currency(amount)}")
-                self._result_action = "refresh"
-                self.accept()
-            except Exception as e:
-                QMessageBox.critical(self, "خطأ", str(e))
-
-    def _commission(self):
-        p = self.platform
-        amount, ok = QInputDialog.getDouble(
-            self, "العمولة اليومية",
-            f"مبلغ العمولة لـ [{p['name']}]:\n"
-            f"الرصيد الحالي: {fmt_currency(p.get('balance', 0))}",
-            min=0.01, decimals=2
-        )
-        if ok and amount > 0:
-            try:
-                db.record_daily_commission(p["id"], amount)
-                QMessageBox.information(
-                    self, "تم ",
-                    f"تم تسجيل العمولة: {fmt_currency(amount)}\n"
-                    f"خُصمت من [{p['name']}] وأُضيفت للخزينة."
-                )
-                self._result_action = "refresh"
-                self.accept()
+                db.deposit_to_platform(self.platform["id"], amount)
+                self._result_action = "refresh"; self.accept()
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
     def _edit_limit(self):
-        p       = self.platform
-        current = p.get("monthly_limit", 200000)
-        amount, ok = QInputDialog.getDouble(
-            self, "تعديل الحد الشهري",
-            f"الحد الشهري الجديد لـ [{p['name']}]:",
-            value=current, min=0, decimals=2
-        )
+        current = self.platform.get("monthly_limit", 200000)
+        amount, ok = QInputDialog.getDouble(self, "تعديل الحد", "الحد الشهري الجديد:", value=current, min=0, decimals=2)
         if ok:
             try:
                 from database.schema import get_connection
                 with get_connection() as conn:
-                    conn.execute(
-                        "UPDATE platforms SET monthly_limit = ? WHERE id = ?",
-                        (amount, p["id"])
-                    )
+                    conn.execute("UPDATE platforms SET monthly_limit = ? WHERE id = ?", (amount, self.platform["id"]))
                     conn.commit()
-                QMessageBox.information(self, "تم ", f"تم تحديث الحد إلى {fmt_currency(amount)}")
-                self._result_action = "refresh"
-                self.accept()
+                self._result_action = "refresh"; self.accept()
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
     def _delete(self):
-        p = self.platform
-        if QMessageBox.question(
-            self, "تأكيد الحذف",
-            f"هل تريد حذف [{p['name']}]؟\n"
-            f"الرصيد الحالي: {fmt_currency(p.get('balance', 0))}\n\n"
-            "⚠️ سيتم إخفاؤها من كل القوائم.",
+        if QMessageBox.question(self, "تأكيد الحذف",
+            f"هل تريد حذف [{self.platform['name']}]؟",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         ) == QMessageBox.StandardButton.Yes:
-            db.delete_platform(p["id"])
-            self._result_action = "refresh"
-            self.accept()
+            db.delete_platform(self.platform["id"])
+            self._result_action = "refresh"; self.accept()
 
-
-# ══════════════════════════════════════════
-#  Platform Row
-# ══════════════════════════════════════════
-
-class PlatformRow(QFrame):
-    actions_clicked = pyqtSignal(int)
-    add_transaction_clicked = pyqtSignal(int)
-
-    def __init__(self, platform: dict, alternate: bool = False, parent=None):
-        super().__init__(parent)
-        self.platform_id = platform["id"]
-        self.setObjectName("platform_row")
-        self.setFixedHeight(ROW_HEIGHT)
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        bg = COLORS["bg_card"] if not alternate else COLORS["bg_elevated"]
-        self.setStyleSheet(
-            f"QFrame#platform_row {{ background:{bg};"
-            f"border-bottom:1px solid {COLORS['border']}; }}"
-        )
-        self._build(platform)
-
-    def _build(self, p: dict):
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(16, 0, 16, 0)
-        layout.setSpacing(0)
-
-        p_type = p["type"]
-
-        # اسم المنصة (يمين)
-        name_lbl = QLabel(p["name"])
-        name_lbl.setStyleSheet(
-            f"color:{COLORS['text_primary']};font-size:14px;font-weight:bold;"
-            f"background:transparent;border:none;"
-        )
-        name_lbl.setFixedWidth(180)
-        name_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        layout.addWidget(name_lbl)
-
-        layout.addStretch()
-
-        # الحد المتبقي (للمحافظ وانستا باي فقط)
-        if p_type in ("wallet", "instapay"):
-            used      = p.get("monthly_used", 0)
-            limit     = p.get("monthly_limit", 200000)
-            remaining = limit - used
-            pct       = min(100, int(used / limit * 100)) if limit else 0
-            lim_color = (COLORS["red"]    if pct >= 90 else
-                         COLORS["yellow"] if pct >= 70 else
-                         COLORS["text_secondary"])
-            lim_lbl = QLabel(f"متبقي: {fmt_currency(remaining)}")
-            lim_lbl.setStyleSheet(
-                f"color:{lim_color};font-size:12px;"
-                f"background:transparent;border:none;"
-            )
-            lim_lbl.setFixedWidth(190)
-            lim_lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-            layout.addWidget(lim_lbl)
-            layout.addStretch()
-
-        # الرصيد (وسط)
-        balance   = p.get("balance", 0)
-        bal_color = COLORS["green"] if balance > 0 else COLORS["text_muted"]
-        bal_lbl   = QLabel(fmt_currency(balance))
-        bal_lbl.setStyleSheet(
-            f"color:{bal_color};font-size:15px;font-weight:bold;"
-            f"background:transparent;border:none;"
-        )
-        bal_lbl.setFixedWidth(140)
-        bal_lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(bal_lbl)
-
-        # عدد العمليات
-        count = p.get("transaction_count", 0)
-        count_lbl = QLabel(f"🔢 {count}")
-        count_lbl.setStyleSheet(f"color:{COLORS['text_muted']};font-size:12px;")
-        count_lbl.setFixedWidth(60)
-        count_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(count_lbl)
-
-        # زرار إضافة عملية
-        add_btn = QPushButton("➕ إضافة عملية")
-        add_btn.setFixedHeight(30)
-        add_btn.setFixedWidth(130)
-        add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        add_btn.setStyleSheet(
-            f"background:{COLORS['blue_bg']};color:{COLORS['blue']};"
-            f"border:1px solid {COLORS['blue']};border-radius:6px;"
-            f"font-size:13px;padding:2px 10px;font-weight:bold;"
-        )
-        add_btn.clicked.connect(lambda: self.add_transaction_clicked.emit(self.platform_id))
-        layout.addWidget(add_btn)
-
-        layout.addSpacing(8)
-
-        # زرار الإجراءات (يسار)
-        act_btn = QPushButton("⋮  إجراءات")
-        act_btn.setFixedHeight(30)
-        act_btn.setFixedWidth(100)
-        act_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        act_btn.setStyleSheet(
-            f"background:{COLORS['bg_input']};color:{COLORS['text_secondary']};"
-            f"border:1px solid {COLORS['border']};border-radius:6px;"
-            f"font-size:13px;padding:2px 10px;"
-        )
-        act_btn.clicked.connect(lambda: self.actions_clicked.emit(self.platform_id))
-        layout.addWidget(act_btn)
 
 
 # ══════════════════════════════════════════
@@ -465,8 +332,8 @@ class PlatformListTab(QWidget):
             
             # Actions
             self.table.add_action_buttons(row, col, [
-                {'text': "➕ إضافة عملية", 'callback': lambda _, pid=p["id"]: self._open_transaction_form(pid), 'role': 'primary'},
-                {'text': "⚙️ إعدادات", 'callback': lambda _, pid=p["id"]: self._open_actions(pid), 'role': 'secondary'}
+                {'text': "➕ عملية", 'callback': lambda _, pid=p["id"]: self._open_transaction_form(pid), 'role': 'primary'},
+                {'text': "📊 المزيد", 'callback': lambda _, pid=p["id"]: self._open_more(pid), 'role': 'statement'}
             ])
             
         self.table.setSortingEnabled(True)
@@ -474,17 +341,27 @@ class PlatformListTab(QWidget):
         self.table.setMinimumHeight(self.table.verticalHeader().length() + self.table.horizontalHeader().height() + 2)
 
 
+    def _get_date(self):
+        """Get date from parent PlatformsScreen"""
+        parent = self.parent()
+        while parent:
+            if hasattr(parent, 'get_selected_date'):
+                return parent.get_selected_date()
+            parent = parent.parent()
+        from datetime import date
+        return date.today().isoformat()
+
     def _open_transaction_form(self, platform_id: int):
         from ui.screens.transaction_form import TransactionDialog
-        dialog = TransactionDialog(platform_id=platform_id, parent=self)
+        dialog = TransactionDialog(platform_id=platform_id, selected_date=self._get_date(), parent=self)
         dialog.exec()
         self.refreshed.emit()
 
-    def _open_actions(self, platform_id: int):
+    def _open_more(self, platform_id: int):
         platform = db.get_platform_by_id(platform_id)
         if not platform:
             return
-        dialog = PlatformActionsDialog(platform, self)
+        dialog = PlatformMoreDialog(platform, self._get_date(), self)
         if dialog.exec() and dialog._result_action == "refresh":
             self.refreshed.emit()
 
@@ -499,7 +376,23 @@ class PlatformsScreen(ScreenShell):
         super().__init__("المنصات", "الماكينات والمحافظ الإلكترونية")
         self._build_content()
 
+    def get_selected_date(self) -> str:
+        return self._date_edit.date().toString("yyyy-MM-dd")
+
     def _build_content(self):
+        # Date picker in header
+        date_lbl = QLabel("📅 التاريخ:")
+        date_lbl.setStyleSheet(f"color:{COLORS['text_secondary']}; font-weight:bold;")
+        self.add_action(date_lbl)
+
+        self._date_edit = QDateEdit()
+        self._date_edit.setCalendarPopup(True)
+        self._date_edit.setDate(QDate.currentDate())
+        self._date_edit.setFixedHeight(36)
+        self._date_edit.setFixedWidth(150)
+        self._date_edit.dateChanged.connect(lambda: self.refresh())
+        self.add_action(self._date_edit)
+
         add_btn = QPushButton("＋  إضافة منصة")
         add_btn.setObjectName("btn_primary")
         add_btn.setFixedHeight(36)
@@ -529,6 +422,11 @@ class PlatformsScreen(ScreenShell):
 
     def refresh(self):
         platforms = db.get_all_platforms()
+        date_str = self.get_selected_date()
+        for p in platforms:
+            p["balance"] = db.get_closing_balance(p["id"], date_str)
+            p["transaction_count"] = db.get_platform_day_stats(p["id"], date_str)["txn_count"]
+
         self._tab_machines.load([p for p in platforms if p["type"] == "machine"])
         self._tab_wallets.load( [p for p in platforms if p["type"] == "wallet"])
         self._tab_instapay.load([p for p in platforms if p["type"] == "instapay"])

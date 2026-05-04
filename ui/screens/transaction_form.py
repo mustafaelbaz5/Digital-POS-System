@@ -29,10 +29,11 @@ class FocusSpinBox(QDoubleSpinBox):
 class CompactTransactionTab(QWidget):
     transaction_added = pyqtSignal()
     
-    def __init__(self, platform: dict, is_inbound: bool = False, parent=None):
+    def __init__(self, platform: dict, is_inbound: bool = False, selected_date: str = None, parent=None):
         super().__init__(parent)
         self.platform = platform
         self.is_inbound = is_inbound
+        self.selected_date = selected_date or __import__('datetime').date.today().isoformat()
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self._build_ui()
         self.load_data()
@@ -171,42 +172,21 @@ class CompactTransactionTab(QWidget):
         
         layout.addLayout(row3)
 
-        # ── Row 4: Custom Date Selector
+        # ── Row 4: Read-Only Date Display
         row4 = QHBoxLayout()
-        row4.setContentsMargins(0, 15, 0, 15) # Increased vertical breathing space even more
+        row4.setContentsMargins(0, 15, 0, 15)
         row4.setSpacing(10)
         
         lbl_d = QLabel("تاريخ العملية:")
         lbl_d.setStyleSheet(f"color:{COLORS['text_secondary']}; font-weight:bold; font-size:14px;")
         row4.addWidget(lbl_d)
 
-        from datetime import datetime
-        now = datetime.now()
-
-        date_style = f"font-size: 15px; font-weight: bold; background: {COLORS['bg_hover']}; padding: 2px;"
-
-        self.day_combo = QComboBox()
-        self.day_combo.addItems([str(i).zfill(2) for i in range(1, 32)])
-        self.day_combo.setCurrentText(str(now.day).zfill(2))
-        self.day_combo.setFixedWidth(75)
-        self.day_combo.setStyleSheet(date_style)
-        row4.addWidget(self.day_combo)
-
-        self.month_combo = QComboBox()
-        months = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
-        for i, m in enumerate(months):
-            self.month_combo.addItem(f"{i+1:02d} - {m}", i+1)
-        self.month_combo.setCurrentIndex(now.month - 1)
-        self.month_combo.setFixedWidth(145)
-        self.month_combo.setStyleSheet(date_style)
-        row4.addWidget(self.month_combo)
-
-        self.year_combo = QComboBox()
-        self.year_combo.addItems([str(i) for i in range(now.year - 2, now.year + 2)])
-        self.year_combo.setCurrentText(str(now.year))
-        self.year_combo.setFixedWidth(110) # Expanded width further to ensure no clipping
-        self.year_combo.setStyleSheet(date_style)
-        row4.addWidget(self.year_combo)
+        self.date_label = QLabel(self.selected_date)
+        self.date_label.setStyleSheet(
+            f"font-size: 15px; font-weight: bold; background: {COLORS['bg_hover']};"
+            f"padding: 6px 16px; border-radius: 6px; color: {COLORS['accent']};"
+        )
+        row4.addWidget(self.date_label)
 
         row4.addStretch()
         layout.addLayout(row4)
@@ -302,13 +282,10 @@ class CompactTransactionTab(QWidget):
         if spent <= 0 and req <= 0: QMessageBox.warning(self, "تنبيه", "أدخل المبلغ"); return
         
         pid = self.platform["id"]
-        # Use current time with selected date
+        # Use selected date with current time
         from datetime import datetime
         now_time = datetime.now().strftime("%H:%M:%S")
-        y = self.year_combo.currentText()
-        m = self.month_combo.currentData()
-        d = self.day_combo.currentText()
-        created_at = f"{y}-{m:02d}-{d} {now_time}"
+        created_at = f"{self.selected_date} {now_time}"
 
         try:
             if not self.is_inbound:
@@ -356,9 +333,10 @@ class CompactTransactionTab(QWidget):
 
 
 class TransactionDialog(BaseDialog):
-    def __init__(self, platform_id: int, parent=None):
+    def __init__(self, platform_id: int, selected_date: str = None, parent=None):
         self.platform_id = platform_id
         self.platform = db.get_platform_by_id(platform_id)
+        self.selected_date = selected_date or __import__('datetime').date.today().isoformat()
         
         title = f"إضافة عملية"
         super().__init__(title, parent)
@@ -394,17 +372,17 @@ class TransactionDialog(BaseDialog):
     def _build_content(self):
         if self.platform and self.platform["type"] in ("wallet", "instapay"):
             self.tabs = QTabWidget()
-            self.out_tab = CompactTransactionTab(self.platform, is_inbound=False)
+            self.out_tab = CompactTransactionTab(self.platform, is_inbound=False, selected_date=self.selected_date)
             self.out_tab.transaction_added.connect(self._on_added)
             self.tabs.addTab(self.out_tab, "📤 شحن صادر")
             
-            self.in_tab = CompactTransactionTab(self.platform, is_inbound=True)
+            self.in_tab = CompactTransactionTab(self.platform, is_inbound=True, selected_date=self.selected_date)
             self.in_tab.transaction_added.connect(self._on_added)
             self.tabs.addTab(self.in_tab, "📥 استلام وارد")
             
             self.body.addWidget(self.tabs)
         else:
-            self.out_tab = CompactTransactionTab(self.platform, is_inbound=False)
+            self.out_tab = CompactTransactionTab(self.platform, is_inbound=False, selected_date=self.selected_date)
             self.out_tab.transaction_added.connect(self._on_added)
             self.body.addWidget(self.out_tab)
             

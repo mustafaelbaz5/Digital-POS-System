@@ -410,6 +410,185 @@ def cleanup_transactions_before(cutoff_date: str) -> int:
         return cursor.rowcount
 
 
+# ══════════════════════════════════════════
+#  Daily Financial Closing Model
+# ══════════════════════════════════════════
+
+def get_platform_day_stats(platform_id: int, date_str: str) -> dict:
+    """
+    إحصائيات يوم معين لمنصة:
+    - عدد العمليات
+    - إجمالي المصروف (outbound)
+    - إجمالي الوارد (deposits via inbound)
+    - العمولات اليدوية
+    """
+    with get_connection() as conn:
+        # Count transactions for this platform on this date
+        row = conn.execute("""
+            SELECT 
+                COUNT(*) AS txn_count,
+                COALESCE(SUM(CASE WHEN operation_type='outbound' THEN amount_spent ELSE 0 END), 0) AS total_outbound,
+                COALESCE(SUM(CASE WHEN operation_type='inbound' THEN amount_required ELSE 0 END), 0) AS total_inbound,
+                COALESCE(SUM(CASE WHEN operation_type='manual_commission' THEN amount_spent ELSE 0 END), 0) AS total_commission
+            FROM transactions
+            WHERE platform_id = ? AND DATE(created_at) = ?
+        """, (platform_id, date_str)).fetchone()
+
+        # Deposits from machine_deposits table
+        dep_row = conn.execute("""
+            SELECT COALESCE(SUM(amount), 0) AS total_deposits
+            FROM machine_deposits
+            WHERE platform_id = ? AND DATE(created_at) = ?
+        """, (platform_id, date_str)).fetchone()
+
+        # Daily commissions from daily_commissions table (legacy)
+        comm_row = conn.execute("""
+            SELECT COALESCE(SUM(amount), 0) AS total_legacy_commission
+            FROM daily_commissions
+            WHERE platform_id = ? AND DATE(created_at) = ?
+        """, (platform_id, date_str)).fetchone()
+
+        return {
+            "txn_count": row["txn_count"] if row else 0,
+            "total_outbound": row["total_outbound"] if row else 0,
+            "total_inbound": row["total_inbound"] if row else 0,
+            "total_commission": (row["total_commission"] if row else 0) + (comm_row["total_legacy_commission"] if comm_row else 0),
+            "total_deposits": dep_row["total_deposits"] if dep_row else 0,
+        }
+
+
+def get_opening_balance(platform_id: int, date_str: str) -> float:
+    """
+    رصيد البداية = الرصيد النهائي لليوم السابق.
+    يُحسب بأخذ الرصيد الحالي وعكس كل عمليات اليوم وما بعده.
+    
+    الطريقة: الرصيد الحالي + كل ما خُصم اليوم وما بعده - كل ما أُضيف اليوم وما بعده
+    """
+    with get_connection() as conn:
+        # Current live balance
+        plat = conn.execute("SELECT balance FROM platforms WHERE id = ?", (platform_id,)).fetchone()
+        if not plat:
+            return 0.0
+        current_balance = plat["balance"]
+
+        # All outbound (deducted from platform) on date_str and after
+        out = conn.execute("""
+            SELECT COALESCE(SUM(amount_spent), 0) AS total
+            FROM transactions
+            WHERE platform_id = ? AND DATE(created_at) >= ? AND operation_type = 'outbound'
+        """, (platform_id, date_str)).fetchone()
+
+        # All inbound (added to platform) on date_str and after
+        inb = conn.execute("""
+            SELECT COALESCE(SUM(amount_required), 0) AS total
+            FROM transactions
+            WHERE platform_id = ? AND DATE(created_at) >= ? AND operation_type = 'inbound'
+        """, (platform_id, date_str)).fetchone()
+
+        # All manual commissions (deducted from platform) on date_str and after
+        comm = conn.execute("""
+            SELECT COALESCE(SUM(amount_spent), 0) AS total
+            FROM transactions
+            WHERE platform_id = ? AND DATE(created_at) >= ? AND operation_type = 'manual_commission'
+        """, (platform_id, date_str)).fetchone()
+
+        # Legacy daily_commissions (deducted from platform) on date_str and after
+        legacy_comm = conn.execute("""
+            SELECT COALESCE(SUM(amount), 0) AS total
+            FROM daily_commissions
+            WHERE platform_id = ? AND DATE(created_at) >= ?
+        """, (platform_id, date_str)).fetchone()
+
+        # Deposits (added to platform) on date_str and after
+        deps = conn.execute("""
+            SELECT COALESCE(SUM(amount), 0) AS total
+            FROM machine_deposits
+            WHERE platform_id = ? AND DATE(created_at) >= ?
+        """, (platform_id, date_str)).fetchone()
+
+        # Reverse all operations from date_str onwards to get opening balance
+        opening = (current_balance
+                   + out["total"]           # re-add what was spent
+                   - inb["total"]           # remove what was received
+                   + comm["total"]          # re-add commissions
+                   + legacy_comm["total"]   # re-add legacy commissions
+                   - deps["total"])         # remove deposits
+
+        return opening
+
+
+def get_closing_balance(platform_id: int, date_str: str) -> float:
+    """
+    الرصيد النهائي = رصيد البداية + الإيداعات + الوارد - المصروف - العمولات
+    """
+    opening = get_opening_balance(platform_id, date_str)
+    stats = get_platform_day_stats(platform_id, date_str)
+
+    closing = (opening
+               + stats["total_deposits"]
+               + stats["total_inbound"]
+               - stats["total_outbound"]
+               - stats["total_commission"])
+    return closing
+
+
+def add_manual_commission(platform_id: int, amount: float, date_str: str, notes: str = "") -> int:
+    """تسجيل عمولة يدوية لماكينة — تُخصم من رصيد الماكينة وتُضاف للخزينة"""
+    if amount <= 0:
+        raise ValueError("مبلغ العمولة يجب أن يكون أكبر من الصفر")
+
+    with get_connection() as conn:
+        try:
+            platform = conn.execute(
+                "SELECT id, type, balance FROM platforms WHERE id = ? AND is_active = 1", (platform_id,)
+            ).fetchone()
+
+            if not platform:
+                raise ValueError("المنصة غير موجودة")
+            if platform["type"] != "machine":
+                raise ValueError("العمولة اليدوية متاحة للماكينات فقط")
+            if platform["balance"] < amount:
+                raise ValueError(
+                    f"رصيد الماكينة غير كافٍ — الرصيد: {platform['balance']:,.2f} ج"
+                )
+
+            created_at = f"{date_str} 23:59:00"
+
+            cursor = conn.execute("""
+                INSERT INTO transactions
+                    (operation_type, service_name, platform_id, customer_id,
+                     amount_spent, amount_required, payment_status, notes, created_at)
+                VALUES ('manual_commission', 'عمولة يدوية', ?, NULL, ?, 0, 'paid', ?, ?)
+            """, (platform_id, amount, notes, created_at))
+
+            # Deduct from machine balance
+            conn.execute("UPDATE platforms SET balance = balance - ? WHERE id = ?", (amount, platform_id))
+            # Add to cash vault
+            conn.execute("UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1", (amount,))
+
+            conn.commit()
+            return cursor.lastrowid
+        except Exception:
+            conn.rollback()
+            raise
+
+
+def get_platform_transactions_for_date(platform_id: int, date_str: str) -> list[dict]:
+    """جلب كل عمليات منصة في يوم معين"""
+    with get_connection() as conn:
+        rows = conn.execute("""
+            SELECT t.id, t.created_at, t.operation_type, t.service_name,
+                   t.amount_spent, t.amount_required, t.profit,
+                   t.reference_no, t.payment_status, t.is_delivered, t.notes,
+                   c.name AS customer_name
+            FROM transactions t
+            LEFT JOIN customers c ON c.id = t.customer_id
+            WHERE t.platform_id = ? AND DATE(t.created_at) = ?
+            ORDER BY t.created_at DESC
+        """, (platform_id, date_str)).fetchall()
+        return [dict(r) for r in rows]
+
+
 def get_dashboard_stats() -> dict:
     with get_connection() as conn:
         budget  = conn.execute("SELECT main_budget, cash_vault FROM budget WHERE id=1").fetchone()

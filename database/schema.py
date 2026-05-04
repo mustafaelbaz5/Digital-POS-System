@@ -170,7 +170,7 @@ def initialize_database() -> None:
                     id              INTEGER PRIMARY KEY AUTOINCREMENT,
                     created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
                     operation_type  TEXT    NOT NULL
-                                    CHECK (operation_type IN ('outbound', 'inbound')),
+                                    CHECK (operation_type IN ('outbound', 'inbound', 'commission', 'manual_commission')),
                     service_name    TEXT    NOT NULL,
                     platform_id     INTEGER NOT NULL REFERENCES platforms(id),
                     customer_id     INTEGER REFERENCES customers(id) ON DELETE SET NULL,
@@ -193,6 +193,45 @@ def initialize_database() -> None:
             conn.commit()
         except Exception:
             pass
+
+        # Migration: expand operation_type CHECK to include manual_commission
+        try:
+            conn.execute("INSERT INTO transactions (operation_type, service_name, platform_id, amount_spent, amount_required, payment_status) VALUES ('manual_commission', '__migration_test__', 1, 0, 0, 'paid')")
+            conn.execute("DELETE FROM transactions WHERE service_name = '__migration_test__'")
+            conn.commit()
+        except Exception:
+            # CHECK constraint is old, need to rebuild table
+            try:
+                conn.execute("PRAGMA foreign_keys = OFF")
+                conn.executescript("""
+                    CREATE TABLE transactions_new (
+                        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                        created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+                        operation_type  TEXT    NOT NULL
+                                        CHECK (operation_type IN ('outbound', 'inbound', 'commission', 'manual_commission')),
+                        service_name    TEXT    NOT NULL,
+                        platform_id     INTEGER NOT NULL REFERENCES platforms(id),
+                        customer_id     INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+                        amount_spent    REAL    NOT NULL DEFAULT 0,
+                        amount_required REAL    NOT NULL DEFAULT 0,
+                        profit          REAL    GENERATED ALWAYS AS (amount_required - amount_spent) VIRTUAL,
+                        reference_no    TEXT,
+                        is_card         INTEGER NOT NULL DEFAULT 0,
+                        payment_status  TEXT    NOT NULL DEFAULT 'pending'
+                                        CHECK (payment_status IN ('cash', 'pending', 'paid')),
+                        is_delivered    INTEGER NOT NULL DEFAULT 0,
+                        notes           TEXT
+                    );
+                    INSERT INTO transactions_new (id, created_at, operation_type, service_name, platform_id, customer_id, amount_spent, amount_required, reference_no, is_card, payment_status, is_delivered, notes)
+                        SELECT id, created_at, operation_type, service_name, platform_id, customer_id, amount_spent, amount_required, reference_no, is_card, payment_status, is_delivered, notes FROM transactions;
+                    DROP TABLE transactions;
+                    ALTER TABLE transactions_new RENAME TO transactions;
+                """)
+                conn.execute("PRAGMA foreign_keys = ON")
+                conn.commit()
+                print("[DB] transactions table migrated for manual_commission support")
+            except Exception as e:
+                print(f"[DB] transactions migration error: {e}")
 
         # Column migrations
         for sql in [
