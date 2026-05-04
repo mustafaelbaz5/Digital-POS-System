@@ -4,25 +4,37 @@ widgets.py — Component Library v4 (Pro Dark Edition)
 Unified, professional components with modern emerald accents.
 """
 
-from PyQt6.QtWidgets import (
-    QWidget, QLabel, QVBoxLayout, QHBoxLayout,
-    QTableWidget, QTableWidgetItem, QHeaderView,
-    QPushButton, QFrame, QSizePolicy, QScrollArea,
-    QDialog, QComboBox,
-)
-from PyQt6.QtCore import Qt, pyqtSignal, QSize, QDate, QTimer
+from PyQt6.QtCore import QDate, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import (
+    QDialog,
+    QFrame,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ui.styles.theme import (
-    COLORS, FONT, CARD_RADIUS, BORDER_RADIUS,
-    get_status_style, get_status_text,
-    BTN_HEIGHT, INPUT_HEIGHT, ROW_HEIGHT,
-    GAP_XS, GAP_SM, GAP_MD, GAP_LG, GAP_XL,
-    MARGIN_CONTENT, MARGIN_CARD
+    CARD_RADIUS,
+    COLORS,
+    FONT,
+    GAP_LG,
+    GAP_MD,
+    GAP_SM,
+    GAP_XS,
+    MARGIN_CARD,
+    MARGIN_CONTENT,
 )
 
 RTL = Qt.LayoutDirection.RightToLeft
-AlignLeft  = Qt.AlignmentFlag.AlignLeft  | Qt.AlignmentFlag.AlignVCenter
+AlignLeft = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
 AlignCenter = Qt.AlignmentFlag.AlignCenter
 
 
@@ -30,11 +42,13 @@ AlignCenter = Qt.AlignmentFlag.AlignCenter
 #  BaseDialog
 # ══════════════════════════════════════════════════════
 
+
 class BaseDialog(QDialog):
     """
     A professional base dialog with Header-Body-Footer structure.
     Ensures consistent spacing and visibility in dark mode.
     """
+
     def __init__(self, title: str, parent=None):
         super().__init__(parent)
         self.setLayoutDirection(RTL)
@@ -43,15 +57,17 @@ class BaseDialog(QDialog):
 
     def _build(self, title: str):
         self.root = QVBoxLayout(self)
-        self.root.setContentsMargins(1, 1, 1, 1) # Space for border
+        self.root.setContentsMargins(1, 1, 1, 1)  # Space for border
         self.root.setSpacing(0)
 
         # ─── Header
         header = QFrame()
         header.setObjectName("dialog_header")
         hl = QHBoxLayout(header)
-        hl.setContentsMargins(GAP_MD, GAP_MD, GAP_MD, GAP_MD) # Increased top/bottom margins
-        
+        hl.setContentsMargins(
+            GAP_MD, GAP_MD, GAP_MD, GAP_MD
+        )  # Increased top/bottom margins
+
         title_lbl = QLabel(title)
         title_lbl.setObjectName("dialog_title")
         hl.addWidget(title_lbl)
@@ -97,7 +113,9 @@ class BaseDialog(QDialog):
             header = self.findChild(QFrame, "dialog_header")
             if header and header.geometry().contains(event.pos()):
                 self._is_dragging = True
-                self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                self._drag_pos = (
+                    event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                )
                 event.accept()
             else:
                 super().mousePressEvent(event)
@@ -105,14 +123,14 @@ class BaseDialog(QDialog):
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if getattr(self, '_is_dragging', False):
+        if getattr(self, "_is_dragging", False):
             self.move(event.globalPosition().toPoint() - self._drag_pos)
             event.accept()
         else:
             super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if getattr(self, '_is_dragging', False):
+        if getattr(self, "_is_dragging", False):
             self._is_dragging = False
             event.accept()
         else:
@@ -130,6 +148,7 @@ class BaseDialog(QDialog):
 # ══════════════════════════════════════════════════════
 #  ScreenShell
 # ══════════════════════════════════════════════════════
+
 
 class ScreenShell(QWidget):
     def __init__(self, title: str, subtitle: str = "", parent=None):
@@ -187,7 +206,9 @@ class ScreenShell(QWidget):
 
         self._content_w = QWidget()
         self._content_l = QVBoxLayout(self._content_w)
-        self._content_l.setContentsMargins(MARGIN_CONTENT, GAP_LG, MARGIN_CONTENT, MARGIN_CONTENT)
+        self._content_l.setContentsMargins(
+            MARGIN_CONTENT, GAP_LG, MARGIN_CONTENT, MARGIN_CONTENT
+        )
         self._content_l.setSpacing(GAP_LG)
         scroll.setWidget(self._content_w)
 
@@ -211,20 +232,24 @@ class ScreenShell(QWidget):
 #  CardGroup
 # ══════════════════════════════════════════════════════
 
+
 class CardGroup(QFrame):
     """
     A container that groups items inside a styled card.
     Useful for separating logical sections of a screen.
     """
+
     def __init__(self, title: str = "", parent=None):
         super().__init__(parent)
         self.setObjectName("card")
         self.setLayoutDirection(RTL)
-        
+
         self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(MARGIN_CARD, MARGIN_CARD, MARGIN_CARD, MARGIN_CARD)
+        self._layout.setContentsMargins(
+            MARGIN_CARD, MARGIN_CARD, MARGIN_CARD, MARGIN_CARD
+        )
         self._layout.setSpacing(GAP_MD)
-        
+
         if title:
             header = SectionTitle(title)
             self._layout.addWidget(header)
@@ -233,7 +258,7 @@ class CardGroup(QFrame):
 
     def add_widget(self, widget: QWidget):
         self._layout.addWidget(widget)
-    
+
     def add_layout(self, layout: QVBoxLayout | QHBoxLayout):
         self._layout.addLayout(layout)
 
@@ -245,9 +270,16 @@ class CardGroup(QFrame):
 #  StatCard
 # ══════════════════════════════════════════════════════
 
+
 class StatCard(QWidget):
-    def __init__(self, title: str, value: str = "—",
-                 accent_color: str = None, icon: str = "", parent=None):
+    def __init__(
+        self,
+        title: str,
+        value: str = "—",
+        accent_color: str = None,
+        icon: str = "",
+        parent=None,
+    ):
         super().__init__(parent)
         self._accent = accent_color or COLORS["accent"]
         self._build(title, value, icon)
@@ -309,6 +341,7 @@ class StatCard(QWidget):
 #  PlatformCard
 # ══════════════════════════════════════════════════════
 
+
 class PlatformCard(QWidget):
     deposit_clicked = pyqtSignal(int)
 
@@ -330,9 +363,9 @@ class PlatformCard(QWidget):
 
         ptype = p.get("type", "machine")
         type_color, type_text = {
-            "machine":  (COLORS["blue"],    "ماكينة"),
-            "wallet":   (COLORS["purple"],  "محفظة"),
-            "instapay": (COLORS["cyan"],    "انستا باي"),
+            "machine": (COLORS["blue"], "ماكينة"),
+            "wallet": (COLORS["purple"], "محفظة"),
+            "instapay": (COLORS["cyan"], "انستا باي"),
         }.get(ptype, (COLORS["text_muted"], ptype))
 
         # ─ Header row
@@ -381,6 +414,7 @@ class PlatformCard(QWidget):
 #  DataTable
 # ══════════════════════════════════════════════════════
 
+
 class DataTable(QTableWidget):
     def __init__(self, columns: list, parent=None):
         super().__init__(parent)
@@ -394,11 +428,15 @@ class DataTable(QTableWidget):
         for i, col in enumerate(columns):
             w = col[1] if len(col) > 1 else -1
             if w == -1:
-                self.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
+                self.horizontalHeader().setSectionResizeMode(
+                    i, QHeaderView.ResizeMode.Stretch
+                )
             else:
                 self.setColumnWidth(i, w)
-                self.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeMode.Interactive) # Changed from Fixed to allow responsiveness
-        
+                self.horizontalHeader().setSectionResizeMode(
+                    i, QHeaderView.ResizeMode.Interactive
+                )  # Changed from Fixed to allow responsiveness
+
         self.horizontalHeader().setStretchLastSection(True)
 
         self.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -420,7 +458,7 @@ class DataTable(QTableWidget):
                 text-align: center;
             }}
         """)
-        
+
         # Grid Layout centering & padding
         self.setAlternatingRowColors(True)
         self.setStyleSheet(f"""
@@ -444,8 +482,15 @@ class DataTable(QTableWidget):
             }}
         """)
 
-    def set_cell(self, row: int, col: int, text: str,
-                 color: str = None, bold: bool = False, align=None):
+    def set_cell(
+        self,
+        row: int,
+        col: int,
+        text: str,
+        color: str = None,
+        bold: bool = False,
+        align=None,
+    ):
         item = QTableWidgetItem(str(text) if text is not None else "—")
         item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         if color:
@@ -461,7 +506,9 @@ class DataTable(QTableWidget):
         """
         Singular convenience method for add_action_buttons.
         """
-        return self.add_action_buttons(row, col, [{'text': text, 'callback': callback, 'role': role}])[0]
+        return self.add_action_buttons(
+            row, col, [{"text": text, "callback": callback, "role": role}]
+        )[0]
 
     def add_action_buttons(self, row: int, col: int, buttons_data: list):
         """
@@ -470,31 +517,41 @@ class DataTable(QTableWidget):
         """
         wrapper = QWidget()
         wrapper.setObjectName("cell_wrapper")
-        wrapper.setStyleSheet("#cell_wrapper { background: transparent; border: none; }")
+        wrapper.setStyleSheet(
+            "#cell_wrapper { background: transparent; border: none; }"
+        )
         layout = QHBoxLayout(wrapper)
-        layout.setContentsMargins(5, 2, 5, 2) # Specific professional margins
+        layout.setContentsMargins(5, 2, 5, 2)  # Specific professional margins
         layout.setSpacing(GAP_SM)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         btns = []
         for data in buttons_data:
-            btn = QPushButton(data.get('text', ''))
+            btn = QPushButton(data.get("text", ""))
             btn.setObjectName(f"btn_{data.get('role', 'ghost')}")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setMinimumHeight(24)
             btn.setMinimumWidth(80)
-            btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+            btn.setSizePolicy(
+                QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
+            )
 
-            if 'callback' in data:
-                btn.clicked.connect(data['callback'])
+            if "callback" in data:
+                btn.clicked.connect(data["callback"])
             layout.addWidget(btn)
             btns.append(btn)
-        
+
         self.setCellWidget(row, col, wrapper)
         return btns
 
-    def add_status_badge(self, row: int, col: int, status: str,
-                         operation_type: str = "outbound", is_delivered: int = 0):
+    def add_status_badge(
+        self,
+        row: int,
+        col: int,
+        status: str,
+        operation_type: str = "outbound",
+        is_delivered: int = 0,
+    ):
         if operation_type == "inbound":
             if is_delivered:
                 text, color = "تم التسليم ", COLORS["green"]
@@ -518,6 +575,7 @@ class DataTable(QTableWidget):
 #  SectionTitle
 # ══════════════════════════════════════════════════════
 
+
 class SectionTitle(QWidget):
     def __init__(self, title: str, subtitle: str = "", parent=None):
         super().__init__(parent)
@@ -527,13 +585,17 @@ class SectionTitle(QWidget):
         layout.setSpacing(GAP_XS)
 
         t = QLabel(title)
-        t.setStyleSheet(f"color:{COLORS['text_primary']}; font-size:{FONT['lg']}; font-weight:bold;")
+        t.setStyleSheet(
+            f"color:{COLORS['text_primary']}; font-size:{FONT['lg']}; font-weight:bold;"
+        )
         t.setAlignment(AlignLeft)
         layout.addWidget(t)
 
         if subtitle:
             s = QLabel(subtitle)
-            s.setStyleSheet(f"color:{COLORS['text_secondary']}; font-size:{FONT['sm']};")
+            s.setStyleSheet(
+                f"color:{COLORS['text_secondary']}; font-size:{FONT['sm']};"
+            )
             s.setAlignment(AlignLeft)
             layout.addWidget(s)
 
@@ -541,6 +603,7 @@ class SectionTitle(QWidget):
 # ══════════════════════════════════════════════════════
 #  GroupLabel
 # ══════════════════════════════════════════════════════
+
 
 class GroupLabel(QWidget):
     def __init__(self, text: str, color: str = None, parent=None):
@@ -558,13 +621,17 @@ class GroupLabel(QWidget):
         layout.addWidget(dot)
 
         lbl = QLabel(text)
-        lbl.setStyleSheet(f"color:{color}; font-size:{FONT['xs']}; font-weight:bold; text-transform:uppercase;")
+        lbl.setStyleSheet(
+            f"color:{color}; font-size:{FONT['xs']}; font-weight:bold; text-transform:uppercase;"
+        )
         lbl.setAlignment(AlignLeft)
         layout.addWidget(lbl)
 
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
-        line.setStyleSheet(f"background:{COLORS['border']}; max-height:1px; border:none;")
+        line.setStyleSheet(
+            f"background:{COLORS['border']}; max-height:1px; border:none;"
+        )
         layout.addWidget(line)
 
 
@@ -572,9 +639,11 @@ class GroupLabel(QWidget):
 #  InfoRow
 # ══════════════════════════════════════════════════════
 
+
 class InfoRow(QWidget):
-    def __init__(self, label: str, value: str = "—",
-                 value_color: str = None, parent=None):
+    def __init__(
+        self, label: str, value: str = "—", value_color: str = None, parent=None
+    ):
         super().__init__(parent)
         self.setLayoutDirection(RTL)
 
@@ -605,6 +674,7 @@ class InfoRow(QWidget):
 #  Utilities
 # ══════════════════════════════════════════════════════
 
+
 def make_divider() -> QFrame:
     line = QFrame()
     line.setFrameShape(QFrame.Shape.HLine)
@@ -612,8 +682,7 @@ def make_divider() -> QFrame:
     return line
 
 
-def make_section_header(title: str, btn_text: str = None,
-                        btn_callback=None) -> QWidget:
+def make_section_header(title: str, btn_text: str = None, btn_callback=None) -> QWidget:
     w = QWidget()
     w.setLayoutDirection(RTL)
     row = QHBoxLayout(w)
@@ -621,7 +690,9 @@ def make_section_header(title: str, btn_text: str = None,
     row.setSpacing(GAP_MD)
 
     lbl = QLabel(title)
-    lbl.setStyleSheet(f"color:{COLORS['text_primary']}; font-size:{FONT['lg']}; font-weight:bold;")
+    lbl.setStyleSheet(
+        f"color:{COLORS['text_primary']}; font-size:{FONT['lg']}; font-weight:bold;"
+    )
     lbl.setAlignment(AlignLeft)
     row.addWidget(lbl)
     row.addStretch()
@@ -640,6 +711,7 @@ def make_section_header(title: str, btn_text: str = None,
 #  MiniStatCard
 # ══════════════════════════════════════════════════════
 
+
 class MiniStatCard(QFrame):
     def __init__(self, title: str, value: str = "—", color: str = None, parent=None):
         super().__init__(parent)
@@ -652,7 +724,9 @@ class MiniStatCard(QFrame):
         layout.setSpacing(6)
 
         title_lbl = QLabel(title)
-        title_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: {FONT['xs']}; font-weight: bold;")
+        title_lbl.setStyleSheet(
+            f"color: {COLORS['text_secondary']}; font-size: {FONT['xs']}; font-weight: bold;"
+        )
         title_lbl.setAlignment(AlignLeft)
         layout.addWidget(title_lbl)
 
@@ -675,11 +749,13 @@ class MiniStatCard(QFrame):
 #  DateRangePicker
 # ══════════════════════════════════════════════════════
 
+
 class DateRangePicker(QFrame):
     """
     Unified filter for time periods using action buttons.
     Supports "All", Today, Yesterday, Week, Month, Last Month.
     """
+
     changed = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -732,7 +808,7 @@ class DateRangePicker(QFrame):
             btn.clicked.connect(lambda checked, v=val: self._on_clicked(v))
             layout.addWidget(btn)
             self.buttons.append(btn)
-            
+
             if val == "all":
                 btn.setChecked(True)
 
@@ -740,26 +816,38 @@ class DateRangePicker(QFrame):
 
     def _on_clicked(self, val):
         today = QDate.currentDate()
-        
+
         if val == "all":
             self._current_range = (None, None)
         elif val == "today":
-            self._current_range = (today.toString("yyyy-MM-dd"), today.toString("yyyy-MM-dd"))
+            self._current_range = (
+                today.toString("yyyy-MM-dd"),
+                today.toString("yyyy-MM-dd"),
+            )
         elif val == "yesterday":
             y = today.addDays(-1)
             self._current_range = (y.toString("yyyy-MM-dd"), y.toString("yyyy-MM-dd"))
         elif val == "week":
             start = today.addDays(-(today.dayOfWeek() % 7))
-            self._current_range = (start.toString("yyyy-MM-dd"), today.toString("yyyy-MM-dd"))
+            self._current_range = (
+                start.toString("yyyy-MM-dd"),
+                today.toString("yyyy-MM-dd"),
+            )
         elif val == "month":
             start = QDate(today.year(), today.month(), 1)
-            self._current_range = (start.toString("yyyy-MM-dd"), today.toString("yyyy-MM-dd"))
+            self._current_range = (
+                start.toString("yyyy-MM-dd"),
+                today.toString("yyyy-MM-dd"),
+            )
         elif val == "last_month":
             lm = today.addMonths(-1)
             start = QDate(lm.year(), lm.month(), 1)
             end = QDate(lm.year(), lm.month(), lm.daysInMonth())
-            self._current_range = (start.toString("yyyy-MM-dd"), end.toString("yyyy-MM-dd"))
-        
+            self._current_range = (
+                start.toString("yyyy-MM-dd"),
+                end.toString("yyyy-MM-dd"),
+            )
+
         self.changed.emit()
 
     def get_range(self):
@@ -770,19 +858,23 @@ class DateRangePicker(QFrame):
 #  Toast Notification
 # ══════════════════════════════════════════════════════
 
+
 class Toast(QLabel):
     """
     A non-intrusive, self-closing notification message.
     """
+
     def __init__(self, parent, message: str, type: str = "success"):
         # We use parent.window() to ensure it floats over everything in the dialog/window
         super().__init__(parent.window())
         self.setText(message)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
+
         bg = COLORS.get(type, COLORS["accent"])
-        if type == "success": bg = COLORS["green"]
-        if type == "danger" or type == "error": bg = COLORS["red"]
+        if type == "success":
+            bg = COLORS["green"]
+        if type == "danger" or type == "error":
+            bg = COLORS["red"]
 
         self.setStyleSheet(f"""
             QLabel {{
@@ -795,11 +887,11 @@ class Toast(QLabel):
                 border: 2px solid rgba(255, 255, 255, 0.2);
             }}
         """)
-        
+
         self.adjustSize()
         self.show()
         self._position()
-        
+
         # Auto-close timer
         QTimer.singleShot(2000, self.deleteLater)
 
@@ -812,7 +904,6 @@ class Toast(QLabel):
             y = rect.height() - self.height() - 40
             self.move(x, y)
 
+
 def show_toast(parent, message: str, type: str = "success"):
     Toast(parent, message, type)
-
-

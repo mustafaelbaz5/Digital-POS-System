@@ -2,34 +2,38 @@
 customers_screen.py — شاشة العملاء (Professional Rebuild v5)
 """
 
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QLineEdit, QComboBox, QTextEdit,
-    QDialog, QFormLayout, QMessageBox, QTabWidget,
-    QMenu, QFrame, QSizePolicy, QStackedWidget
-)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction
-
-from ui.styles.theme import (
-    COLORS, FONT, ROW_HEIGHT,
-    GAP_XS, GAP_SM, GAP_MD, GAP_LG, GAP_XL,
-    MARGIN_CARD, MARGIN_CONTENT
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QFormLayout,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QSizePolicy,
+    QTabWidget,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
-from ui.components.widgets import (
-    ScreenShell, DataTable, CardGroup, make_divider, BaseDialog
-)
-from utils.formatters import fmt_currency
 
 import database as db
+from ui.components.widgets import BaseDialog, DataTable, ScreenShell
+from ui.styles.theme import COLORS, FONT, GAP_MD, GAP_SM, GAP_XS, ROW_HEIGHT
+from utils.formatters import fmt_currency
 
-RTL    = Qt.LayoutDirection.RightToLeft
-ALeft  = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+RTL = Qt.LayoutDirection.RightToLeft
+ALeft = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
 
 
 # ══════════════════════════════════════════════════════
 #  CustomersScreen
 # ══════════════════════════════════════════════════════
+
 
 class CustomersScreen(ScreenShell):
     open_statement = pyqtSignal(int)
@@ -57,8 +61,11 @@ class CustomersScreen(ScreenShell):
         self._on_tab(self.tabs.currentIndex())
 
     def _on_tab(self, idx: int):
-        if idx == 0: self.customers_tab.load_data()
-        else:        self.groups_tab.load_data()
+        if idx == 0:
+            self.customers_tab.load_data()
+        else:
+            self.groups_tab.load_data()
+
 
 class CustomersTab(QWidget):
     open_statement = pyqtSignal(int)
@@ -90,8 +97,10 @@ class CustomersTab(QWidget):
 
         self.group_filter = QComboBox()
         self.group_filter.setFixedHeight(42)
-        self.group_filter.setMinimumWidth(200) # Expanded width
-        self.group_filter.setStyleSheet(f"background: {COLORS['bg_hover']}; font-weight: bold; font-size: 14px;")
+        self.group_filter.setMinimumWidth(200)  # Expanded width
+        self.group_filter.setStyleSheet(
+            f"background: {COLORS['bg_hover']}; font-weight: bold; font-size: 14px;"
+        )
         self.group_filter.currentIndexChanged.connect(self.load_data)
         tb_row.addWidget(self.group_filter)
 
@@ -112,25 +121,27 @@ class CustomersTab(QWidget):
         # layout.addSpacing(GAP_SM)
 
         cols = [
-            ("الاسم",    -1), # Stretches to fill space
+            ("الاسم", -1),  # Stretches to fill space
             ("التليفون", 130),
             ("المجموعة", 130),
-            ("عليه 🔴",  120),
-            ("له 🟢",    120),
-            ("ملاحظات",   200),
-            ("الكشف",    150),
+            ("عليه 🔴", 120),
+            ("له 🟢", 120),
+            ("ملاحظات", 200),
+            ("الكشف", 150),
         ]
         self.table = DataTable(cols)
-        self.table.horizontalHeader().setVisible(True) 
+        self.table.horizontalHeader().setVisible(True)
         self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._ctx_menu)
-        
+
         # Disable internal scroll
         self.table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        
+        self.table.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
+        )
+
         layout.addWidget(self.table)
 
         self.total_lbl = QLabel("")
@@ -153,11 +164,14 @@ class CustomersTab(QWidget):
         self._load_table()
 
     def _load_table(self):
-        query    = self.search.text().strip()
+        query = self.search.text().strip()
         group_id = self.group_filter.currentData()
-        if query:    customers = db.search_customers(query)
-        elif group_id: customers = db.get_customers_by_group(group_id)
-        else:          customers = db.get_all_customers()
+        if query:
+            customers = db.search_customers(query)
+        elif group_id:
+            customers = db.get_customers_by_group(group_id)
+        else:
+            customers = db.get_all_customers()
 
         customers = sorted(customers, key=lambda c: -(c.get("total_debt") or 0))
         self._customers = customers
@@ -169,16 +183,22 @@ class CustomersTab(QWidget):
         for row, c in enumerate(customers):
             self.table.set_cell(row, 0, c["name"], bold=True)
             self.table.set_cell(row, 1, c.get("phone") or "—", COLORS["text_secondary"])
-            self.table.set_cell(row, 2, c.get("group_name") or "—", COLORS["text_muted"])
+            self.table.set_cell(
+                row, 2, c.get("group_name") or "—", COLORS["text_muted"]
+            )
 
             debt = c.get("total_debt") or 0
             if debt > 0:
-                self.table.set_cell(row, 3, fmt_currency(debt), COLORS["red"], bold=True)
+                self.table.set_cell(
+                    row, 3, fmt_currency(debt), COLORS["red"], bold=True
+                )
                 self.table.set_cell(row, 4, "—", COLORS["text_muted"])
                 total_owed += debt
             elif debt < 0:
                 self.table.set_cell(row, 3, "—", COLORS["text_muted"])
-                self.table.set_cell(row, 4, fmt_currency(abs(debt)), COLORS["green"], bold=True)
+                self.table.set_cell(
+                    row, 4, fmt_currency(abs(debt)), COLORS["green"], bold=True
+                )
                 total_due += abs(debt)
             else:
                 self.table.set_cell(row, 3, "—", COLORS["text_muted"])
@@ -188,54 +208,77 @@ class CustomersTab(QWidget):
 
             # task 8: prominent statement button
             self.table.add_action_button(
-                row, 6, "📊 كشف الحساب", 
-                lambda _, cid=c["id"]: self._open_statement(cid), 
-                role="statement"
+                row,
+                6,
+                "📊 كشف الحساب",
+                lambda _, cid=c["id"]: self._open_statement(cid),
+                role="statement",
             )
 
         parts = [f"إجمالي: {len(customers)} عميل"]
-        if total_owed: parts.append(f"عليهم: {fmt_currency(total_owed)}")
-        if total_due:  parts.append(f"لهم: {fmt_currency(total_due)}")
+        if total_owed:
+            parts.append(f"عليهم: {fmt_currency(total_owed)}")
+        if total_due:
+            parts.append(f"لهم: {fmt_currency(total_due)}")
         self.total_lbl.setText("  ·  ".join(parts))
-        
+
         # Update table height to fit all rows (Full-Page Scroll)
-        self.table.setMinimumHeight(self.table.verticalHeader().length() + self.table.horizontalHeader().height() + 2)
+        self.table.setMinimumHeight(
+            self.table.verticalHeader().length()
+            + self.table.horizontalHeader().height()
+            + 2
+        )
 
     def _add_customer(self):
-        if CustomerDialog(self).exec(): self.load_data()
+        if CustomerDialog(self).exec():
+            self.load_data()
 
     def _open_statement(self, cid: int):
         from ui.screens.statement_screen import CustomerStatementDialog
+
         CustomerStatementDialog(cid, self).exec()
 
     def _ctx_menu(self, pos):
         row = self.table.rowAt(pos.y())
-        if row < 0 or row >= len(self._customers): return
-        c   = self._customers[row]
+        if row < 0 or row >= len(self._customers):
+            return
+        c = self._customers[row]
         menu = QMenu(self)
-        menu.addAction(QAction("  كشف حساب", self, triggered=lambda: self._open_statement(c["id"])))
-        menu.addAction(QAction("✏️  تعديل",    self, triggered=lambda: self._edit(c)))
+        menu.addAction(
+            QAction("  كشف حساب", self, triggered=lambda: self._open_statement(c["id"]))
+        )
+        menu.addAction(QAction("✏️  تعديل", self, triggered=lambda: self._edit(c)))
         menu.addSeparator()
-        menu.addAction(QAction("🗑️  حذف",      self, triggered=lambda: self._delete(c)))
+        menu.addAction(QAction("🗑️  حذف", self, triggered=lambda: self._delete(c)))
         menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def _edit(self, c: dict):
         full = db.get_customer_by_id(c["id"])
-        if CustomerDialog(self, full).exec(): self.load_data()
+        if CustomerDialog(self, full).exec():
+            self.load_data()
 
     def _delete(self, c: dict):
         debt = c.get("total_debt", 0)
-        msg  = f"هل تريد حذف العميل [{c['name']}]؟"
-        if debt and debt > 0: msg += f"\n⚠️  لديه مديونية {fmt_currency(debt)}"
-        if QMessageBox.question(self, "تأكيد الحذف", msg,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        ) == QMessageBox.StandardButton.Yes:
-            db.delete_customer(c["id"]); self.load_data()
+        msg = f"هل تريد حذف العميل [{c['name']}]؟"
+        if debt and debt > 0:
+            msg += f"\n⚠️  لديه مديونية {fmt_currency(debt)}"
+        if (
+            QMessageBox.question(
+                self,
+                "تأكيد الحذف",
+                msg,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            == QMessageBox.StandardButton.Yes
+        ):
+            db.delete_customer(c["id"])
+            self.load_data()
 
 
 # ══════════════════════════════════════════════════════
 #  GroupsTab
 # ══════════════════════════════════════════════════════
+
 
 class GroupsTab(QWidget):
 
@@ -276,35 +319,39 @@ class GroupsTab(QWidget):
         layout.addSpacing(GAP_SM)
 
         cols = [
-            ("اسم المجموعة", -1), # Stretch
-            ("القائد",        180),
-            ("ملاحظات",        200),
-            ("إجراءات",       210),
+            ("اسم المجموعة", -1),  # Stretch
+            ("القائد", 180),
+            ("ملاحظات", 200),
+            ("إجراءات", 210),
         ]
         self.table = DataTable(cols)
         self.table.horizontalHeader().setVisible(True)
         self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._ctx_menu)
-        
+
         # Full page scroll logic
         self.table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        
+        self.table.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
+        )
+
         layout.addWidget(self.table)
 
     def load_data(self):
         self._all_groups = db.get_all_groups()
-        self._groups     = list(self._all_groups)
+        self._groups = list(self._all_groups)
         self._render()
 
     def _filter(self, text: str):
-        if not self._all_groups: return
+        if not self._all_groups:
+            return
         q = text.strip().lower()
         self._groups = (
             [g for g in self._all_groups if q in g["name"].lower()]
-            if q else list(self._all_groups)
+            if q
+            else list(self._all_groups)
         )
         self._render()
 
@@ -314,50 +361,83 @@ class GroupsTab(QWidget):
 
         for row, g in enumerate(self._groups):
             self.table.set_cell(row, 0, g["name"], bold=True)
-            self.table.set_cell(row, 1, g.get("leader_name") or "—", COLORS["text_secondary"])
+            self.table.set_cell(
+                row, 1, g.get("leader_name") or "—", COLORS["text_secondary"]
+            )
             self.table.set_cell(row, 2, g.get("notes") or "—", COLORS["text_muted"])
 
             # task 10: clear, well-spaced action buttons
-            self.table.add_action_buttons(row, 3, [
-                {'text': "✏️ تعديل", 'callback': lambda _, g=g: self._edit_group(g), 'role': 'secondary'},
-                {'text': "📊 تقرير", 'callback': lambda _, gid=g["id"]: self._show_report(gid), 'role': 'statement'}
-            ])
-            
+            self.table.add_action_buttons(
+                row,
+                3,
+                [
+                    {
+                        "text": "✏️ تعديل",
+                        "callback": lambda _, g=g: self._edit_group(g),
+                        "role": "secondary",
+                    },
+                    {
+                        "text": "📊 تقرير",
+                        "callback": lambda _, gid=g["id"]: self._show_report(gid),
+                        "role": "statement",
+                    },
+                ],
+            )
+
         # Update table height to fit all rows (Full-Page Scroll)
-        self.table.setMinimumHeight(self.table.verticalHeader().length() + self.table.horizontalHeader().height() + 2)
+        self.table.setMinimumHeight(
+            self.table.verticalHeader().length()
+            + self.table.horizontalHeader().height()
+            + 2
+        )
 
     def _add_group(self):
-        if GroupDialog(self).exec(): self.load_data()
+        if GroupDialog(self).exec():
+            self.load_data()
 
     def _edit_group(self, g: dict):
-        if GroupDialog(self, g).exec(): self.load_data()
+        if GroupDialog(self, g).exec():
+            self.load_data()
 
     def _show_report(self, gid: int):
         from ui.screens.statement_screen import GroupReportDialog
+
         GroupReportDialog(gid, self).exec()
 
     def _ctx_menu(self, pos):
         row = self.table.rowAt(pos.y())
-        if row < 0 or row >= len(self._groups): return
-        g   = self._groups[row]
+        if row < 0 or row >= len(self._groups):
+            return
+        g = self._groups[row]
         menu = QMenu(self)
-        menu.addAction(QAction("📊  تقرير",  self, triggered=lambda: self._show_report(g["id"])))
-        menu.addAction(QAction("✏️  تعديل", self, triggered=lambda: self._edit_group(g)))
+        menu.addAction(
+            QAction("📊  تقرير", self, triggered=lambda: self._show_report(g["id"]))
+        )
+        menu.addAction(
+            QAction("✏️  تعديل", self, triggered=lambda: self._edit_group(g))
+        )
         menu.addSeparator()
-        menu.addAction(QAction("🗑️  حذف",   self, triggered=lambda: self._delete(g)))
+        menu.addAction(QAction("🗑️  حذف", self, triggered=lambda: self._delete(g)))
         menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def _delete(self, g: dict):
-        if QMessageBox.question(self, "تأكيد الحذف",
-            f"هل تريد حذف المجموعة [{g['name']}]؟\nالعملاء سيبقون بدون مجموعة.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        ) == QMessageBox.StandardButton.Yes:
-            db.delete_group(g["id"]); self.load_data()
+        if (
+            QMessageBox.question(
+                self,
+                "تأكيد الحذف",
+                f"هل تريد حذف المجموعة [{g['name']}]؟\nالعملاء سيبقون بدون مجموعة.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            == QMessageBox.StandardButton.Yes
+        ):
+            db.delete_group(g["id"])
+            self.load_data()
 
 
 # ══════════════════════════════════════════════════════
 #  CustomerDialog
 # ══════════════════════════════════════════════════════
+
 
 class CustomerDialog(BaseDialog):
 
@@ -367,16 +447,17 @@ class CustomerDialog(BaseDialog):
         self.customer = customer
         self.setMinimumWidth(460)
         self._build_form()
-        if customer: self._fill()
+        if customer:
+            self._fill()
 
     def _build_form(self):
         form = QFormLayout()
         form.setSpacing(GAP_MD)
         form.setLabelAlignment(ALeft)
 
-        self.name_input  = QLineEdit()
+        self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("اسم العميل *")
-        
+
         self.phone_input = QLineEdit()
         self.phone_input.setPlaceholderText("رقم التليفون")
 
@@ -393,9 +474,9 @@ class CustomerDialog(BaseDialog):
         form.addRow("التليفون:", self.phone_input)
         form.addRow("المجموعة:", self.group_combo)
         form.addRow("ملاحظات:", self.notes_input)
-        
+
         self.body.addLayout(form)
-        
+
         # Footer buttons
         self.add_stretch()
         self.add_button("إلغاء", self.reject, role="secondary")
@@ -408,22 +489,30 @@ class CustomerDialog(BaseDialog):
         gid = self.customer.get("group_id")
         if gid:
             idx = self.group_combo.findData(gid)
-            if idx >= 0: self.group_combo.setCurrentIndex(idx)
+            if idx >= 0:
+                self.group_combo.setCurrentIndex(idx)
 
     def _save(self):
         name = self.name_input.text().strip()
         if not name:
-            QMessageBox.warning(self, "تنبيه", "اسم العميل مطلوب"); return
+            QMessageBox.warning(self, "تنبيه", "اسم العميل مطلوب")
+            return
         try:
-            db.update_customer(self.customer["id"], name,
-                self.phone_input.text().strip(),
-                self.group_combo.currentData(),
-                self.notes_input.toPlainText().strip()
-            ) if self.customer else db.add_customer(
-                name,
-                self.phone_input.text().strip(),
-                self.group_combo.currentData(),
-                self.notes_input.toPlainText().strip()
+            (
+                db.update_customer(
+                    self.customer["id"],
+                    name,
+                    self.phone_input.text().strip(),
+                    self.group_combo.currentData(),
+                    self.notes_input.toPlainText().strip(),
+                )
+                if self.customer
+                else db.add_customer(
+                    name,
+                    self.phone_input.text().strip(),
+                    self.group_combo.currentData(),
+                    self.notes_input.toPlainText().strip(),
+                )
             )
             self.accept()
         except Exception as e:
@@ -434,6 +523,7 @@ class CustomerDialog(BaseDialog):
 #  GroupDialog
 # ══════════════════════════════════════════════════════
 
+
 class GroupDialog(BaseDialog):
 
     def __init__(self, parent=None, group: dict = None):
@@ -442,21 +532,22 @@ class GroupDialog(BaseDialog):
         self.group = group
         self.setMinimumWidth(400)
         self._build_form()
-        if group: self._fill()
+        if group:
+            self._fill()
 
     def _build_form(self):
         form = QFormLayout()
         form.setSpacing(GAP_MD)
         form.setLabelAlignment(ALeft)
 
-        self.name_input   = QLineEdit()
+        self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("اسم المجموعة *")
-        
+
         self.leader_combo = QComboBox()
         self.leader_combo.addItem("بدون قائد", None)
         for c in db.get_all_customers():
             self.leader_combo.addItem(c["name"], c["id"])
-            
+
         self.notes_input = QTextEdit()
         self.notes_input.setMaximumHeight(80)
         self.notes_input.setPlaceholderText("ملاحظات (اختياري)")
@@ -464,9 +555,9 @@ class GroupDialog(BaseDialog):
         form.addRow("الاسم *:", self.name_input)
         form.addRow("القائد:", self.leader_combo)
         form.addRow("ملاحظات:", self.notes_input)
-        
+
         self.body.addLayout(form)
-        
+
         # Footer buttons
         self.add_stretch()
         self.add_button("إلغاء", self.reject, role="secondary")
@@ -478,17 +569,21 @@ class GroupDialog(BaseDialog):
         lid = self.group.get("leader_id")
         if lid:
             idx = self.leader_combo.findData(lid)
-            if idx >= 0: self.leader_combo.setCurrentIndex(idx)
+            if idx >= 0:
+                self.leader_combo.setCurrentIndex(idx)
 
     def _save(self):
         name = self.name_input.text().strip()
         if not name:
-            QMessageBox.warning(self, "تنبيه", "اسم المجموعة مطلوب"); return
+            QMessageBox.warning(self, "تنبيه", "اسم المجموعة مطلوب")
+            return
         try:
-            lid   = self.leader_combo.currentData()
+            lid = self.leader_combo.currentData()
             notes = self.notes_input.toPlainText().strip()
-            if self.group: db.update_group(self.group["id"], name, lid, notes)
-            else:          db.add_group(name, lid, notes)
+            if self.group:
+                db.update_group(self.group["id"], name, lid, notes)
+            else:
+                db.add_group(name, lid, notes)
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "خطأ", str(e))
@@ -496,7 +591,9 @@ class GroupDialog(BaseDialog):
 
 # ── local helpers ──────────────────────────────────────
 
+
 def _make_div() -> QFrame:
-    f = QFrame(); f.setFrameShape(QFrame.Shape.HLine)
+    f = QFrame()
+    f.setFrameShape(QFrame.Shape.HLine)
     f.setStyleSheet(f"background:{COLORS['border']}; max-height:1px; border:none;")
     return f

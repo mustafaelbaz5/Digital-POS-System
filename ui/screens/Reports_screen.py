@@ -2,34 +2,40 @@
 Reports_screen.py — شاشة التقارير والجرد (Pro Dark Edition)
 """
 
+from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QTabWidget, QFrame, QDateEdit,
-    QComboBox, QMessageBox, QGridLayout, QSizePolicy,
-    QLineEdit
+    QComboBox,
+    QDateEdit,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QSizePolicy,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QDate, pyqtSignal
-from PyQt6.QtGui import QFont
-from ui.styles.theme import (
-    COLORS, FONT, CARD_RADIUS, ROW_HEIGHT,
-    GAP_XS, GAP_SM, GAP_MD, GAP_LG, GAP_XL,
-    MARGIN_CONTENT, MARGIN_CARD
-)
-from ui.components.widgets import ScreenShell, DataTable, SectionTitle, make_divider, CardGroup, DateRangePicker, MiniStatCard, BaseDialog, Toast
-from utils.formatters import fmt_currency
 
 import database as db
-
-
-
-
-
-
-
+from ui.components.widgets import (
+    BaseDialog,
+    CardGroup,
+    DataTable,
+    DateRangePicker,
+    MiniStatCard,
+    ScreenShell,
+    Toast,
+)
+from ui.styles.theme import COLORS, FONT, GAP_LG, GAP_MD, ROW_HEIGHT
+from utils.formatters import fmt_currency
 
 # ══════════════════════════════════════════
 #  Tab 1: الجرد العام
 # ══════════════════════════════════════════
+
 
 class InventoryTab(QWidget):
 
@@ -52,22 +58,32 @@ class InventoryTab(QWidget):
         stats_group = CardGroup("📊  ملخص الفترة")
         self._cards_grid = QGridLayout()
         self._cards_grid.setSpacing(GAP_MD)
-        
-        self.card_cash     = MiniStatCard("الخزينة النقدية",    color=COLORS["green"])
-        self.card_machines = MiniStatCard("إجمالي الماكينات",  color=COLORS["blue"])
-        self.card_wallets  = MiniStatCard("إجمالي المحافظ",    color=COLORS["purple"])
-        self.card_instapay = MiniStatCard("إجمالي انستا باي",  color=COLORS["cyan"])
-        self.card_debts    = MiniStatCard("إجمالي الديون",     color=COLORS["yellow"])
-        self.card_profit   = MiniStatCard("أرباح الفترة",      color=COLORS["accent"])
-        self.card_budget   = MiniStatCard("الميزانية الرئيسية",color=COLORS["text_primary"])
-        self.card_pending  = MiniStatCard("إجمالي المؤجل",     color=COLORS["red"])
 
-        for i, card in enumerate([
-            self.card_cash, self.card_machines, self.card_wallets, self.card_instapay,
-            self.card_debts, self.card_profit, self.card_budget, self.card_pending,
-        ]):
+        self.card_cash = MiniStatCard("الخزينة النقدية", color=COLORS["green"])
+        self.card_machines = MiniStatCard("إجمالي الماكينات", color=COLORS["blue"])
+        self.card_wallets = MiniStatCard("إجمالي المحافظ", color=COLORS["purple"])
+        self.card_instapay = MiniStatCard("إجمالي انستا باي", color=COLORS["cyan"])
+        self.card_debts = MiniStatCard("إجمالي الديون", color=COLORS["yellow"])
+        self.card_profit = MiniStatCard("أرباح الفترة", color=COLORS["accent"])
+        self.card_budget = MiniStatCard(
+            "الميزانية الرئيسية", color=COLORS["text_primary"]
+        )
+        self.card_pending = MiniStatCard("إجمالي المؤجل", color=COLORS["red"])
+
+        for i, card in enumerate(
+            [
+                self.card_cash,
+                self.card_machines,
+                self.card_wallets,
+                self.card_instapay,
+                self.card_debts,
+                self.card_profit,
+                self.card_budget,
+                self.card_pending,
+            ]
+        ):
             self._cards_grid.addWidget(card, i // 4, i % 4)
-        
+
         stats_group.add_layout(self._cards_grid)
         layout.addWidget(stats_group)
 
@@ -76,17 +92,19 @@ class InventoryTab(QWidget):
 
         # ── Platforms table
         platforms_group = CardGroup("🏢  تفاصيل المنصات")
-        
+
         columns = [
-            ("المنصة",       180),
-            ("النوع",          120),
-            ("الرصيد",        -1),
-            ("الحد الشهري",   130),
-            ("المستخدم",      -1),
-            ("المتبقي",       -1),
+            ("المنصة", 180),
+            ("النوع", 120),
+            ("الرصيد", -1),
+            ("الحد الشهري", 130),
+            ("المستخدم", -1),
+            ("المتبقي", -1),
         ]
         self.platforms_table = DataTable(columns)
-        self.platforms_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.platforms_table.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         platforms_group.add_widget(self.platforms_table)
         layout.addWidget(platforms_group)
 
@@ -95,7 +113,9 @@ class InventoryTab(QWidget):
 
         header = QHBoxLayout()
         formula = QLabel("(أرصدة + كاش + ديون)  =  (ميزانية + أرباح كلية)")
-        formula.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: {FONT['xs']};")
+        formula.setStyleSheet(
+            f"color: {COLORS['text_secondary']}; font-size: {FONT['xs']};"
+        )
         header.addStretch()
         header.addWidget(formula)
         frame.add_layout(header)
@@ -140,7 +160,9 @@ class InventoryTab(QWidget):
         frame.add_layout(row)
 
         self._match_breakdown = QLabel("")
-        self._match_breakdown.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: {FONT['xs']};")
+        self._match_breakdown.setStyleSheet(
+            f"color: {COLORS['text_secondary']}; font-size: {FONT['xs']};"
+        )
         self._match_breakdown.setAlignment(Qt.AlignmentFlag.AlignCenter)
         frame.add_widget(self._match_breakdown)
 
@@ -149,12 +171,18 @@ class InventoryTab(QWidget):
     def run_inventory(self):
         date_from, date_to = self.date_picker.get_range()
 
-        stats     = db.get_dashboard_stats()
-        budget    = db.get_budget()
+        stats = db.get_dashboard_stats()
+        budget = db.get_budget()
         platforms = db.get_all_platforms()
 
-        period_txns   = db.get_transactions(date_from=date_from, date_to=date_to, limit=5000)
-        period_profit = sum(t.get("profit", 0) or 0 for t in period_txns if t.get("payment_status") != "cash")
+        period_txns = db.get_transactions(
+            date_from=date_from, date_to=date_to, limit=5000
+        )
+        period_profit = sum(
+            t.get("profit", 0) or 0
+            for t in period_txns
+            if t.get("payment_status") != "cash"
+        )
 
         self.card_cash.set_value(fmt_currency(stats["cash_vault"]))
         self.card_machines.set_value(fmt_currency(stats["total_machines"]))
@@ -162,23 +190,31 @@ class InventoryTab(QWidget):
         self.card_instapay.set_value(fmt_currency(stats.get("total_instapay", 0)))
         self.card_debts.set_value(
             fmt_currency(stats["total_debts"]),
-            color=COLORS["yellow"] if stats["total_debts"] > 0 else COLORS["green"]
+            color=COLORS["yellow"] if stats["total_debts"] > 0 else COLORS["green"],
         )
         self.card_profit.set_value(
             fmt_currency(period_profit),
-            color=COLORS["accent"] if period_profit >= 0 else COLORS["red"]
+            color=COLORS["accent"] if period_profit >= 0 else COLORS["red"],
         )
         self.card_budget.set_value(fmt_currency(budget["main_budget"]))
         self.card_pending.set_value(
             fmt_currency(stats.get("total_pending", 0)),
-            color=COLORS["red"] if stats.get("total_pending", 0) > 0 else COLORS["text_secondary"]
+            color=(
+                COLORS["red"]
+                if stats.get("total_pending", 0) > 0
+                else COLORS["text_secondary"]
+            ),
         )
 
-        all_txns      = db.get_transactions(limit=5000)
-        total_profit  = sum(t.get("profit", 0) or 0 for t in all_txns if t.get("payment_status") != "cash")
-        left_side     = stats["total_balances"] + stats["total_debts"]
-        right_side    = budget["main_budget"] + total_profit
-        diff          = left_side - right_side
+        all_txns = db.get_transactions(limit=5000)
+        total_profit = sum(
+            t.get("profit", 0) or 0
+            for t in all_txns
+            if t.get("payment_status") != "cash"
+        )
+        left_side = stats["total_balances"] + stats["total_debts"]
+        right_side = budget["main_budget"] + total_profit
+        diff = left_side - right_side
 
         self._match_left.setText(fmt_currency(left_side))
         self._match_right.setText(fmt_currency(right_side))
@@ -225,25 +261,39 @@ class InventoryTab(QWidget):
                 type_text, type_color = "💳 محفظة", COLORS["purple"]
             else:
                 type_text, type_color = "🔷 انستا باي", COLORS["cyan"]
-            
+
             self.platforms_table.set_cell(row, 0, p["name"], bold=True)
             self.platforms_table.set_cell(row, 1, type_text, color=type_color)
-            self.platforms_table.set_cell(row, 2, fmt_currency(p.get("balance", 0)), color=COLORS["accent"])
+            self.platforms_table.set_cell(
+                row, 2, fmt_currency(p.get("balance", 0)), color=COLORS["accent"]
+            )
 
             if p_type != "machine":
-                limit     = p.get("monthly_limit", 200000)
-                used      = p.get("monthly_used", 0)
+                limit = p.get("monthly_limit", 200000)
+                used = p.get("monthly_used", 0)
                 remaining = limit - used
-                rem_color = COLORS["red"] if remaining < 10000 else COLORS["text_secondary"]
+                rem_color = (
+                    COLORS["red"] if remaining < 10000 else COLORS["text_secondary"]
+                )
                 self.platforms_table.set_cell(row, 3, fmt_currency(limit))
-                self.platforms_table.set_cell(row, 4, fmt_currency(used), color=COLORS["yellow"])
-                self.platforms_table.set_cell(row, 5, fmt_currency(remaining), color=rem_color)
+                self.platforms_table.set_cell(
+                    row, 4, fmt_currency(used), color=COLORS["yellow"]
+                )
+                self.platforms_table.set_cell(
+                    row, 5, fmt_currency(remaining), color=rem_color
+                )
             else:
                 for col in [3, 4, 5]:
-                    self.platforms_table.set_cell(row, col, "—", color=COLORS["text_muted"])
+                    self.platforms_table.set_cell(
+                        row, col, "—", color=COLORS["text_muted"]
+                    )
 
         # Adjust table height to content (fixed look, scroll with page)
-        h = self.platforms_table.horizontalHeader().height() + (len(platforms) * ROW_HEIGHT) + 4
+        h = (
+            self.platforms_table.horizontalHeader().height()
+            + (len(platforms) * ROW_HEIGHT)
+            + 4
+        )
         self.platforms_table.setMinimumHeight(h)
         self.platforms_table.setMaximumHeight(h)
 
@@ -251,6 +301,7 @@ class InventoryTab(QWidget):
 # ══════════════════════════════════════════
 #  Tab 2: سجل العمليات
 # ══════════════════════════════════════════
+
 
 class TransactionsLogTab(QWidget):
 
@@ -285,7 +336,7 @@ class TransactionsLogTab(QWidget):
         self.status_filter.setFixedHeight(34)
         self.status_filter.setMinimumWidth(120)
         self.status_filter.addItem("كل الحالات", None)
-        self.status_filter.addItem("⏳ مؤجل",    "pending")
+        self.status_filter.addItem("⏳ مؤجل", "pending")
         self.status_filter.addItem(" تم السداد", "paid")
         self.status_filter.addItem("⏳ لم يسلم", "not_delivered")
         self.status_filter.addItem(" تم التسليم", "delivered")
@@ -297,33 +348,35 @@ class TransactionsLogTab(QWidget):
         self.platform_filter.setMinimumWidth(140)
         self.platform_filter.currentIndexChanged.connect(self.load_data)
         fl.addWidget(self.platform_filter)
-        
+
         fl.addStretch()
         filters_group.add_layout(fl)
         layout.addWidget(filters_group)
 
         # ── Table Card
         table_group = CardGroup("  سجل العمليات")
-        
+
         columns = [
             ("التاريخ", 140),
-            ("المرجع",  90),
-            ("الخدمة",  130),
-            ("المنصة",  110),
-            ("العميل",  -1),
+            ("المرجع", 90),
+            ("الخدمة", 130),
+            ("المنصة", 110),
+            ("العميل", -1),
             ("المطلوب", -1),
             ("المصروف", 90),
-            ("الربح",   90),
-            ("الحالة",  -1),
+            ("الربح", 90),
+            ("الحالة", -1),
             ("إجراءات", 150),
         ]
         self.table = DataTable(columns)
         table_group.add_widget(self.table)
 
         self.summary_lbl = QLabel("")
-        self.summary_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: {FONT['sm']};")
+        self.summary_lbl.setStyleSheet(
+            f"color: {COLORS['text_secondary']}; font-size: {FONT['sm']};"
+        )
         table_group.add_widget(self.summary_lbl)
-        
+
         layout.addWidget(table_group)
 
     def load_platforms_filter(self):
@@ -334,9 +387,9 @@ class TransactionsLogTab(QWidget):
 
     def load_data(self):
         date_from, date_to = self.date_picker.get_range()
-        status      = self.status_filter.currentData()
+        status = self.status_filter.currentData()
         platform_id = self.platform_filter.currentData()
-        ref         = self.ref_input.text().strip()
+        ref = self.ref_input.text().strip()
 
         if ref:
             txns = db.search_by_reference(ref)
@@ -349,54 +402,65 @@ class TransactionsLogTab(QWidget):
             elif status == "not_delivered":
                 is_del = 0
                 pay_st = None
-                
+
             txns = db.get_transactions(
-                platform_id    = platform_id,
-                payment_status = pay_st,
-                date_from      = date_from,
-                date_to        = date_to,
-                is_delivered   = is_del,
-                limit          = 1000
+                platform_id=platform_id,
+                payment_status=pay_st,
+                date_from=date_from,
+                date_to=date_to,
+                is_delivered=is_del,
+                limit=1000,
             )
         self._render(txns)
 
     def _render(self, transactions: list):
         from ui.screens.statement_screen import make_txn_actions
+
         self.table.clear_rows()
         self.table.setRowCount(len(transactions))
         total_profit = total_required = 0
-        
+
         for row, t in enumerate(transactions):
             dt = (t.get("created_at") or "")[:16].replace("T", " ")
             self.table.set_cell(row, 0, dt, color=COLORS["text_secondary"])
-            
+
             # المرجع
             ref = t.get("reference_no") or f"#{t.get('id')}"
             self.table.set_cell(row, 1, ref, color=COLORS["text_muted"])
-            
+
             self.table.set_cell(row, 2, t.get("service_name") or "—")
-            self.table.set_cell(row, 3, t.get("platform_name") or "—", color=COLORS["text_secondary"])
+            self.table.set_cell(
+                row, 3, t.get("platform_name") or "—", color=COLORS["text_secondary"]
+            )
             self.table.set_cell(row, 4, t.get("customer_name") or "—", bold=True)
-            
+
             required = t.get("amount_required", 0) or 0
-            spent    = t.get("amount_spent", 0) or 0
-            profit   = t.get("profit", 0) or 0
-            
+            spent = t.get("amount_spent", 0) or 0
+            profit = t.get("profit", 0) or 0
+
             self.table.set_cell(row, 5, fmt_currency(required), bold=True)
-            self.table.set_cell(row, 6, fmt_currency(spent), color=COLORS["text_secondary"])
-            self.table.set_cell(row, 7, fmt_currency(profit), color=COLORS["accent"] if profit >= 0 else COLORS["red"])
-            
+            self.table.set_cell(
+                row, 6, fmt_currency(spent), color=COLORS["text_secondary"]
+            )
+            self.table.set_cell(
+                row,
+                7,
+                fmt_currency(profit),
+                color=COLORS["accent"] if profit >= 0 else COLORS["red"],
+            )
+
             self.table.add_status_badge(
-                row, 8,
+                row,
+                8,
                 t.get("payment_status", ""),
                 operation_type=t.get("operation_type", "outbound"),
-                is_delivered=t.get("is_delivered", 0)
+                is_delivered=t.get("is_delivered", 0),
             )
-            
+
             actions = make_txn_actions(t, self._on_status_change, self._on_delete)
             self.table.setCellWidget(row, 9, actions)
-            
-            total_profit   += profit
+
+            total_profit += profit
             total_required += required
 
         self.summary_lbl.setText(
@@ -411,10 +475,15 @@ class TransactionsLogTab(QWidget):
             QMessageBox.critical(self, "خطأ", str(e))
 
     def _on_delete(self, tid: int):
-        if QMessageBox.question(self, "تأكيد الحذف",
-            "⚠️ حذف العملية وعكس تأثيرها المالي؟ لا يمكن التراجع.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        ) == QMessageBox.StandardButton.Yes:
+        if (
+            QMessageBox.question(
+                self,
+                "تأكيد الحذف",
+                "⚠️ حذف العملية وعكس تأثيرها المالي؟ لا يمكن التراجع.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            == QMessageBox.StandardButton.Yes
+        ):
             try:
                 db.delete_transaction(tid)
                 self.load_data()
@@ -433,8 +502,12 @@ class CleanupByDateDialog(BaseDialog):
     def _build_content(self):
         self.body.setSpacing(16)
 
-        warning_lbl = QLabel("سيتم حذف جميع العمليات المنتهية حتى هذا التاريخ. لا يمكن التراجع عن هذه الخطوة.")
-        warning_lbl.setStyleSheet(f"color: {COLORS['red']}; font-size: {FONT['md']}; font-weight: bold;")
+        warning_lbl = QLabel(
+            "سيتم حذف جميع العمليات المنتهية حتى هذا التاريخ. لا يمكن التراجع عن هذه الخطوة."
+        )
+        warning_lbl.setStyleSheet(
+            f"color: {COLORS['red']}; font-size: {FONT['md']}; font-weight: bold;"
+        )
         warning_lbl.setWordWrap(True)
         self.body.addWidget(warning_lbl)
 
@@ -478,7 +551,9 @@ class CleanupTab(QWidget):
         stat_layout.setContentsMargins(20, 14, 20, 14)
 
         self.stat_label = QLabel("عدد العمليات المسددة القابلة للحذف: —")
-        self.stat_label.setStyleSheet(f"color: {COLORS['text_primary']}; font-weight: bold;")
+        self.stat_label.setStyleSheet(
+            f"color: {COLORS['text_primary']}; font-weight: bold;"
+        )
         stat_layout.addWidget(self.stat_label)
         stat_layout.addStretch()
 
@@ -497,10 +572,14 @@ class CleanupTab(QWidget):
         cl.setSpacing(16)
 
         title = QLabel("🧹  تنظيف البيانات المسددة")
-        title.setStyleSheet(f"color: {COLORS['text_primary']}; font-size: {FONT['lg']}; font-weight: bold;")
+        title.setStyleSheet(
+            f"color: {COLORS['text_primary']}; font-size: {FONT['lg']}; font-weight: bold;"
+        )
         cl.addWidget(title)
 
-        desc = QLabel("سيتم حذف العمليات التي تم تسديدها (paid) فقط لتخفيف حجم قاعدة البيانات.")
+        desc = QLabel(
+            "سيتم حذف العمليات التي تم تسديدها (paid) فقط لتخفيف حجم قاعدة البيانات."
+        )
         desc.setStyleSheet(f"color: {COLORS['text_secondary']};")
         cl.addWidget(desc)
 
@@ -513,20 +592,20 @@ class CleanupTab(QWidget):
         clean_btn.setObjectName("btn_secondary")
         clean_btn.clicked.connect(self._cleanup_single)
         btn_row.addWidget(clean_btn)
-        
+
         clean_date_btn = QPushButton("📅  تنظيف حسب التاريخ")
         clean_date_btn.setObjectName("btn_secondary")
         clean_date_btn.clicked.connect(self._cleanup_by_date)
         btn_row.addWidget(clean_date_btn)
-        
+
         btn_row.addStretch()
-        
+
         clean_all_btn = QPushButton("🗑️  تنظيف الكل")
         clean_all_btn.setObjectName("btn_danger")
         clean_all_btn.setFixedWidth(150)
         clean_all_btn.clicked.connect(self._cleanup_all)
         btn_row.addWidget(clean_all_btn)
-        
+
         cl.addLayout(btn_row)
         layout.addWidget(clean_frame)
         layout.addStretch()
@@ -543,24 +622,48 @@ class CleanupTab(QWidget):
 
     def _cleanup_single(self):
         cid = self.customer_combo.currentData()
-        if not cid: return
-        if QMessageBox.question(self, "تأكيد", "حذف العمليات المسددة لهذا العميل؟",
-                                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
+        if not cid:
+            return
+        if (
+            QMessageBox.question(
+                self,
+                "تأكيد",
+                "حذف العمليات المسددة لهذا العميل؟",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            == QMessageBox.StandardButton.Yes
+        ):
             db.cleanup_paid_transactions(cid)
             self._refresh_stat()
 
     def _cleanup_by_date(self):
         dialog = CleanupByDateDialog(self)
         if dialog.exec() and dialog.selected_date:
-            if QMessageBox.warning(self, "تأكيد نهائي", "هل أنت متأكد من حذف العمليات المنتهية حتى هذا التاريخ؟ لا يمكن التراجع!", 
-                                   QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
+            if (
+                QMessageBox.warning(
+                    self,
+                    "تأكيد نهائي",
+                    "هل أنت متأكد من حذف العمليات المنتهية حتى هذا التاريخ؟ لا يمكن التراجع!",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+                == QMessageBox.StandardButton.Yes
+            ):
                 count = db.cleanup_transactions_before(dialog.selected_date)
                 self._refresh_stat()
-                Toast(self.window(), f"تم تنظيف {count} عملية قديمة بنجاح", type="success").show()
+                Toast(
+                    self.window(), f"تم تنظيف {count} عملية قديمة بنجاح", type="success"
+                ).show()
 
     def _cleanup_all(self):
-        if QMessageBox.warning(self, "تحذير", "حذف جميع العمليات المسددة؟ لا يمكن التراجع!",
-                               QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
+        if (
+            QMessageBox.warning(
+                self,
+                "تحذير",
+                "حذف جميع العمليات المسددة؟ لا يمكن التراجع!",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            == QMessageBox.StandardButton.Yes
+        ):
             count = db.cleanup_paid_transactions()
             self._refresh_stat()
             Toast(self.window(), f"تم تنظيف {count} عملية بنجاح", type="success").show()
@@ -570,10 +673,13 @@ class CleanupTab(QWidget):
 #  Reports Screen (main)
 # ══════════════════════════════════════════
 
+
 class ReportsScreen(ScreenShell):
 
     def __init__(self, parent=None):
-        super().__init__("التقارير والجرد", "إدارة العمليات، الجرد المالي، وتنظيف البيانات")
+        super().__init__(
+            "التقارير والجرد", "إدارة العمليات، الجرد المالي، وتنظيف البيانات"
+        )
         self._build_content()
 
     def _build_content(self):
@@ -581,7 +687,9 @@ class ReportsScreen(ScreenShell):
         c.setContentsMargins(0, 0, 0, 0)
 
         self.tabs = QTabWidget()
-        self.tabs.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.tabs.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
 
         self.inventory_tab = InventoryTab()
         self.tabs.addTab(self.inventory_tab, "📊  الجرد المالي")

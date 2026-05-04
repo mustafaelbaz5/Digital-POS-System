@@ -3,92 +3,72 @@
 # ──────────────────────────────────────────────────
 
 COLORS = {
-
     # ─────────────────────────────────────────
     # SURFACES
     # Deep, GitHub-inspired charcoal/gray tones
     # ─────────────────────────────────────────
-
-    "bg_dark":      "#0D1117",   # main app background
-    "bg_card":      "#0D1117",   # cards/sidebar/containers
-    "bg_elevated":  "#161B22",   # elevated surfaces (lighter than bg_dark)
-
-    "bg_input":     "#090C10",   # inputs (darker for depth)
-    "bg_hover":     "#21262D",
-    "bg_button":    "#21262D",   # distinct button background
-
+    "bg_dark": "#0D1117",  # main app background
+    "bg_card": "#0D1117",  # cards/sidebar/containers
+    "bg_elevated": "#161B22",  # elevated surfaces (lighter than bg_dark)
+    "bg_input": "#090C10",  # inputs (darker for depth)
+    "bg_hover": "#21262D",
+    "bg_button": "#21262D",  # distinct button background
     # ─────────────────────────────────────────
     # BORDERS
     # Subtle separation
     # ─────────────────────────────────────────
-
-    "border":       "#30363D",
+    "border": "#30363D",
     "border_light": "#424B57",
-
     # ─────────────────────────────────────────
     # ACCENT
     # Modern Dark Green (Professional and clear for confirmations)
     # ─────────────────────────────────────────
-
-    "accent":       "#059669",   # Darker Emerald
-    "accent_hover": "#10B981",   # Vibrant Emerald on hover
-    "accent_dim":   "#064E3B",   # Very dark green
-
+    "accent": "#059669",  # Darker Emerald
+    "accent_hover": "#10B981",  # Vibrant Emerald on hover
+    "accent_dim": "#064E3B",  # Very dark green
     # ─────────────────────────────────────────
     # TYPOGRAPHY
     # Optimized for readability on dark backgrounds
     # ─────────────────────────────────────────
-
-    "text_primary":   "#E6EDF3",   # High contrast
-    "text_secondary": "#8B949E",   # Soft contrast
-    "text_muted":     "#484F58",   # Low contrast
-
+    "text_primary": "#E6EDF3",  # High contrast
+    "text_secondary": "#8B949E",  # Soft contrast
+    "text_muted": "#484F58",  # Low contrast
     # ─────────────────────────────────────────
     # SEMANTIC
     # Unified with accent and industry standards
     # ─────────────────────────────────────────
-
-    "green":         "#10B981",
-    "green_bg":      "#064E3B20",
-    "green_border":  "#064E3B",
-
-    "red":           "#F85149",
-    "red_bg":        "#490E0E20",
-    "red_border":    "#490E0E",
-
-    "yellow":        "#D29922",
-    "yellow_bg":     "#35210020",
+    "green": "#10B981",
+    "green_bg": "#064E3B20",
+    "green_border": "#064E3B",
+    "red": "#F85149",
+    "red_bg": "#490E0E20",
+    "red_border": "#490E0E",
+    "yellow": "#D29922",
+    "yellow_bg": "#35210020",
     "yellow_border": "#352100",
-
     # ─────────────────────────────────────────
     # COMPATIBILITY ALIASES
     # Supporting existing components
     # ─────────────────────────────────────────
-
     "teal_primary": "#10B981",
-    "teal_light":   "#34D399",
-    "teal_bright":  "#6EE7B7",
-    "teal_dark":    "#059669",
-    "teal_subtle":  "#064E3B",
-    "teal_glow":    "#064E3B",
-
-    "blue":         "#58A6FF",
-    "blue_bg":      "#0C2D6B20",
-    "blue_border":  "#0C2D6B",
-
-    "purple":       "#BC8CFF",
-    "purple_bg":    "#3B256B20",
-
-    "cyan":         "#39C5BB",
-    "cyan_bg":      "#1A3B3920",
-
-    "emerald":         "#10B981",
-    "emerald_bg":      "#064E3B20",
-    "emerald_border":  "#064E3B",
-
-    "bg_selected":  "#161B22",
+    "teal_light": "#34D399",
+    "teal_bright": "#6EE7B7",
+    "teal_dark": "#059669",
+    "teal_subtle": "#064E3B",
+    "teal_glow": "#064E3B",
+    "blue": "#58A6FF",
+    "blue_bg": "#0C2D6B20",
+    "blue_border": "#0C2D6B",
+    "purple": "#BC8CFF",
+    "purple_bg": "#3B256B20",
+    "cyan": "#39C5BB",
+    "cyan_bg": "#1A3B3920",
+    "emerald": "#10B981",
+    "emerald_bg": "#064E3B20",
+    "emerald_border": "#064E3B",
+    "bg_selected": "#161B22",
     "border_focus": "#10B981",
-    "text_dim":     "#484F58",
+    "text_dim": "#484F58",
 }
 
 # ──────────────────────────────────────────────────
@@ -97,11 +77,11 @@ COLORS = {
 
 FONT = {
     "family": "'Cairo', 'Tajawal', 'Segoe UI', sans-serif",
-    "xs":  "10px",
-    "sm":  "12px",
-    "md":  "14px",
-    "lg":  "16px",
-    "xl":  "20px",
+    "xs": "10px",
+    "sm": "12px",
+    "md": "14px",
+    "lg": "16px",
+    "xl": "20px",
     "2xl": "26px",
     "3xl": "32px",
 }
@@ -111,13 +91,13 @@ FONT = {
 # LAYOUT CONSTANTS
 # ──────────────────────────────────────────────────
 
-SIDEBAR_WIDTH  = 240
-HEADER_HEIGHT  = 70
-ROW_HEIGHT     = 60
-BTN_HEIGHT     = 42
-INPUT_HEIGHT   = 44
-BORDER_RADIUS  = "10px"
-CARD_RADIUS    = "14px"
+SIDEBAR_WIDTH = 240
+HEADER_HEIGHT = 70
+ROW_HEIGHT = 60
+BTN_HEIGHT = 42
+INPUT_HEIGHT = 44
+BORDER_RADIUS = "10px"
+CARD_RADIUS = "14px"
 
 # Standard Spacing (Gaps)
 GAP_XS = 4
@@ -128,7 +108,7 @@ GAP_XL = 32
 
 # Standard Margins
 MARGIN_CONTENT = 20
-MARGIN_CARD    = 20
+MARGIN_CARD = 20
 
 
 # ──────────────────────────────────────────────────
@@ -546,11 +526,12 @@ QMenu::item:selected {{
 # STATUS HELPERS
 # ──────────────────────────────────────────────────
 
+
 def get_status_style(status: str) -> str:
-    base = f"border-radius: 6px; padding: 4px 12px; font-size: 11px; font-weight: bold;"
+    base = "border-radius: 6px; padding: 4px 12px; font-size: 11px; font-weight: bold;"
     styles = {
         "pending": f"color: {COLORS['yellow']}; background: {COLORS['yellow_bg']}; border: 1px solid {COLORS['yellow_border']}; {base}",
-        "paid":    f"color: {COLORS['green']}; background: {COLORS['green_bg']}; border: 1px solid {COLORS['green_border']}; {base}",
+        "paid": f"color: {COLORS['green']}; background: {COLORS['green_bg']}; border: 1px solid {COLORS['green_border']}; {base}",
     }
     return styles.get(status, "")
 

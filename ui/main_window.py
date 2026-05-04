@@ -2,32 +2,39 @@
 main_window.py — Main Window v2.1 (Improved Sidebar + Better UX)
 """
 
-from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
-    QPushButton, QLabel, QStackedWidget, QFrame,
-    QSizePolicy
-)
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QPushButton,
+    QSizePolicy,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
-from ui.styles.theme import COLORS, MAIN_STYLE, SIDEBAR_WIDTH
+from ui.screens.customers_screen import CustomersScreen
 from ui.screens.dashboard import DashboardScreen
 from ui.screens.platforms_screen import PlatformsScreen
-from ui.screens.customers_screen import CustomersScreen
-from ui.screens.Reports_screen import ReportsScreen   # تأكد من اسم الملف Reports_screen.py
-
+from ui.screens.Reports_screen import (
+    ReportsScreen,
+)  # تأكد من اسم الملف Reports_screen.py
+from ui.styles.theme import MAIN_STYLE, SIDEBAR_WIDTH
 
 NAV_ITEMS = [
-    ("dashboard",   "لوحة التحكم",      DashboardScreen),
-    ("platforms",   "المنصات",           PlatformsScreen),
-    ("customers",   "العملاء",           CustomersScreen),
-    ("reports",     "التقارير والجرد",   ReportsScreen),
+    ("dashboard", "لوحة التحكم", DashboardScreen),
+    ("platforms", "المنصات", PlatformsScreen),
+    ("customers", "العملاء", CustomersScreen),
+    ("reports", "التقارير والجرد", ReportsScreen),
 ]
 
 NAV_SYMBOLS = {
-    "dashboard":   "◈",
-    "platforms":   "◉",
-    "customers":   "◎",
-    "reports":     "◑",
+    "dashboard": "◈",
+    "platforms": "◉",
+    "customers": "◎",
+    "reports": "◑",
 }
 
 
@@ -35,7 +42,9 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("نظام إدارة المدفوعات", )
+        self.setWindowTitle(
+            "نظام إدارة المدفوعات",
+        )
         self.setMinimumSize(1150, 720)
         self.resize(1350, 850)
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
@@ -68,7 +77,9 @@ class MainWindow(QMainWindow):
 
         # منطقة المحتوى مع مسافة داخلية على الجانبين
         self.stack = QStackedWidget()
-        self.stack.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.stack.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         self.stack.setContentsMargins(15, 10, 15, 10)
         main_layout.addWidget(self.stack, 1)
 
@@ -110,7 +121,7 @@ class MainWindow(QMainWindow):
         btn.setFixedHeight(46)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setProperty("active", "false")
-        btn.setLayoutDirection(Qt.LayoutDirection.RightToLeft)   # مهم جداً
+        btn.setLayoutDirection(Qt.LayoutDirection.RightToLeft)  # مهم جداً
 
         # ربط الزر بالتنقل
         screen_class = next((s[2] for s in NAV_ITEMS if s[0] == key), None)
@@ -134,6 +145,7 @@ class MainWindow(QMainWindow):
                 print(f"[OK] Screen created: {key}")
             except Exception as e:
                 import traceback
+
                 print(f"[ERR] Failed to create screen {key}: {e}")
                 traceback.print_exc()
                 self._show_placeholder(key)
@@ -160,7 +172,7 @@ class MainWindow(QMainWindow):
 
     def _show_placeholder(self, key: str):
         # ... (نفس الكود السابق أو يمكن تبسيطه)
-        pass   # يمكنك الاحتفاظ بالنسخة القديمة أو تحسينها
+        pass  # يمكنك الاحتفاظ بالنسخة القديمة أو تحسينها
 
     def navigate_to(self, key: str):
         """API عام للتنقل من أي مكان"""

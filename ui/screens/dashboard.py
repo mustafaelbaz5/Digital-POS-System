@@ -2,29 +2,36 @@
 dashboard.py — لوحة التحكم الرئيسية (Pro Dark Edition)
 """
 
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QGridLayout, QFrame, QInputDialog, QMessageBox,
-    QSizePolicy, QTableWidget, QTableWidgetItem, QHeaderView,
-    QProgressDialog, QApplication
-)
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QColor
 from datetime import datetime
 
-from ui.styles.theme import (
-    COLORS, FONT, CARD_RADIUS, BORDER_RADIUS, ROW_HEIGHT,
-    GAP_XS, GAP_SM, GAP_MD, GAP_LG, GAP_XL, MARGIN_CONTENT
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import (
+    QApplication,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QInputDialog,
+    QLabel,
+    QMessageBox,
+    QProgressDialog,
+    QPushButton,
+    QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
 )
-from ui.components.widgets import StatCard, SectionTitle, ScreenShell, CardGroup, make_divider, BaseDialog
-from utils.formatters import fmt_currency, fmt_datetime
 
 import database as db
-
+from ui.components.widgets import BaseDialog, CardGroup, ScreenShell, StatCard
+from ui.styles.theme import COLORS, FONT, GAP_LG, GAP_MD, ROW_HEIGHT
+from utils.formatters import fmt_currency
 
 # ══════════════════════════════════════════
 #  Export Success Dialog
 # ══════════════════════════════════════════
+
 
 class ExportSuccessDialog(BaseDialog):
     def __init__(self, url: str, parent=None):
@@ -35,9 +42,11 @@ class ExportSuccessDialog(BaseDialog):
 
     def _build_content(self):
         self.body.setSpacing(GAP_MD)
-        
+
         info_lbl = QLabel("تم تصدير كل البيانات إلى Google Sheets بنجاح.")
-        info_lbl.setStyleSheet(f"color:{COLORS['text_primary']}; font-size:{FONT['md']};")
+        info_lbl.setStyleSheet(
+            f"color:{COLORS['text_primary']}; font-size:{FONT['md']};"
+        )
         info_lbl.setWordWrap(True)
         self.body.addWidget(info_lbl)
 
@@ -46,17 +55,18 @@ class ExportSuccessDialog(BaseDialog):
         card.setObjectName("card_highlight")
         cl = QVBoxLayout(card)
         cl.setContentsMargins(12, 12, 12, 12)
-        
+
         url_lbl = QLabel(self.url)
-        url_lbl.setStyleSheet(f"color:{COLORS['accent']}; font-size:{FONT['sm']}; font-family: 'Consolas', monospace;")
+        url_lbl.setStyleSheet(
+            f"color:{COLORS['accent']}; font-size:{FONT['sm']}; font-family: 'Consolas', monospace;"
+        )
         url_lbl.setWordWrap(True)
         cl.addWidget(url_lbl)
-        
+
         self.body.addWidget(card)
-        
+
         # Footer
         self.add_stretch()
-        copy_btn = self.add_button("📋 نسخ الرابط", self._copy, role="secondary")
         self.add_button("إغلاق", self.accept, role="primary")
 
     def _copy(self):
@@ -75,7 +85,15 @@ class DashboardScreen(ScreenShell):
 
     @staticmethod
     def _today_str() -> str:
-        days_ar = ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
+        days_ar = [
+            "الإثنين",
+            "الثلاثاء",
+            "الأربعاء",
+            "الخميس",
+            "الجمعة",
+            "السبت",
+            "الأحد",
+        ]
         now = datetime.now()
         return f"{days_ar[now.weekday()]}  ·  {now.strftime('%Y-%m-%d')}"
 
@@ -107,27 +125,43 @@ class DashboardScreen(ScreenShell):
         grid.setSpacing(GAP_MD)
         grid.setContentsMargins(0, 0, 0, 0)
 
-        self.card_budget   = StatCard("رأس المال",       accent_color=COLORS["text_secondary"])
-        self.card_assets   = StatCard("إجمالي الأصول",    accent_color=COLORS["cyan"])
-        self.card_cash     = StatCard("الخزينة النقدية",  accent_color=COLORS["green"])
-        self.card_wallets  = StatCard("إجمالي المحافظ",    accent_color=COLORS["purple"])
-        self.card_machines = StatCard("إجمالي الماكينات",   accent_color=COLORS["blue"])
-        self.card_pending  = StatCard("إجمالي المؤجل",     accent_color=COLORS["red"])
-        self.card_today    = StatCard("أرباح اليوم",       accent_color=COLORS["accent"])
-        self.card_month    = StatCard("أرباح الشهر",       accent_color=COLORS["accent_hover"])
-        self.card_ops      = StatCard("عمليات اليوم",      accent_color=COLORS["blue"])
+        self.card_budget = StatCard("رأس المال", accent_color=COLORS["text_secondary"])
+        self.card_assets = StatCard("إجمالي الأصول", accent_color=COLORS["cyan"])
+        self.card_cash = StatCard("الخزينة النقدية", accent_color=COLORS["green"])
+        self.card_wallets = StatCard("إجمالي المحافظ", accent_color=COLORS["purple"])
+        self.card_machines = StatCard("إجمالي الماكينات", accent_color=COLORS["blue"])
+        self.card_pending = StatCard("إجمالي المؤجل", accent_color=COLORS["red"])
+        self.card_today = StatCard("أرباح اليوم", accent_color=COLORS["accent"])
+        self.card_month = StatCard("أرباح الشهر", accent_color=COLORS["accent_hover"])
+        self.card_ops = StatCard("عمليات اليوم", accent_color=COLORS["blue"])
 
         placement = [
-            (self.card_budget, 0, 0), (self.card_assets, 0, 1), (self.card_cash, 0, 2),
-            (self.card_wallets, 1, 0), (self.card_machines, 1, 1), (self.card_pending, 1, 2),
-            (self.card_today, 2, 0),  (self.card_month, 2, 1),  (self.card_ops, 2, 2),
+            (self.card_budget, 0, 0),
+            (self.card_assets, 0, 1),
+            (self.card_cash, 0, 2),
+            (self.card_wallets, 1, 0),
+            (self.card_machines, 1, 1),
+            (self.card_pending, 1, 2),
+            (self.card_today, 2, 0),
+            (self.card_month, 2, 1),
+            (self.card_ops, 2, 2),
         ]
         for card, r, col in placement:
             grid.addWidget(card, r, col)
         return grid
 
     def _make_ops_table(self) -> QTableWidget:
-        columns = ["التاريخ", "المرجع", "العميل", "الخدمة", "المنصة", "المطلوب", "المصروف", "الربح", "الحالة"]
+        columns = [
+            "التاريخ",
+            "المرجع",
+            "العميل",
+            "الخدمة",
+            "المنصة",
+            "المطلوب",
+            "المصروف",
+            "الربح",
+            "الحالة",
+        ]
         tbl = QTableWidget()
         tbl.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         tbl.setColumnCount(len(columns))
@@ -139,7 +173,7 @@ class DashboardScreen(ScreenShell):
         tbl.verticalHeader().setVisible(False)
         tbl.setShowGrid(False)
         tbl.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        
+
         header = tbl.horizontalHeader()
         widths = [140, 90, -1, 130, 130, -1, 120, 120, -1]
         for i, w in enumerate(widths):
@@ -148,39 +182,54 @@ class DashboardScreen(ScreenShell):
             else:
                 tbl.setColumnWidth(i, w)
                 header.setSectionResizeMode(i, QHeaderView.ResizeMode.Fixed)
-        
+
         tbl.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         return tbl
 
     def _fill_ops_table(self):
         txns = db.get_transactions(limit=15)
         self._ops_table.setRowCount(len(txns))
-        
+
         for row, t in enumerate(txns):
+
             def cell(col, text, color=None, bold=False):
                 item = QTableWidgetItem(str(text) if text else "—")
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-                if color: item.setForeground(QColor(color))
-                if bold:  f = item.font(); f.setBold(True); item.setFont(f)
+                item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+                )
+                if color:
+                    item.setForeground(QColor(color))
+                if bold:
+                    f = item.font()
+                    f.setBold(True)
+                    item.setFont(f)
                 self._ops_table.setItem(row, col, item)
 
             raw_date = t.get("created_at") or ""
             cell(0, raw_date[:16].replace("T", " "), color=COLORS["text_secondary"])
-            
+
             # المرجع: يفضل رقم العملية إذا لم يوجد مرجع يدوي
             ref = t.get("reference_no") or f"#{t.get('id')}"
             cell(1, ref, color=COLORS["text_muted"])
-            
+
             cell(2, t.get("customer_name") or "—", bold=True)
             cell(3, t.get("service_name") or "—")
             cell(4, t.get("platform_name") or "—", color=COLORS["text_secondary"])
             cell(5, fmt_currency(t.get("amount_required", 0) or 0), bold=True)
-            cell(6, fmt_currency(t.get("amount_spent", 0) or 0), color=COLORS["text_secondary"])
-            
+            cell(
+                6,
+                fmt_currency(t.get("amount_spent", 0) or 0),
+                color=COLORS["text_secondary"],
+            )
+
             profit = t.get("profit", 0) or 0
-            cell(7, fmt_currency(profit), color=COLORS["accent"] if profit >= 0 else COLORS["red"])
-            
+            cell(
+                7,
+                fmt_currency(profit),
+                color=COLORS["accent"] if profit >= 0 else COLORS["red"],
+            )
+
             st = t.get("payment_status", "")
             if t.get("operation_type") == "inbound":
                 is_del = bool(t.get("is_delivered", 0))
@@ -189,7 +238,7 @@ class DashboardScreen(ScreenShell):
             else:
                 st_text = "مؤجل ⏳" if st == "pending" else "تم السداد ✓"
                 st_color = COLORS["yellow"] if st == "pending" else COLORS["green"]
-            
+
             cell(8, st_text, color=st_color, bold=True)
 
     def _make_actions_panel(self) -> QFrame:
@@ -201,8 +250,8 @@ class DashboardScreen(ScreenShell):
         row.setSpacing(16)
 
         actions = [
-            ("⊕  عملية جديدة",           "btn_primary",   self._go_to_transaction),
-            ("💰  إدارة الميزانية",        "btn_secondary", self._manage_budget),
+            ("⊕  عملية جديدة", "btn_primary", self._go_to_transaction),
+            ("💰  إدارة الميزانية", "btn_secondary", self._manage_budget),
             ("💵  تعديل الكاش (الخزينة)", "btn_secondary", self._edit_cash),
         ]
 
@@ -218,7 +267,9 @@ class DashboardScreen(ScreenShell):
         self._btn_export = QPushButton("☁️  تصدير البيانات")
         self._btn_export.setObjectName("btn_secondary")
         self._btn_export.setMinimumHeight(48)
-        self._btn_export.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._btn_export.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
         self._btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_export.clicked.connect(self._export_to_sheets)
         row.addWidget(self._btn_export)
@@ -235,66 +286,86 @@ class DashboardScreen(ScreenShell):
         self.card_pending.set_value(fmt_currency(stats["total_pending"]))
         self.card_today.set_value(fmt_currency(stats["today_profit"]))
         self.card_month.set_value(fmt_currency(stats["month_profit"]))
-        
+
         # Update Header with Budget
         budget_str = fmt_currency(stats["main_budget"])
         self.set_subtitle(f"{self._today_str()}   |   الميزانية المركزية: {budget_str}")
 
         try:
             from datetime import date
+
             today_str = date.today().isoformat()
             all_t = db.get_transactions(limit=500)
-            ops_today = sum(1 for t in all_t if (t.get("created_at") or "").startswith(today_str))
+            ops_today = sum(
+                1 for t in all_t if (t.get("created_at") or "").startswith(today_str)
+            )
             self.card_ops.set_value(str(ops_today))
         except Exception:
             self.card_ops.set_value("—")
-        
+
         self._fill_ops_table()
 
     def _go_to_transaction(self):
         win = self.window()
-        if hasattr(win, "navigate_to"): win.navigate_to("transaction")
+        if hasattr(win, "navigate_to"):
+            win.navigate_to("transaction")
 
     def _go_to_reports(self):
         win = self.window()
-        if hasattr(win, "navigate_to"): win.navigate_to("reports")
+        if hasattr(win, "navigate_to"):
+            win.navigate_to("reports")
 
     def _manage_budget(self):
         current = db.get_budget()["main_budget"]
         amount, ok = QInputDialog.getDouble(
-            self, "إدارة الميزانية المركزية",
+            self,
+            "إدارة الميزانية المركزية",
             f"أدخل رصيد الميزانية المركزية الكلي:\n(الحالي: {fmt_currency(current)})",
-            value=current, min=0, max=100_000_000, decimals=2
+            value=current,
+            min=0,
+            max=100_000_000,
+            decimals=2,
         )
         if ok:
             try:
                 db.update_main_budget(amount)
                 self.refresh()
-                QMessageBox.information(self, "تم ", f"تم تحديث الميزانية المركزية إلى {fmt_currency(amount)}")
+                QMessageBox.information(
+                    self,
+                    "تم ",
+                    f"تم تحديث الميزانية المركزية إلى {fmt_currency(amount)}",
+                )
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
     def _edit_cash(self):
         current = db.get_budget()["cash_vault"]
         amount, ok = QInputDialog.getDouble(
-            self, "تعديل الكاش",
+            self,
+            "تعديل الكاش",
             f"أدخل المبلغ النقدي الحالي:\n(الحالي: {fmt_currency(current)})",
-            value=current, min=0, decimals=2
+            value=current,
+            min=0,
+            decimals=2,
         )
         if ok:
             try:
                 db.set_cash_vault(amount)
                 self.refresh()
-                QMessageBox.information(self, "تم ", f"تم تحديث الكاش إلى {fmt_currency(amount)}")
+                QMessageBox.information(
+                    self, "تم ", f"تم تحديث الكاش إلى {fmt_currency(amount)}"
+                )
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
     def _export_to_sheets(self):
         self._btn_export.setEnabled(False)
         self._btn_export.setText("جاري التصدير...")
-        
+
         # Setup Progress Dialog
-        progress = QProgressDialog("جاري تصدير البيانات إلى Google Sheets...", None, 0, 0, self)
+        progress = QProgressDialog(
+            "جاري تصدير البيانات إلى Google Sheets...", None, 0, 0, self
+        )
         progress.setWindowTitle("يرجى الانتظار")
         progress.setWindowModality(Qt.WindowModality.WindowModal)
         progress.setCancelButton(None)
@@ -304,13 +375,15 @@ class DashboardScreen(ScreenShell):
         try:
             data = db.get_export_data()
             from utils.google_sheets import export_to_sheets
+
             url = export_to_sheets(data)
-            
+
             progress.close()
             ExportSuccessDialog(url, self).exec()
-            
+
         except Exception as e:
-            if progress: progress.close()
+            if progress:
+                progress.close()
             QMessageBox.critical(self, "خطأ في التصدير", str(e))
         finally:
             self._btn_export.setEnabled(True)

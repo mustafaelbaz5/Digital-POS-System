@@ -2,14 +2,14 @@
 main.py — نقطة البداية
 """
 
-import sys
 import os
+import sys
 
 # إضافة مسار المشروع لـ Python path
 sys.path.insert(0, os.path.dirname(__file__))
 
-from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication
 
 from database.schema import initialize_database
 from ui.main_window import MainWindow
