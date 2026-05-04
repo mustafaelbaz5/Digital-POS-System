@@ -613,9 +613,9 @@ class PlatformListTab(QWidget):
         # ── Table
         cols = [
             ("اسم المنصة", -1),      # Name stretches
-            ("الرصيد الحالي", 150),
+            ("الرصيد الحالي", 180),
             ("العمليات", 100),
-            ("إجراءات", 180),        # Fixed width for action buttons
+            ("إجراءات", 200),        # Increased to fit buttons + 24px spacing
         ]
         if self.p_type in ("wallet", "instapay"):
             cols.insert(1, ("المتبقي من الحد", 190))
@@ -683,8 +683,8 @@ class PlatformListTab(QWidget):
             col += 1
 
             self.table.add_action_buttons(row, col, [
-                {"text": "📊 المزيد", "callback": lambda _, pid=p["id"]: self._open_more(pid), "role": "statement"},
                 {"text": "➕ عملية", "callback": lambda _, pid=p["id"]: self._open_transaction_form(pid), "role": "primary"},
+                {"text": "📊 المزيد", "callback": lambda _, pid=p["id"]: self._open_more(pid), "role": "statement"},
             ])
 
         self.table.setSortingEnabled(True)
@@ -773,7 +773,7 @@ class PlatformsScreen(ScreenShell):
         platforms = db.get_all_platforms()
         date_str  = self.get_selected_date()
         for p in platforms:
-            p["balance"]           = db.get_closing_balance(p["id"], date_str)
+            # We keep the real balance from p["balance"] as requested
             p["transaction_count"] = db.get_platform_day_stats(p["id"], date_str)["txn_count"]
 
         self._tab_machines.load( [p for p in platforms if p["type"] == "machine"])

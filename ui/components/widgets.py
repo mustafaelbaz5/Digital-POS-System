@@ -510,28 +510,25 @@ class DataTable(QTableWidget):
             row, col, [{"text": text, "callback": callback, "role": role}]
         )[0]
 
-    def add_action_buttons(self, row: int, col: int, buttons_data: list):
-        """
-        Adds multiple buttons to a table cell.
-        buttons_data: list of dicts like {'text': '...', 'callback': ..., 'role': 'ghost'}
-        """
-        wrapper = QWidget()
+    def add_action_buttons(self, row, col, buttons_data, spacing=GAP_LG):
+        """إضافة أزرار عمليات للخلية مع مسافات قابلة للتخصيص"""
+        wrapper = QFrame()
         wrapper.setObjectName("cell_wrapper")
         wrapper.setStyleSheet(
             "#cell_wrapper { background: transparent; border: none; }"
         )
         layout = QHBoxLayout(wrapper)
-        layout.setContentsMargins(5, 2, 5, 2)  # Specific professional margins
-        layout.setSpacing(GAP_MD)  # Increased spacing between buttons
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setContentsMargins(5, 0, 5, 0)  # Reduced vertical padding
+        layout.setSpacing(spacing)
+        layout.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         btns = []
         for data in buttons_data:
             btn = QPushButton(data.get("text", ""))
             btn.setObjectName(f"btn_{data.get('role', 'ghost')}")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setMinimumHeight(24)
-            btn.setMinimumWidth(80)
+            btn.setMinimumHeight(22) # Slightly lower height
+            btn.setMinimumWidth(120) # Increased width
             btn.setSizePolicy(
                 QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
             )
