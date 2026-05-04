@@ -12,10 +12,9 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
-    QWidget,
 )
 
-from ui.styles.theme import COLORS, FONT, GAP_LG
+from ui.styles.theme import COLORS, GAP_LG
 
 AlignCenter = Qt.AlignmentFlag.AlignCenter
 
@@ -94,11 +93,14 @@ class DataTable(QTableWidget):
         color: str = None,
         bold: bool = False,
         align=None,
+        bg_color: str = None,
     ):
         item = QTableWidgetItem(str(text) if text is not None else "—")
         item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         if color:
             item.setForeground(QColor(color))
+        if bg_color:
+            item.setBackground(QColor(bg_color))
         if bold:
             f = item.font()
             f.setBold(True)

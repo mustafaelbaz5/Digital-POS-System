@@ -228,12 +228,17 @@ class CustomerStatementDialog(QDialog):
         self.table.setRowCount(len(txns))
 
         for row, t in enumerate(txns):
+            op = t.get("operation_type", "")
+            is_manual = op in ("manual_commission", "inbound")
+            bg = COLORS["bg_hover"] if is_manual else None
+
             # Date
             self.table.set_cell(
                 row,
                 0,
                 (t.get("created_at") or "")[:16].replace("T", " "),
                 color=COLORS["text_secondary"],
+                bg_color=bg,
             )
 
             # Type
@@ -241,7 +246,7 @@ class CustomerStatementDialog(QDialog):
             is_out = op == "outbound"
             type_text = "📤 شحن صادر" if is_out else "📥 استلام"
             type_color = COLORS["blue"] if is_out else COLORS["purple"]
-            self.table.set_cell(row, 1, type_text, color=type_color, bold=True)
+            self.table.set_cell(row, 1, type_text, color=type_color, bold=True, bg_color=bg)
 
             # Service
             self.table.set_cell(
@@ -249,28 +254,33 @@ class CustomerStatementDialog(QDialog):
                 2,
                 t.get("service_name") or "—",
                 align=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                bg_color=bg,
             )
 
             # Platform
             self.table.set_cell(
-                row, 3, t.get("platform_name") or "—", color=COLORS["text_secondary"]
+                row, 3, t.get("platform_name") or "—", color=COLORS["text_secondary"], bg_color=bg
             )
 
             # Reference
             ref = "🃏 كارت" if t.get("is_card") else (t.get("reference_no") or "—")
-            self.table.set_cell(row, 4, ref, color=COLORS["text_muted"])
+            self.table.set_cell(row, 4, ref, color=COLORS["text_muted"], bg_color=bg)
 
             # Spent (المصروف)
             spent = t.get("amount_spent", 0)
-            self.table.set_cell(row, 5, fmt_currency(spent), color=COLORS["text_secondary"])
+            self.table.set_cell(row, 5, fmt_currency(spent), color=COLORS["text_secondary"], bg_color=bg)
 
             # Required (المطلوب)
             req = t.get("amount_required", 0)
-            self.table.set_cell(row, 6, fmt_currency(req), bold=True)
+            self.table.set_cell(row, 6, fmt_currency(req), bold=True, bg_color=bg)
 
             # Profit (الربح)
             profit = t.get("profit", 0)
-            self.table.set_cell(row, 7, fmt_currency(profit), color=COLORS["cyan"] if profit >= 0 else COLORS["red"])
+            profit_text = fmt_currency(profit) if not is_manual else "—"
+            profit_color = COLORS["cyan"] if profit >= 0 else COLORS["red"]
+            if is_manual:
+                profit_color = COLORS["text_secondary"]
+            self.table.set_cell(row, 7, profit_text, color=profit_color, bg_color=bg)
 
             # Status
             if is_out:
@@ -282,7 +292,7 @@ class CustomerStatementDialog(QDialog):
                 st_text = "تم التسليم ✓" if is_del else "لم يسلم ⏳"
                 st_color = COLORS["green"] if is_del else COLORS["yellow"]
 
-            self.table.set_cell(row, 8, st_text, color=st_color, bold=True)
+            self.table.set_cell(row, 8, st_text, color=st_color, bold=True, bg_color=bg)
 
             # Notes
             self.table.set_cell(
@@ -291,6 +301,7 @@ class CustomerStatementDialog(QDialog):
                 t.get("notes") or "—",
                 color=COLORS["text_muted"],
                 align=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                bg_color=bg,
             )
 
             # Actions

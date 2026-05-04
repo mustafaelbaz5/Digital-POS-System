@@ -192,14 +192,18 @@ class DashboardScreen(ScreenShell):
 
         for row, t in enumerate(txns):
 
+            op_type = t.get("operation_type")
+            is_manual = op_type in ("manual_commission", "inbound")
+            bg_color = COLORS["bg_hover"] if is_manual else None
+
             def cell(col, text, color=None, bold=False):
                 item = QTableWidgetItem(str(text) if text else "—")
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                item.setTextAlignment(
-                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-                )
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 if color:
                     item.setForeground(QColor(color))
+                if bg_color:
+                    item.setBackground(QColor(bg_color))
                 if bold:
                     f = item.font()
                     f.setBold(True)
@@ -224,11 +228,11 @@ class DashboardScreen(ScreenShell):
             )
 
             profit = t.get("profit", 0) or 0
-            cell(
-                7,
-                fmt_currency(profit),
-                color=COLORS["accent"] if profit >= 0 else COLORS["red"],
-            )
+            profit_text = fmt_currency(profit) if not is_manual else "—"
+            profit_color = COLORS["accent"] if profit >= 0 else COLORS["red"]
+            if is_manual:
+                profit_color = COLORS["text_secondary"]
+            cell(7, profit_text, color=profit_color)
 
             st = t.get("payment_status", "")
             if t.get("operation_type") == "inbound":

@@ -421,32 +421,42 @@ class TransactionsLogTab(QWidget):
         total_profit = total_required = 0
 
         for row, t in enumerate(transactions):
+            op = t.get("operation_type")
+            is_manual = op in ("manual_commission", "inbound")
+            bg = COLORS["bg_hover"] if is_manual else None
+
             dt = (t.get("created_at") or "")[:16].replace("T", " ")
-            self.table.set_cell(row, 0, dt, color=COLORS["text_secondary"])
+            self.table.set_cell(row, 0, dt, color=COLORS["text_secondary"], bg_color=bg)
 
             # المرجع
             ref = t.get("reference_no") or f"#{t.get('id')}"
-            self.table.set_cell(row, 1, ref, color=COLORS["text_muted"])
+            self.table.set_cell(row, 1, ref, color=COLORS["text_muted"], bg_color=bg)
 
-            self.table.set_cell(row, 2, t.get("service_name") or "—")
+            self.table.set_cell(row, 2, t.get("service_name") or "—", bg_color=bg)
             self.table.set_cell(
-                row, 3, t.get("platform_name") or "—", color=COLORS["text_secondary"]
+                row, 3, t.get("platform_name") or "—", color=COLORS["text_secondary"], bg_color=bg
             )
-            self.table.set_cell(row, 4, t.get("customer_name") or "—", bold=True)
+            self.table.set_cell(row, 4, t.get("customer_name") or "—", bold=True, bg_color=bg)
 
             required = t.get("amount_required", 0) or 0
             spent = t.get("amount_spent", 0) or 0
             profit = t.get("profit", 0) or 0
 
-            self.table.set_cell(row, 5, fmt_currency(required), bold=True)
+            self.table.set_cell(row, 5, fmt_currency(required), bold=True, bg_color=bg)
             self.table.set_cell(
-                row, 6, fmt_currency(spent), color=COLORS["text_secondary"]
+                row, 6, fmt_currency(spent), color=COLORS["text_secondary"], bg_color=bg
             )
+            profit_text = fmt_currency(profit) if not is_manual else "—"
+            profit_color = COLORS["accent"] if profit >= 0 else COLORS["red"]
+            if is_manual:
+                profit_color = COLORS["text_secondary"]
+
             self.table.set_cell(
                 row,
                 7,
-                fmt_currency(profit),
-                color=COLORS["accent"] if profit >= 0 else COLORS["red"],
+                profit_text,
+                color=profit_color,
+                bg_color=bg,
             )
 
             self.table.add_status_badge(
