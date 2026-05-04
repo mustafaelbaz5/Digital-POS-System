@@ -115,6 +115,13 @@ def add_platform(name: str, platform_type: str, initial_balance: float = 0,
             monthly_limit = 0
 
     with get_connection() as conn:
+        # Check if active platform with same name already exists
+        existing = conn.execute(
+            "SELECT id FROM platforms WHERE name = ? AND is_active = 1", (name,)
+        ).fetchone()
+        if existing:
+            raise ValueError(f"يوجد منصة نشطة بنفس الاسم بالفعل: {name}")
+
         try:
             if initial_balance > 0:
                 budget = conn.execute("SELECT main_budget FROM budget WHERE id = 1").fetchone()
@@ -266,7 +273,10 @@ def update_platform_limit(platform_id: int, new_limit: float) -> None:
 
 
 def delete_platform(platform_id: int) -> None:
-    """حذف منصة (Soft Delete)"""
+    """حذف منصة (Soft Delete) مع تغيير الاسم لتجنب تكرار الأسماء مستقبلاً"""
     with get_connection() as conn:
-        conn.execute("UPDATE platforms SET is_active = 0 WHERE id = ?", (platform_id,))
+        conn.execute(
+            "UPDATE platforms SET name = name || ' (محذوف - ' || id || ')', is_active = 0 WHERE id = ?",
+            (platform_id,)
+        )
         conn.commit()
