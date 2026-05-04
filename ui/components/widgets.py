@@ -469,7 +469,8 @@ class DataTable(QTableWidget):
         buttons_data: list of dicts like {'text': '...', 'callback': ..., 'role': 'ghost'}
         """
         wrapper = QWidget()
-        wrapper.setStyleSheet("background: transparent; border: none;")
+        wrapper.setObjectName("cell_wrapper")
+        wrapper.setStyleSheet("#cell_wrapper { background: transparent; border: none; }")
         layout = QHBoxLayout(wrapper)
         layout.setContentsMargins(5, 2, 5, 2) # Specific professional margins
         layout.setSpacing(GAP_SM)
@@ -480,7 +481,7 @@ class DataTable(QTableWidget):
             btn = QPushButton(data.get('text', ''))
             btn.setObjectName(f"btn_{data.get('role', 'ghost')}")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setMinimumHeight(34)
+            btn.setMinimumHeight(28)
             btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
             if 'callback' in data:

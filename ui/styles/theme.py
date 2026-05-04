@@ -349,19 +349,39 @@ QPushButton {{
     background: #0A3069;
 }}
 
-/* ── In-Table Buttons (Static & Highlighted) ── */
-QTableWidget QPushButton,
-QTableWidget #btn_ghost, QTableWidget #btn_ghost:hover, QTableWidget #btn_ghost:pressed,
-QTableWidget #btn_primary, QTableWidget #btn_primary:hover, QTableWidget #btn_primary:pressed,
-QTableWidget #btn_secondary, QTableWidget #btn_secondary:hover, QTableWidget #btn_secondary:pressed,
-QTableWidget #btn_statement, QTableWidget #btn_statement:hover, QTableWidget #btn_statement:pressed {{
-    border: 2px solid {COLORS['accent']};
-    border-radius: 6px;
-    padding: 5px 10px;
-    background-color: {COLORS['green_bg']};
-    color: {COLORS['text_primary']};
+/* ── In-Table Buttons (Static) ── */
+QTableWidget QPushButton {{
+    border-radius: 4px;
+    padding: 2px 8px;
     font-weight: bold;
     font-size: {FONT['sm']};
+    border: 1px solid {COLORS['border_light']};
+    background-color: {COLORS['bg_hover']};
+    color: {COLORS['text_primary']};
+}}
+
+QTableWidget #btn_ghost, QTableWidget #btn_ghost:hover, QTableWidget #btn_ghost:pressed {{
+    border: 1px solid {COLORS['border_light']};
+    background-color: {COLORS['bg_hover']};
+    color: {COLORS['text_primary']};
+}}
+
+QTableWidget #btn_secondary, QTableWidget #btn_secondary:hover, QTableWidget #btn_secondary:pressed {{
+    border: 1px solid {COLORS['border_light']};
+    background-color: {COLORS['bg_elevated']};
+    color: {COLORS['text_primary']};
+}}
+
+QTableWidget #btn_statement, QTableWidget #btn_statement:hover, QTableWidget #btn_statement:pressed {{
+    border: 1px solid #0969DA;
+    background-color: #0969DA;
+    color: #ffffff;
+}}
+
+QTableWidget #btn_primary, QTableWidget #btn_primary:hover, QTableWidget #btn_primary:pressed {{
+    border: 1px solid {COLORS['accent']};
+    background-color: {COLORS['accent']};
+    color: #ffffff;
 }}
 
 /* ── Inputs ── */

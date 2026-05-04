@@ -212,11 +212,12 @@ class CustomerStatementDialog(QDialog):
         btn = QPushButton("⋮ إجراءات")
         btn.setObjectName("btn_ghost")
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setFixedHeight(30)
+        btn.setFixedHeight(26)
         
         # Wrap button in layout for padding
         wrap = QWidget()
-        wrap.setStyleSheet("background: transparent;")
+        wrap.setObjectName("cell_wrapper_1")
+        wrap.setStyleSheet("#cell_wrapper_1 { background: transparent; }")
         lay = QHBoxLayout(wrap)
         lay.setContentsMargins(6, 4, 6, 4)
         lay.addWidget(btn)
@@ -300,7 +301,7 @@ def make_txn_actions(t: dict, on_status_change, on_delete) -> QWidget:
     """
     btn = QPushButton("⋮ إجراءات")
     btn.setObjectName("btn_ghost")
-    btn.setFixedHeight(30)
+    btn.setFixedHeight(26)
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
     btn.setStyleSheet(f"font-size: {FONT['sm']}; padding: 0 12px;")
 
@@ -312,7 +313,8 @@ def make_txn_actions(t: dict, on_status_change, on_delete) -> QWidget:
     btn.clicked.connect(_open)
 
     wrap = QWidget()
-    wrap.setStyleSheet("background: transparent; border: none;")
+    wrap.setObjectName("cell_wrapper_2")
+    wrap.setStyleSheet("#cell_wrapper_2 { background: transparent; border: none; }")
     wl   = QHBoxLayout(wrap)
     wl.setContentsMargins(2, 4, 2, 4)
     wl.setAlignment(Qt.AlignmentFlag.AlignCenter)
