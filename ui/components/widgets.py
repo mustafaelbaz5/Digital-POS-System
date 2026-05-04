@@ -522,7 +522,7 @@ class DataTable(QTableWidget):
         )
         layout = QHBoxLayout(wrapper)
         layout.setContentsMargins(5, 2, 5, 2)  # Specific professional margins
-        layout.setSpacing(GAP_SM)
+        layout.setSpacing(GAP_MD)  # Increased spacing between buttons
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         btns = []
