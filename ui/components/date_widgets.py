@@ -28,13 +28,22 @@ def _arrow_btn(text: str) -> QPushButton:
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
     btn.setStyleSheet(f"""
         QPushButton {{
-            # background: transparent; border: none;
-            color: {COLORS['text_secondary']};
-            font-size: 16px; font-weight: bold; border-radius: 6px;
+            background: {COLORS['bg_button']};
+            border: 1px solid {COLORS['border']};
+            color: {COLORS['text_primary']};
+            font-size: 18px; font-weight: bold; border-radius: 6px;
+            padding: 0px;
+            margin: 0px;
         }}
         QPushButton:hover {{
             background: {COLORS['bg_hover']};
+            border-color: {COLORS['accent']};
             color: {COLORS['accent']};
+        }}
+        QPushButton:disabled {{
+            background: transparent;
+            border: none;
+            color: {COLORS['text_muted']};
         }}
     """)
     return btn
@@ -66,9 +75,9 @@ def _open_calendar_dialog(parent, current_date: QDate) -> QDate | None:
 
     nav_style = f"""
         QPushButton {{
-            background: {COLORS['bg_elevated']}; border: 1px solid {COLORS['border_light']};
-            color: {COLORS['text_primary']}; font-size: 16px; font-weight: bold;
-            border-radius: 6px;
+            background: {COLORS['bg_button']}; border: 1px solid {COLORS['border']};
+            color: {COLORS['text_primary']}; font-size: 18px; font-weight: bold;
+            border-radius: 6px; padding: 0px; margin: 0px;
         }}
         QPushButton:hover {{
             background: {COLORS['bg_hover']}; border-color: {COLORS['accent']};
@@ -85,8 +94,8 @@ def _open_calendar_dialog(parent, current_date: QDate) -> QDate | None:
     year_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
     year_lbl.setStyleSheet(lbl_style)
 
-    btn_yp = QPushButton("‹")
-    btn_yn = QPushButton("›")
+    btn_yp = QPushButton(">")
+    btn_yn = QPushButton("<")
     for b in (btn_yp, btn_yn):
         b.setFixedSize(36, 32)
         b.setStyleSheet(nav_style)
@@ -104,8 +113,8 @@ def _open_calendar_dialog(parent, current_date: QDate) -> QDate | None:
     month_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
     month_lbl.setStyleSheet(lbl_style)
 
-    btn_mp = QPushButton("‹")
-    btn_mn = QPushButton("›")
+    btn_mp = QPushButton("<")
+    btn_mn = QPushButton(">")
     for b in (btn_mp, btn_mn):
         b.setFixedSize(36, 32)
         b.setStyleSheet(nav_style)
@@ -175,7 +184,7 @@ class _SingleDateCell(QFrame):
         layout.setContentsMargins(4, 0, 4, 0)
         layout.setSpacing(0)
 
-        self._btn_prev = _arrow_btn("‹")
+        self._btn_prev = _arrow_btn(">")
         self._btn_prev.clicked.connect(self._go_prev)
         layout.addWidget(self._btn_prev)
 
@@ -190,7 +199,7 @@ class _SingleDateCell(QFrame):
         self._lbl.mousePressEvent = lambda e: self._open_cal()
         layout.addWidget(self._lbl, 1)
 
-        self._btn_next = _arrow_btn("›")
+        self._btn_next = _arrow_btn("<")
         self._btn_next.clicked.connect(self._go_next)
         layout.addWidget(self._btn_next)
 
@@ -261,7 +270,7 @@ class SingleDateWidget(QFrame):
         layout.setContentsMargins(4, 0, 4, 0)
         layout.setSpacing(0)
 
-        self._btn_prev = _arrow_btn("‹")
+        self._btn_prev = _arrow_btn(">")
         self._btn_prev.clicked.connect(self._go_prev)
         layout.addWidget(self._btn_prev)
 
@@ -276,7 +285,7 @@ class SingleDateWidget(QFrame):
         self._lbl.mousePressEvent = lambda e: self._open_cal()
         layout.addWidget(self._lbl, 1)
 
-        self._btn_next = _arrow_btn("›")
+        self._btn_next = _arrow_btn("<")
         self._btn_next.clicked.connect(self._go_next)
         layout.addWidget(self._btn_next)
 

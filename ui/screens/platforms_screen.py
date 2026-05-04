@@ -466,8 +466,8 @@ class PlatformListTab(QWidget):
             col += 1
 
             self.table.add_action_buttons(row, col, [
-                {"text": "➕ عملية", "callback": lambda _, pid=p["id"]: self._open_transaction_form(pid), "role": "primary"},
-                {"text": "📊 المزيد", "callback": lambda _, pid=p["id"]: self._open_more(pid), "role": "statement"},
+                {"text": "اضافة  عملية", "callback": lambda _, pid=p["id"]: self._open_transaction_form(pid), "role": "primary"},
+                {"text": " المزيد", "callback": lambda _, pid=p["id"]: self._open_more(pid), "role": "statement"},
             ])
 
         self.table.setSortingEnabled(True)
