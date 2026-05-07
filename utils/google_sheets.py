@@ -26,6 +26,13 @@ def _hex_to_rgb(hex_color: str) -> dict:
     }
 
 
+def _contrast_text(bg_hex: str) -> str:
+    h = bg_hex.lstrip("#")
+    r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    return "#111827" if luminance > 0.55 else "#F9FAFB"
+
+
 def _fmt(
     sheet_id: int,
     r0: int,
@@ -38,6 +45,7 @@ def _fmt(
     fg: str = None,
     align: str = "RIGHT",
     num_fmt: str = None,
+    num_fmt_type: str = "NUMBER",
     font_size: int = None,
 ) -> dict:
     cell_fmt: dict = {"verticalAlignment": "MIDDLE", "horizontalAlignment": align}
@@ -59,7 +67,7 @@ def _fmt(
         parts.append("backgroundColor")
 
     if num_fmt:
-        cell_fmt["numberFormat"] = {"type": "NUMBER", "pattern": num_fmt}
+        cell_fmt["numberFormat"] = {"type": num_fmt_type, "pattern": num_fmt}
         parts.append("numberFormat")
 
     return {
@@ -92,6 +100,19 @@ def _col_width(sheet_id: int, col: int, px: int) -> dict:
     }
 
 
+def _auto_resize(sheet_id: int, c0: int, c1: int) -> dict:
+    return {
+        "autoResizeDimensions": {
+            "dimensions": {
+                "sheetId": sheet_id,
+                "dimension": "COLUMNS",
+                "startIndex": c0,
+                "endIndex": c1,
+            }
+        }
+    }
+
+
 def _row_height(sheet_id: int, row: int, px: int) -> dict:
     return {
         "updateDimensionProperties": {
@@ -103,6 +124,56 @@ def _row_height(sheet_id: int, row: int, px: int) -> dict:
             },
             "properties": {"pixelSize": px},
             "fields": "pixelSize",
+        }
+    }
+
+
+def _banded_rows(sheet_id: int, r0: int, r1: int, c0: int, c1: int) -> dict:
+    return {
+        "addBanding": {
+            "bandedRange": {
+                "range": {
+                    "sheetId": sheet_id,
+                    "startRowIndex": r0,
+                    "endRowIndex": r1,
+                    "startColumnIndex": c0,
+                    "endColumnIndex": c1,
+                },
+                "rowProperties": {
+                    "headerColor": _hex_to_rgb("#415A77"),
+                    "firstBandColor": _hex_to_rgb("#F8F9FA"),
+                    "secondBandColor": _hex_to_rgb("#FFFFFF"),
+                },
+            }
+        }
+    }
+
+
+def _status_rule(sheet_id: int, status: str, bg: str, r1: int, cols: int) -> dict:
+    return {
+        "addConditionalFormatRule": {
+            "rule": {
+                "ranges": [
+                    {
+                        "sheetId": sheet_id,
+                        "startRowIndex": 0,
+                        "endRowIndex": r1,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": cols,
+                    }
+                ],
+                "booleanRule": {
+                    "condition": {
+                        "type": "CUSTOM_FORMULA",
+                        "values": [{"userEnteredValue": f'=$F1="{status}"'}],
+                    },
+                    "format": {
+                        "backgroundColor": _hex_to_rgb(bg),
+                        "textFormat": {"foregroundColor": _hex_to_rgb(_contrast_text(bg))},
+                    },
+                },
+            },
+            "index": 0,
         }
     }
 
@@ -187,7 +258,7 @@ def _build_summary(spreadsheet, ws, data: dict, customer_links: dict) -> None:
         fg = "#D0021B" if debt > 0 else ("#008000" if debt < 0 else "#000000")
 
         reqs.append(_fmt(sid, r, r + 1, 0, 4, bg=bg))
-        reqs.append(_fmt(sid, r, r + 1, 3, 4, fg=fg, bold=True, num_fmt='#,##0.00 "ج"'))
+        reqs.append(_fmt(sid, r, r + 1, 3, 4, fg=fg, bold=True, num_fmt='#,##0.00 "ج.م"'))
         reqs.append(_row_height(sid, r, 32))
 
     # Header & Layout
@@ -224,6 +295,7 @@ def _build_customers(spreadsheet, ws, data: dict) -> dict:
     rows = []
     reqs = _optimize_view(sid)
     customer_links = {}
+    col_count = 6
 
     reqs.extend(
         [
@@ -231,12 +303,14 @@ def _build_customers(spreadsheet, ws, data: dict) -> dict:
             _col_width(sid, 1, 280),
             _col_width(sid, 2, 120),
             _col_width(sid, 3, 120),
+            _col_width(sid, 4, 130),
+            _col_width(sid, 5, 130),
         ]
     )
 
     for i, cust in enumerate(statements):
         if i > 0:
-            rows.extend([[""] * 4, [""] * 4])  # Spacer rows
+            rows.extend([[""] * col_count, [""] * col_count])  # Spacer rows
 
         block_start = len(rows)
         customer_links[cust["name"]] = block_start + 1
@@ -244,16 +318,16 @@ def _build_customers(spreadsheet, ws, data: dict) -> dict:
         # 1. Block Header
         hdr_idx = len(rows)
         rows.append(
-            [f"👤  كشف حساب: {cust['name']}  |  {cust.get('phone', '')}", "", "", ""]
+            [f"👤  كشف حساب: {cust['name']}  |  {cust.get('phone', '')}", "", "", "", "", ""]
         )
-        reqs.append(_merge(sid, hdr_idx, 0, 4))
+        reqs.append(_merge(sid, hdr_idx, 0, col_count))
         reqs.append(
             _fmt(
                 sid,
                 hdr_idx,
                 hdr_idx + 1,
                 0,
-                4,
+                col_count,
                 bold=True,
                 bg="#1B263B",
                 fg="#FFFFFF",
@@ -265,14 +339,14 @@ def _build_customers(spreadsheet, ws, data: dict) -> dict:
 
         # 2. Table Header
         th_idx = len(rows)
-        rows.append(["التاريخ", "البيان / الخدمة", "مدين (عليه)", "دائن (له)"])
+        rows.append(["التاريخ", "البيان / الخدمة", "مدين (عليه)", "دائن (له)", "الرصيد", "حالة العملية"])
         reqs.append(
             _fmt(
                 sid,
                 th_idx,
                 th_idx + 1,
                 0,
-                4,
+                col_count,
                 bold=True,
                 bg="#415A77",
                 fg="#FFFFFF",
@@ -284,13 +358,19 @@ def _build_customers(spreadsheet, ws, data: dict) -> dict:
         # 3. Transaction Rows
         total_owed = 0.0
         total_credit = 0.0
+        running_balance = 0.0
         for j, t in enumerate(cust.get("transactions", [])):
             tx_idx = len(rows)
             amt = float(t["amount"] or 0)
+            effective = float(t.get("effective_amount", amt) or 0)
+            status = t.get("status") or "قيد الانتظار"
             owed = amt if amt > 0 else 0
             credit = abs(amt) if amt < 0 else 0
-            total_owed += owed
-            total_credit += credit
+            eff_owed = effective if effective > 0 else 0
+            eff_credit = abs(effective) if effective < 0 else 0
+            total_owed += eff_owed
+            total_credit += eff_credit
+            running_balance += effective
 
             rows.append(
                 [
@@ -298,20 +378,47 @@ def _build_customers(spreadsheet, ws, data: dict) -> dict:
                     t["service"],
                     owed if owed > 0 else "",
                     credit if credit > 0 else "",
+                    running_balance,
+                    status,
                 ]
             )
-            bg = "#F8F9FA" if j % 2 == 0 else "#FFFFFF"
-            reqs.append(_fmt(sid, tx_idx, tx_idx + 1, 0, 4, bg=bg))
             reqs.append(
                 _fmt(
-                    sid, tx_idx, tx_idx + 1, 2, 3, fg="#D0021B", num_fmt='#,##0.00 "ج"'
+                    sid,
+                    tx_idx,
+                    tx_idx + 1,
+                    0,
+                    1,
+                    align="CENTER",
+                    num_fmt="yyyy-mm-dd",
+                    num_fmt_type="DATE",
                 )
             )
             reqs.append(
                 _fmt(
-                    sid, tx_idx, tx_idx + 1, 3, 4, fg="#008000", num_fmt='#,##0.00 "ج"'
+                    sid, tx_idx, tx_idx + 1, 2, 3, fg="#D0021B", num_fmt='#,##0.00 "ج.م"'
                 )
             )
+            reqs.append(
+                _fmt(
+                    sid, tx_idx, tx_idx + 1, 3, 4, fg="#008000", num_fmt='#,##0.00 "ج.م"'
+                )
+            )
+            balance_fg = "#D0021B" if running_balance > 0 else ("#008000" if running_balance < 0 else "#000000")
+            reqs.append(
+                _fmt(
+                    sid,
+                    tx_idx,
+                    tx_idx + 1,
+                    4,
+                    5,
+                    fg=balance_fg,
+                    bold=True,
+                    num_fmt='#,##0.00 "ج.م"',
+                    align="CENTER",
+                )
+            )
+            reqs.append(_fmt(sid, tx_idx, tx_idx + 1, 5, 6, bold=True, align="CENTER"))
             reqs.append(_row_height(sid, tx_idx, 30))
 
         # 4. Footer
@@ -320,8 +427,8 @@ def _build_customers(spreadsheet, ws, data: dict) -> dict:
         status = "مستحق عليه" if net > 0 else "مستحق له"
         net_fg = "#D0021B" if net > 0 else "#008000"
 
-        rows.append(["", "الإجماليات:", total_owed, total_credit])
-        rows.append(["", f"الرصيد النهائي ({status}):", "", abs(net)])
+        rows.append(["", "الإجماليات:", total_owed, total_credit, total_owed - total_credit, ""])
+        rows.append(["", f"الرصيد النهائي ({status}):", "", "", abs(net), ""])
 
         # Footer styling
         reqs.append(_fmt(sid, f_idx, f_idx + 1, 1, 2, bold=True, bg="#E0E1DD"))
@@ -334,7 +441,7 @@ def _build_customers(spreadsheet, ws, data: dict) -> dict:
                 3,
                 bold=True,
                 fg="#D0021B",
-                num_fmt='#,##0.00 "ج"',
+                num_fmt='#,##0.00 "ج.م"',
             )
         )
         reqs.append(
@@ -346,20 +453,32 @@ def _build_customers(spreadsheet, ws, data: dict) -> dict:
                 4,
                 bold=True,
                 fg="#008000",
-                num_fmt='#,##0.00 "ج"',
+                num_fmt='#,##0.00 "ج.م"',
+            )
+        )
+        reqs.append(
+            _fmt(
+                sid,
+                f_idx,
+                f_idx + 1,
+                4,
+                5,
+                bold=True,
+                num_fmt='#,##0.00 "ج.م"',
+                align="CENTER",
             )
         )
         reqs.append(_row_height(sid, f_idx, 35))
 
         net_row = f_idx + 1
-        reqs.append(_merge(sid, net_row, 1, 3))
+        reqs.append(_merge(sid, net_row, 1, 4))
         reqs.append(
             _fmt(
                 sid,
                 net_row,
                 net_row + 1,
                 1,
-                4,
+                5,
                 bold=True,
                 bg="#1B263B",
                 fg="#FFFFFF",
@@ -371,21 +490,29 @@ def _build_customers(spreadsheet, ws, data: dict) -> dict:
                 sid,
                 net_row,
                 net_row + 1,
-                3,
                 4,
+                5,
                 bold=True,
                 fg=net_fg,
-                num_fmt='#,##0.00 "ج"',
+                num_fmt='#,##0.00 "ج.م"',
                 font_size=12,
             )
         )
         reqs.append(_row_height(sid, net_row, 40))
 
         # Block Border
-        reqs.append(_border(sid, hdr_idx, len(rows), 0, 4))
+        reqs.append(_border(sid, hdr_idx, len(rows), 0, col_count))
 
     if rows:
         ws.update(values=rows, range_name="A1", value_input_option="USER_ENTERED")
+        reqs.insert(1, _banded_rows(sid, 0, max(len(rows), 10000), 0, col_count))
+        reqs.extend(
+            [
+                _status_rule(sid, "مسدد", "#E8F5E9", max(len(rows), 10000), col_count),
+                _status_rule(sid, "تم التسليم", "#E3F2FD", max(len(rows), 10000), col_count),
+                _auto_resize(sid, 0, col_count),
+            ]
+        )
     spreadsheet.batch_update({"requests": reqs})
     return customer_links
 
@@ -461,7 +588,7 @@ def _build_groups(spreadsheet, ws, data: dict) -> None:
             m_owed = 0.0
             m_credit = 0.0
             for t in member.get("transactions", []):
-                amt = float(t["amount"] or 0)
+                amt = float(t.get("effective_amount", t.get("amount", 0)) or 0)
                 if amt > 0:
                     m_owed += amt
                 else:
@@ -491,7 +618,7 @@ def _build_groups(spreadsheet, ws, data: dict) -> None:
                     2,
                     3,
                     fg="#D0021B",
-                    num_fmt='#,##0.00 "ج"',
+                    num_fmt='#,##0.00 "ج.م"',
                 )
             )
             reqs.append(
@@ -502,7 +629,7 @@ def _build_groups(spreadsheet, ws, data: dict) -> None:
                     3,
                     4,
                     fg="#008000",
-                    num_fmt='#,##0.00 "ج"',
+                    num_fmt='#,##0.00 "ج.م"',
                 )
             )
 
@@ -519,7 +646,7 @@ def _build_groups(spreadsheet, ws, data: dict) -> None:
                     5,
                     fg=m_net_fg,
                     bold=True,
-                    num_fmt='#,##0.00 "ج"',
+                    num_fmt='#,##0.00 "ج.م"',
                 )
             )
             reqs.append(_row_height(sid, m_row_idx, 30))
@@ -545,7 +672,7 @@ def _build_groups(spreadsheet, ws, data: dict) -> None:
                 3,
                 bold=True,
                 fg="#D0021B",
-                num_fmt='#,##0.00 "ج"',
+                num_fmt='#,##0.00 "ج.م"',
             )
         )
         reqs.append(
@@ -557,7 +684,7 @@ def _build_groups(spreadsheet, ws, data: dict) -> None:
                 4,
                 bold=True,
                 fg="#008000",
-                num_fmt='#,##0.00 "ج"',
+                num_fmt='#,##0.00 "ج.م"',
             )
         )
         reqs.append(_row_height(sid, f_idx, 35))
@@ -588,7 +715,7 @@ def _build_groups(spreadsheet, ws, data: dict) -> None:
                 5,
                 bold=True,
                 fg=net_fg,
-                num_fmt='#,##0.00 "ج"',
+                num_fmt='#,##0.00 "ج.م"',
                 font_size=12,
             )
         )
@@ -623,7 +750,7 @@ def export_to_sheets(data: dict) -> str:
             spreadsheet.del_worksheet(ws)
 
         ws_summary = spreadsheet.add_worksheet(_SHEET_NAMES[0], rows=2000, cols=4)
-        ws_customers = spreadsheet.add_worksheet(_SHEET_NAMES[1], rows=10000, cols=4)
+        ws_customers = spreadsheet.add_worksheet(_SHEET_NAMES[1], rows=10000, cols=6)
         ws_groups = spreadsheet.add_worksheet(_SHEET_NAMES[2], rows=10000, cols=5)
         if temp:
             spreadsheet.del_worksheet(temp)

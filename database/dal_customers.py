@@ -183,36 +183,53 @@ def get_export_data() -> dict:
         # 2. Summary rows (same as customers but sorted by debt)
         summary_rows = sorted(customers, key=lambda x: x["total_debt"], reverse=True)
 
-        # 3. Fetch transactions (Pending Outbound + All Inbound)
+        # 3. Fetch detailed customer ledger rows. Status/effective_amount are
+        # used by the Sheets exporter so paid/delivered rows can be displayed
+        # without inflating outstanding debt totals.
         customer_ids = [r["id"] for r in customers]
         txn_rows = []
         if customer_ids:
             placeholders = ",".join("?" * len(customer_ids))
             txn_rows = conn.execute(f"""
                 SELECT t.customer_id,
-                       strftime('%Y-%m-%d %H:%M', t.created_at) AS date,
+                       strftime('%Y-%m-%d', t.created_at)       AS date,
                        t.service_name                            AS service,
                        t.amount_required                         AS amount,
+                       t.amount_spent                            AS amount_spent,
                        t.operation_type,
-                       t.payment_status
+                       t.payment_status,
+                       t.is_delivered
                 FROM transactions t
                 WHERE t.customer_id IN ({placeholders})
-                  AND (t.payment_status = 'pending' OR t.operation_type = 'inbound')
+                  AND t.operation_type IN ('outbound', 'inbound')
                 ORDER BY t.created_at ASC
             """, customer_ids).fetchall()
 
     txn_by_customer: dict = {}
     for t in txn_rows:
-        amount = t["amount"]
+        amount = float(t["amount"] or 0)
+        effective_amount = 0.0
         service = t["service"]
+        status = "قيد الانتظار"
+
         if t["operation_type"] == "inbound":
             service = f"📥 دفع: {service}"
-            amount = -amount
+            delivered = int(t["is_delivered"] or 0) == 1
+            status = "تم التسليم" if delivered else "قيد الانتظار"
+            amount = -(float(t["amount_spent"] or 0))
+            effective_amount = 0.0 if delivered else amount
+        elif t["payment_status"] == "paid":
+            status = "مسدد"
+            effective_amount = 0.0
+        else:
+            effective_amount = amount
 
         txn_by_customer.setdefault(t["customer_id"], []).append({
-            "date":    t["date"],
-            "service": service,
-            "amount":  amount,
+            "date":             t["date"],
+            "service":          service,
+            "amount":           amount,
+            "effective_amount": effective_amount,
+            "status":           status,
         })
 
     # Prepare data for sheets
