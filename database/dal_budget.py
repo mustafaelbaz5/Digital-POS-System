@@ -132,8 +132,8 @@ def add_platform(name: str, platform_type: str, initial_balance: float = 0,
                 conn.execute("UPDATE budget SET main_budget = main_budget - ? WHERE id = 1", (initial_balance,))
 
             cursor = conn.execute(
-                "INSERT INTO platforms (name, type, balance, monthly_limit) VALUES (?, ?, ?, ?)",
-                (name, platform_type, initial_balance, monthly_limit)
+                "INSERT INTO platforms (name, type, balance, initial_balance, monthly_limit) VALUES (?, ?, ?, ?, ?)",
+                (name, platform_type, initial_balance, initial_balance, monthly_limit)
             )
             conn.commit()
             return cursor.lastrowid

@@ -310,8 +310,8 @@ class CompactTransactionTab(QWidget):
         ref = self.ref_input.text().strip()
         notes = self.notes_input.text().strip()
 
-        if not cid:
-            QMessageBox.warning(self, "تنبيه", "يجب اختيار العميل لإتمام العملية.")
+        if not cid or cid <= 0:
+            QMessageBox.warning(self, "تنبيه", "يجب اختيار عميل من القائمة لإتمام العملية. العمليات بدون عميل غير مسموح بها حالياً.")
             return
         if not service:
             QMessageBox.warning(self, "تنبيه", "أدخل اسم الخدمة")

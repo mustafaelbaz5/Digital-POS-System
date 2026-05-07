@@ -40,8 +40,10 @@ class PlatformMoreDialog(BaseDialog):
         super().__init__(f"📊 المزيد — {platform['name']}", parent)
         self.platform = platform
         self.date_str = date_str
-        self.setFixedSize(750, 700)
+        self.setMinimumWidth(800)
+        self.setMinimumHeight(850)
         self.setModal(False)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.FramelessWindowHint)
         self._setup_scroll()
         self._build_content()
 
@@ -113,26 +115,26 @@ class PlatformMoreDialog(BaseDialog):
         dl.addStretch()
         self.scroll_layout.addWidget(date_frame)
 
-        # ── Financial summary card
+        # ── Financial summary card (نموذج Chain Balance)
         info = QFrame()
         info.setObjectName("card")
         il = QVBoxLayout(info)
-        il.setContentsMargins(18, 14, 18, 14)
-        il.setSpacing(8)
+        il.setContentsMargins(24, 20, 24, 20)
+        il.setSpacing(12)
 
-        def _row(label, value, color=COLORS["text_primary"], bold=False, is_currency=True):
+        def _row(label, value, color=COLORS["text_primary"], bold=False, is_currency=True, extra_size=False):
             r = QHBoxLayout()
             lbl = QLabel(label)
             lbl.setStyleSheet(
-                f"color:{COLORS['text_secondary']}; font-size:14px; "
+                f"color:{COLORS['text_secondary']}; font-size:15px; "
                 f"background:transparent; border:none;"
             )
             r.addWidget(lbl)
             r.addStretch()
-            val_str = fmt_currency(value) if is_currency else str(value)
+            val_str = fmt_currency(value) if is_currency else str(int(value))
             val = QLabel(val_str)
             val.setStyleSheet(
-                f"color:{color}; font-size:15px; "
+                f"color:{color}; font-size:{'18px' if extra_size else '16px'}; "
                 f"font-weight:{'bold' if bold else 'normal'}; "
                 f"background:transparent; border:none;"
             )
@@ -142,19 +144,37 @@ class PlatformMoreDialog(BaseDialog):
         def _sep():
             s = QFrame()
             s.setFixedHeight(1)
-            s.setStyleSheet(f"background:{COLORS['border']};")
+            s.setStyleSheet(f"background:{COLORS['border']}; margin: 4px 0;")
             il.addWidget(s)
 
-        _row("📂 رصيد البداية",              opening,                  COLORS["blue"],   True)
-        _row("📊 عدد العمليات",              stats["txn_count"],       is_currency=False)
-        _row("📤 إجمالي المصروف",            stats["total_outbound"],  COLORS["red"])
-        _row("📥 إجمالي الوارد",             stats["total_inbound"],   COLORS["green"])
-        _row("💰 إيداعات",                  stats["total_deposits"],   COLORS["purple"])
+        # 1. Opening Balance (A)
+        _row("📂 رصيد البداية (A)",              opening,                  COLORS["blue"],   True)
+        _row("📊 عدد عمليات اليوم",              int(stats["txn_count"]),  is_currency=False)
+        
+        # 2. Net Change (B)
+        net_inward = stats["total_inbound"] + stats["total_deposits"]
+        net_outward = stats["total_outbound"]
+        net_change = net_inward - net_outward
+        
+        _row("📥 إجمالي الوارد اليومي",          net_inward,               COLORS["green"])
+        _row("📤 إجمالي المصروف اليومي",        net_outward,              COLORS["red"])
+        _row("⚡ صافي التغيير اليومي (B)",      net_change,               COLORS["text_primary"], bold=True)
+        
         _sep()
-        _row("⚙️ الرصيد بعد العمليات",      after_ops,                COLORS["yellow"], True)
-        _row("📊 إجمالي العمولات",           stats["total_commission"], COLORS["cyan"])
+        
+        # 3. Balance After Operations (C)
+        after_ops = opening + net_change
+        _row("⚙️ الرصيد بعد العمليات (C)",      after_ops,                COLORS["yellow"], True)
+        
+        # 4. Daily Commission (D)
+        _row("💵 عمولة اليوم (D)",               stats["total_commission"], COLORS["cyan"])
+        
         _sep()
-        _row("🏁 الرصيد النهائي",            closing,                  COLORS["accent"], True)
+        
+        # 5. Final Closing Balance (E)
+        closing = after_ops + stats["total_commission"]
+        _row("🏁 الرصيد النهائي للإغلاق (E)",    closing,                  COLORS["accent"], True, extra_size=True)
+        
         self.scroll_layout.addWidget(info)
 
         # ── Commission (machines only)

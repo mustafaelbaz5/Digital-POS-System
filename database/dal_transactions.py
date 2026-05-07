@@ -580,14 +580,13 @@ def cleanup_transactions_before(cutoff_date: str) -> int:
 
 def get_platform_day_stats(platform_id: int, date_str: str) -> dict:
     """
-    إحصائيات يوم معين لمنصة:
-    - عدد العمليات
-    - إجمالي المصروف (outbound)
-    - إجمالي الوارد (deposits via inbound)
-    - العمولات اليدوية
+    إحصائيات يوم معين لمنصة (تتبع نموذج Chain Balance):
+    - Net Inward: (Deposits + Inbounds)
+    - Net Outward: (Outbounds)
+    - Daily Commission: (manual_commission)
     """
     with get_connection() as conn:
-        # Count transactions for this platform on this date
+        # Transactions on this date
         row = conn.execute(
             """
             SELECT 
@@ -601,7 +600,7 @@ def get_platform_day_stats(platform_id: int, date_str: str) -> dict:
             (platform_id, date_str),
         ).fetchone()
 
-        # Deposits from machine_deposits table
+        # Deposits on this date
         dep_row = conn.execute(
             """
             SELECT COALESCE(SUM(amount), 0) AS total_deposits
@@ -611,10 +610,10 @@ def get_platform_day_stats(platform_id: int, date_str: str) -> dict:
             (platform_id, date_str),
         ).fetchone()
 
-        # Daily commissions from daily_commissions table (legacy)
-        comm_row = conn.execute(
+        # Legacy commissions (fallback)
+        legacy_row = conn.execute(
             """
-            SELECT COALESCE(SUM(amount), 0) AS total_legacy_commission
+            SELECT COALESCE(SUM(amount), 0) AS total_legacy
             FROM daily_commissions
             WHERE platform_id = ? AND DATE(created_at) = ?
         """,
@@ -625,105 +624,76 @@ def get_platform_day_stats(platform_id: int, date_str: str) -> dict:
             "txn_count": row["txn_count"] if row else 0,
             "total_outbound": row["total_outbound"] if row else 0,
             "total_inbound": row["total_inbound"] if row else 0,
-            "total_commission": (row["total_commission"] if row else 0)
-            + (comm_row["total_legacy_commission"] if comm_row else 0),
             "total_deposits": dep_row["total_deposits"] if dep_row else 0,
+            "total_commission": (row["total_commission"] if row else 0) + (legacy_row["total_legacy"] if legacy_row else 0),
         }
 
 
 def get_opening_balance(platform_id: int, date_str: str) -> float:
     """
-    رصيد البداية = الرصيد النهائي لليوم السابق.
-    يُحسب بأخذ الرصيد الحالي وعكس كل عمليات اليوم وما بعده.
-
-    الطريقة: الرصيد الحالي + كل ما خُصم اليوم وما بعده - كل ما أُضيف اليوم وما بعده
+    Dynamic Opening Balance (The Snapshot):
+    Cumulative sum of ALL transactions from the beginning of time up until Date(X-1).
     """
     with get_connection() as conn:
-        # Current live balance
+        # 1. Start with initial_balance
         plat = conn.execute(
-            "SELECT balance FROM platforms WHERE id = ?", (platform_id,)
+            "SELECT initial_balance FROM platforms WHERE id = ?", (platform_id,)
         ).fetchone()
-        if not plat:
-            return 0.0
-        current_balance = plat["balance"]
+        initial = plat["initial_balance"] if plat else 0.0
 
-        # All outbound (deducted from platform) on date_str and after
-        out = conn.execute(
-            """
-            SELECT COALESCE(SUM(amount_spent), 0) AS total
-            FROM transactions
-            WHERE platform_id = ? AND DATE(created_at) >= ? AND operation_type = 'outbound'
-        """,
-            (platform_id, date_str),
-        ).fetchone()
-
-        # All inbound (added to platform) on date_str and after
-        inb = conn.execute(
-            """
-            SELECT COALESCE(SUM(amount_required), 0) AS total
-            FROM transactions
-            WHERE platform_id = ? AND DATE(created_at) >= ? AND operation_type = 'inbound'
-        """,
-            (platform_id, date_str),
-        ).fetchone()
-
-        # All manual commissions (deducted from platform) on date_str and after
-        comm = conn.execute(
-            """
-            SELECT COALESCE(SUM(amount_spent), 0) AS total
-            FROM transactions
-            WHERE platform_id = ? AND DATE(created_at) >= ? AND operation_type = 'manual_commission'
-        """,
-            (platform_id, date_str),
-        ).fetchone()
-
-        # Legacy daily_commissions (deducted from platform) on date_str and after
-        legacy_comm = conn.execute(
-            """
-            SELECT COALESCE(SUM(amount), 0) AS total
-            FROM daily_commissions
-            WHERE platform_id = ? AND DATE(created_at) >= ?
-        """,
-            (platform_id, date_str),
-        ).fetchone()
-
-        # Deposits (added to platform) on date_str and after
-        deps = conn.execute(
-            """
+        # 2. SUM(Deposits) before date_str
+        deps = conn.execute("""
             SELECT COALESCE(SUM(amount), 0) AS total
             FROM machine_deposits
-            WHERE platform_id = ? AND DATE(created_at) >= ?
-        """,
-            (platform_id, date_str),
-        ).fetchone()
+            WHERE platform_id = ? AND DATE(created_at) < ?
+        """, (platform_id, date_str)).fetchone()["total"]
 
-        # Reverse all operations from date_str onwards to get opening balance
-        opening = (
-            current_balance
-            + out["total"]  # re-add what was spent
-            - inb["total"]  # remove what was received
-            - comm["total"]  # remove commissions (since they were added)
-            - legacy_comm["total"]  # remove legacy commissions
-            - deps["total"]
-        )  # remove deposits
+        # 3. SUM(Inbound + Commission - Outbound) before date_str
+        txns = conn.execute("""
+            SELECT 
+                COALESCE(SUM(CASE 
+                    WHEN operation_type = 'inbound' THEN amount_required
+                    WHEN operation_type = 'manual_commission' THEN amount_spent
+                    ELSE 0 END), 0) AS total_in,
+                COALESCE(SUM(CASE 
+                    WHEN operation_type = 'outbound' THEN amount_spent
+                    ELSE 0 END), 0) AS total_out
+            FROM transactions
+            WHERE platform_id = ? AND DATE(created_at) < ?
+        """, (platform_id, date_str)).fetchone()
 
-        return opening
+        # 4. Legacy commissions
+        legacy = conn.execute("""
+            SELECT COALESCE(SUM(amount), 0) AS total
+            FROM daily_commissions
+            WHERE platform_id = ? AND DATE(created_at) < ?
+        """, (platform_id, date_str)).fetchone()["total"]
+
+        return initial + deps + txns["total_in"] + legacy - txns["total_out"]
 
 
 def get_closing_balance(platform_id: int, date_str: str) -> float:
     """
-    الرصيد النهائي = رصيد البداية + الإيداعات + الوارد - المصروف - العمولات
+    الرصيد النهائي (تتبع نموذج Chain Balance):
+    E = (A + B) + D
+    حيث:
+    A = Opening Balance
+    B = Net Change (Inbound + Deposits - Outbound)
+    D = Daily Commission
     """
     opening = get_opening_balance(platform_id, date_str)
     stats = get_platform_day_stats(platform_id, date_str)
-
-    closing = (
-        opening
-        + stats["total_deposits"]
-        + stats["total_inbound"]
-        - stats["total_outbound"]
-        + stats["total_commission"]
-    )
+    
+    # Net Change B (Daily Inward - Daily Outward)
+    inward = stats["total_deposits"] + stats["total_inbound"]
+    outward = stats["total_outbound"]
+    net_change = inward - outward
+    
+    # Balance After Operations C
+    after_ops = opening + net_change
+    
+    # Final Closing Balance E
+    closing = after_ops + stats["total_commission"]
     return closing
 
 

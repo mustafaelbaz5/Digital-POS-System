@@ -51,6 +51,11 @@ CREATE TABLE IF NOT EXISTS machine_deposits (
     created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
+CREATE INDEX IF NOT EXISTS idx_deposits_platform ON machine_deposits(platform_id);
+CREATE INDEX IF NOT EXISTS idx_deposits_created  ON machine_deposits(created_at);
+CREATE INDEX IF NOT EXISTS idx_deposits_platform ON machine_deposits(platform_id);
+CREATE INDEX IF NOT EXISTS idx_deposits_created  ON machine_deposits(created_at);
+
 CREATE TABLE IF NOT EXISTS daily_commissions (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     platform_id     INTEGER NOT NULL,
@@ -78,6 +83,7 @@ def initialize_database() -> None:
                         name            TEXT    NOT NULL UNIQUE,
                         type            TEXT    NOT NULL,
                         balance         REAL    NOT NULL DEFAULT 0,
+                        initial_balance REAL    NOT NULL DEFAULT 0,
                         monthly_limit   REAL    NOT NULL DEFAULT 200000,
                         monthly_used    REAL    NOT NULL DEFAULT 0,
                         last_reset_date TEXT    NOT NULL DEFAULT (strftime('%Y-%m', 'now')),
@@ -174,6 +180,7 @@ def initialize_database() -> None:
                 CREATE INDEX IF NOT EXISTS idx_transactions_status    ON transactions(payment_status);
                 CREATE INDEX IF NOT EXISTS idx_transactions_created   ON transactions(created_at);
                 CREATE INDEX IF NOT EXISTS idx_transactions_reference ON transactions(reference_no);
+                CREATE INDEX IF NOT EXISTS idx_transactions_platform  ON transactions(platform_id);
             """)
             conn.commit()
         except Exception:
@@ -222,6 +229,7 @@ def initialize_database() -> None:
         for sql in [
             "ALTER TABLE transactions ADD COLUMN is_delivered INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE platforms ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE platforms ADD COLUMN initial_balance REAL NOT NULL DEFAULT 0",
         ]:
             try:
                 conn.execute(sql)
