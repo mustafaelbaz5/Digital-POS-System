@@ -834,21 +834,29 @@ def get_dashboard_stats() -> dict:
         debts = conn.execute(
             "SELECT COALESCE(SUM(total_debt),0) AS total FROM customers WHERE is_active=1"
         ).fetchone()
+        # احسب أرباح اليوم: استثني manual_commission التي ليست عمليات بيع
         today_p = conn.execute("""
             SELECT COALESCE(SUM(profit),0) AS total FROM transactions 
             WHERE DATE(created_at)=DATE('now','localtime') 
             AND payment_status IN ('pending', 'paid')
+            AND operation_type != 'manual_commission'
         """).fetchone()
+        # احسب أرباح الشهر: استثني manual_commission التي ليست عمليات بيع
         month_p = conn.execute("""
             SELECT COALESCE(SUM(profit),0) AS total FROM transactions 
             WHERE strftime('%Y-%m',created_at)=strftime('%Y-%m','now','localtime') 
             AND payment_status IN ('pending', 'paid')
+            AND operation_type != 'manual_commission'
         """).fetchone()
         pending = conn.execute(
             "SELECT COALESCE(SUM(amount_required),0) AS total FROM transactions WHERE payment_status='pending' AND operation_type='outbound'"
         ).fetchone()
         injected = conn.execute(
             "SELECT COALESCE(SUM(amount),0) AS total FROM capital_movements"
+        ).fetchone()
+        # احسب إجمالي الكاش المطلوب تسليمه للعملاء
+        pending_cash = conn.execute(
+            "SELECT COALESCE(SUM(amount_spent),0) AS total FROM transactions WHERE operation_type='inbound' AND is_delivered=0"
         ).fetchone()
 
         total_platform_balances = (
@@ -879,6 +887,7 @@ def get_dashboard_stats() -> dict:
             "asset_reconciliation": reconciliation,
             "net_position": reconciliation,
             "total_pending": pending["total"] or 0,
+            "pending_cash_liability": pending_cash["total"] or 0,
         }
 
 
@@ -931,3 +940,20 @@ def get_unique_service_names() -> list[str]:
             "SELECT DISTINCT service_name FROM transactions WHERE service_name IS NOT NULL AND service_name != ''"
         ).fetchall()
         return [r["service_name"] for r in rows]
+
+
+def get_pending_cash_liability() -> float:
+    """
+    احسب إجمالي الكاش المطلوب تسليمه للعملاء
+    (العمليات الواردة التي لم يتم تسليمها بعد)
+    المسؤولية: المبلغ المطلوب تسليمه (amount_spent) للعمليات الواردة حيث is_delivered=0
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT COALESCE(SUM(amount_spent), 0) AS total
+            FROM transactions
+            WHERE operation_type = 'inbound' AND is_delivered = 0
+        """
+        ).fetchone()
+        return row["total"] if row else 0

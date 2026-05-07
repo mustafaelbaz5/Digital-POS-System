@@ -134,6 +134,7 @@ class DashboardScreen(ScreenShell):
         self.card_today = StatCard("أرباح اليوم", accent_color=COLORS["accent"])
         self.card_month = StatCard("أرباح الشهر", accent_color=COLORS["accent_hover"])
         self.card_ops = StatCard("عمليات اليوم", accent_color=COLORS["blue"])
+        self.card_cash_liability = StatCard("الكاش المطلوب تسليمه", accent_color=COLORS["yellow"])
 
         placement = [
             (self.card_budget, 0, 0),
@@ -145,6 +146,7 @@ class DashboardScreen(ScreenShell):
             (self.card_today, 2, 0),
             (self.card_month, 2, 1),
             (self.card_ops, 2, 2),
+            (self.card_cash_liability, 3, 0),
         ]
         for card, r, col in placement:
             grid.addWidget(card, r, col)
@@ -289,6 +291,7 @@ class DashboardScreen(ScreenShell):
         self.card_pending.set_value(fmt_currency(stats["total_pending"]))
         self.card_today.set_value(fmt_currency(stats["today_profit"]))
         self.card_month.set_value(fmt_currency(stats["month_profit"]))
+        self.card_cash_liability.set_value(fmt_currency(stats["pending_cash_liability"]))
 
         # Update Header with Budget
         budget_str = fmt_currency(stats["main_budget"])
