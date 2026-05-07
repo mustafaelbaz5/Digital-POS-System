@@ -63,6 +63,18 @@ CREATE TABLE IF NOT EXISTS daily_commissions (
     notes           TEXT,
     created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
+
+CREATE TABLE IF NOT EXISTS capital_movements (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    target_type     TEXT    NOT NULL CHECK (target_type IN ('platform', 'cash')),
+    target_id       INTEGER,
+    amount          REAL    NOT NULL,
+    notes           TEXT,
+    created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_capital_movements_target ON capital_movements(target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_capital_movements_created ON capital_movements(created_at);
 """
 
 
@@ -236,5 +248,43 @@ def initialize_database() -> None:
                 conn.commit()
             except Exception:
                 pass
+
+        # Seed the capital ledger for existing installations once. Platform deposits
+        # already represent central-budget injections; initial platform balances were
+        # historically stored only on platforms.
+        try:
+            seeded = conn.execute(
+                "SELECT value FROM settings WHERE key = 'capital_movements_seeded'"
+            ).fetchone()
+            if not seeded:
+                conn.execute("""
+                    INSERT INTO machine_deposits (platform_id, amount, notes, created_at)
+                    SELECT id, initial_balance, 'historical initial platform balance', '1970-01-01 00:00:00'
+                    FROM platforms
+                    WHERE COALESCE(initial_balance, 0) > 0
+                      AND NOT EXISTS (
+                          SELECT 1 FROM machine_deposits md
+                          WHERE md.platform_id = platforms.id
+                            AND md.notes = 'historical initial platform balance'
+                      )
+                """)
+                conn.execute("""
+                    INSERT INTO capital_movements (target_type, target_id, amount, notes, created_at)
+                    SELECT 'platform', platform_id, amount, COALESCE(notes, 'historical platform injection'), created_at
+                    FROM machine_deposits
+                    WHERE amount != 0
+                """)
+                conn.execute("""
+                    INSERT INTO capital_movements (target_type, target_id, amount, notes, created_at)
+                    SELECT 'cash', NULL, cash_vault, 'historical cash injection', '1970-01-01 00:00:00'
+                    FROM budget
+                    WHERE id = 1 AND COALESCE(cash_vault, 0) > 0
+                """)
+                conn.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES ('capital_movements_seeded', '1')"
+                )
+                conn.commit()
+        except Exception as e:
+            print(f"[DB] capital movements seed skipped: {e}")
 
     print(f"[DB] Database ready: {DB_PATH}")

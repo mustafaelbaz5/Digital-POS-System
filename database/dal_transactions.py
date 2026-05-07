@@ -430,6 +430,12 @@ def delete_transaction(transaction_id: int) -> None:
                     (spent,),
                 )
 
+            elif op == "manual_commission":
+                conn.execute(
+                    "UPDATE platforms SET balance = balance - ? WHERE id = ?",
+                    (spent, pid),
+                )
+
             conn.execute("DELETE FROM transactions WHERE id = ?", (transaction_id,))
             conn.commit()
         except Exception:
@@ -629,26 +635,45 @@ def get_platform_day_stats(platform_id: int, date_str: str) -> dict:
         }
 
 
+def get_daily_manual_commission(platform_id: int, date_str: str) -> float:
+    """Return the existing manual commission for a platform/day, including legacy rows."""
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                COALESCE((
+                    SELECT SUM(amount_spent)
+                    FROM transactions
+                    WHERE platform_id = ?
+                      AND DATE(created_at) = ?
+                      AND operation_type = 'manual_commission'
+                ), 0)
+                +
+                COALESCE((
+                    SELECT SUM(amount)
+                    FROM daily_commissions
+                    WHERE platform_id = ?
+                      AND DATE(created_at) = ?
+                ), 0) AS amount
+            """,
+            (platform_id, date_str, platform_id, date_str),
+        ).fetchone()
+        return row["amount"] if row else 0.0
+
+
 def get_opening_balance(platform_id: int, date_str: str) -> float:
     """
     Dynamic Opening Balance (The Snapshot):
-    Cumulative sum of ALL transactions from the beginning of time up until Date(X-1).
+    Cumulative sum from the beginning of history up to the previous day.
     """
     with get_connection() as conn:
-        # 1. Start with initial_balance
-        plat = conn.execute(
-            "SELECT initial_balance FROM platforms WHERE id = ?", (platform_id,)
-        ).fetchone()
-        initial = plat["initial_balance"] if plat else 0.0
-
-        # 2. SUM(Deposits) before date_str
         deps = conn.execute("""
             SELECT COALESCE(SUM(amount), 0) AS total
             FROM machine_deposits
-            WHERE platform_id = ? AND DATE(created_at) < ?
+            WHERE platform_id = ?
+              AND datetime(created_at) < datetime(?, 'start of day')
         """, (platform_id, date_str)).fetchone()["total"]
 
-        # 3. SUM(Inbound + Commission - Outbound) before date_str
         txns = conn.execute("""
             SELECT 
                 COALESCE(SUM(CASE 
@@ -659,17 +684,18 @@ def get_opening_balance(platform_id: int, date_str: str) -> float:
                     WHEN operation_type = 'outbound' THEN amount_spent
                     ELSE 0 END), 0) AS total_out
             FROM transactions
-            WHERE platform_id = ? AND DATE(created_at) < ?
+            WHERE platform_id = ?
+              AND datetime(created_at) < datetime(?, 'start of day')
         """, (platform_id, date_str)).fetchone()
 
-        # 4. Legacy commissions
         legacy = conn.execute("""
             SELECT COALESCE(SUM(amount), 0) AS total
             FROM daily_commissions
-            WHERE platform_id = ? AND DATE(created_at) < ?
+            WHERE platform_id = ?
+              AND datetime(created_at) < datetime(?, 'start of day')
         """, (platform_id, date_str)).fetchone()["total"]
 
-        return initial + deps + txns["total_in"] + legacy - txns["total_out"]
+        return deps + txns["total_in"] + legacy - txns["total_out"]
 
 
 def get_closing_balance(platform_id: int, date_str: str) -> float:
@@ -719,11 +745,23 @@ def add_manual_commission(
             # Enforce single daily commission
             existing = conn.execute(
                 """
-                SELECT id FROM transactions 
-                WHERE platform_id = ? AND DATE(created_at) = ? AND operation_type = 'manual_commission'
+                SELECT 1
+                WHERE EXISTS (
+                    SELECT 1 FROM transactions
+                    WHERE platform_id = ?
+                      AND DATE(created_at) = ?
+                      AND operation_type = 'manual_commission'
+                      AND amount_spent > 0
+                )
+                OR EXISTS (
+                    SELECT 1 FROM daily_commissions
+                    WHERE platform_id = ?
+                      AND DATE(created_at) = ?
+                      AND amount > 0
+                )
                 LIMIT 1
             """,
-                (platform_id, date_str),
+                (platform_id, date_str, platform_id, date_str),
             ).fetchone()
 
             if existing:
@@ -788,7 +826,10 @@ def get_dashboard_stats() -> dict:
             "SELECT COALESCE(SUM(balance),0) AS total FROM platforms WHERE type='machine' AND is_active=1"
         ).fetchone()
         wallets = conn.execute(
-            "SELECT COALESCE(SUM(balance),0) AS total FROM platforms WHERE type IN ('wallet','instapay') AND is_active=1"
+            "SELECT COALESCE(SUM(balance),0) AS total FROM platforms WHERE type='wallet' AND is_active=1"
+        ).fetchone()
+        instapay = conn.execute(
+            "SELECT COALESCE(SUM(balance),0) AS total FROM platforms WHERE type='instapay' AND is_active=1"
         ).fetchone()
         debts = conn.execute(
             "SELECT COALESCE(SUM(total_debt),0) AS total FROM customers WHERE is_active=1"
@@ -806,25 +847,37 @@ def get_dashboard_stats() -> dict:
         pending = conn.execute(
             "SELECT COALESCE(SUM(amount_required),0) AS total FROM transactions WHERE payment_status='pending' AND operation_type='outbound'"
         ).fetchone()
+        injected = conn.execute(
+            "SELECT COALESCE(SUM(amount),0) AS total FROM capital_movements"
+        ).fetchone()
 
-        total_assets = (
+        total_platform_balances = (
             (machines["total"] or 0)
             + (wallets["total"] or 0)
+            + (instapay["total"] or 0)
+        )
+        total_assets = (
+            total_platform_balances
             + (budget["cash_vault"] or 0)
         )
+        injected_capital = injected["total"] or 0
+        reconciliation = total_assets - injected_capital
+
         return {
             "main_budget": budget["main_budget"] or 0,
             "cash_vault": budget["cash_vault"] or 0,
             "total_machines": machines["total"] or 0,
             "total_wallets": wallets["total"] or 0,
+            "total_instapay": instapay["total"] or 0,
             "total_debts": debts["total"] or 0,
             "today_profit": today_p["total"] or 0,
             "month_profit": month_p["total"] or 0,
             "total_assets": total_assets,
+            "total_platform_balances": total_platform_balances,
             "total_balances": total_assets,
-            "net_position": total_assets
-            + (debts["total"] or 0)
-            - (budget["main_budget"] or 0),
+            "injected_capital": injected_capital,
+            "asset_reconciliation": reconciliation,
+            "net_position": reconciliation,
             "total_pending": pending["total"] or 0,
         }
 

@@ -172,7 +172,6 @@ class InventoryTab(QWidget):
         date_from, date_to = self.date_picker.get_range()
 
         stats = db.get_dashboard_stats()
-        budget = db.get_budget()
         platforms = db.get_all_platforms()
 
         period_txns = db.get_transactions(
@@ -196,7 +195,7 @@ class InventoryTab(QWidget):
             fmt_currency(period_profit),
             color=COLORS["accent"] if period_profit >= 0 else COLORS["red"],
         )
-        self.card_budget.set_value(fmt_currency(budget["main_budget"]))
+        self.card_budget.set_value(fmt_currency(stats["injected_capital"]))
         self.card_pending.set_value(
             fmt_currency(stats.get("total_pending", 0)),
             color=(
@@ -206,15 +205,9 @@ class InventoryTab(QWidget):
             ),
         )
 
-        all_txns = db.get_transactions(limit=5000)
-        total_profit = sum(
-            t.get("profit", 0) or 0
-            for t in all_txns
-            if t.get("payment_status") != "cash"
-        )
-        left_side = stats["total_balances"] + stats["total_debts"]
-        right_side = budget["main_budget"] + total_profit
-        diff = left_side - right_side
+        left_side = stats["total_assets"]
+        right_side = stats["injected_capital"]
+        diff = stats["asset_reconciliation"]
 
         self._match_left.setText(fmt_currency(left_side))
         self._match_right.setText(fmt_currency(right_side))

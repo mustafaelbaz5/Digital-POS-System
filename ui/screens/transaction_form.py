@@ -301,9 +301,25 @@ class CompactTransactionTab(QWidget):
             f"border: 1px solid {COLORS['border']}; font-family: {FONT['family']}; font-size: 14px;"
         )
         self.service_input.setCompleter(comp_s)
+        self.customer_combo.setCurrentIndex(-1)
+        self.customer_combo.setEditText("")
+
+    def _selected_customer_id(self):
+        cid = self.customer_combo.currentData()
+        if cid:
+            return cid
+
+        typed = self.customer_combo.currentText().strip()
+        if not typed:
+            return None
+        for i in range(self.customer_combo.count()):
+            if self.customer_combo.itemText(i) == typed:
+                self.customer_combo.setCurrentIndex(i)
+                return self.customer_combo.itemData(i)
+        return None
 
     def _save(self):
-        cid = self.customer_combo.currentData()
+        cid = self._selected_customer_id()
         service = self.service_input.text().strip()
         spent = self.amount_spent.value()
         req = self.amount_req.value()
@@ -312,6 +328,7 @@ class CompactTransactionTab(QWidget):
 
         if not cid or cid <= 0:
             QMessageBox.warning(self, "تنبيه", "يجب اختيار عميل من القائمة لإتمام العملية. العمليات بدون عميل غير مسموح بها حالياً.")
+            self.customer_combo.lineEdit().setFocus()
             return
         if not service:
             QMessageBox.warning(self, "تنبيه", "أدخل اسم الخدمة")
@@ -375,11 +392,11 @@ class CompactTransactionTab(QWidget):
 
             # Reset Selections (as requested)
             self.service_input.clear()
-            self.customer_combo.setCurrentIndex(0)  # Back to "بدون عميل محدد"
+            self.customer_combo.setCurrentIndex(-1)
             self.customer_combo.setEditText("")  # Clear search text
 
             # Return focus to Client Search for rapid next entry
-            self.customer_combo.setFocus()
+            self.customer_combo.lineEdit().setFocus()
 
         except Exception as e:
             show_toast(self, f"خطأ: {str(e)}", type="danger")
@@ -419,9 +436,9 @@ class TransactionDialog(BaseDialog):
         # Auto-focus first input field (Customer Search)
         try:
             if hasattr(self, "out_tab"):
-                self.out_tab.customer_combo.setFocus()
+                self.out_tab.customer_combo.lineEdit().setFocus()
             elif hasattr(self, "in_tab"):
-                self.in_tab.customer_combo.setFocus()
+                self.in_tab.customer_combo.lineEdit().setFocus()
         except Exception:
             pass
 

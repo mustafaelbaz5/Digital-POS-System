@@ -23,5 +23,5 @@ from .dal_transactions import (
     update_transaction_status, delete_transaction, get_unique_service_names,
     cleanup_transactions_before,
     get_platform_day_stats, get_opening_balance, get_closing_balance,
-    add_manual_commission, get_platform_transactions_for_date,
+    get_daily_manual_commission, add_manual_commission, get_platform_transactions_for_date,
 )

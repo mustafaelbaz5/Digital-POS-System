@@ -6,6 +6,35 @@ Data Access Layer - Budget & Platforms
 from database.connection import get_connection
 
 
+def _record_capital_movement(
+    conn,
+    target_type: str,
+    amount: float,
+    target_id: int = None,
+    notes: str = "",
+    created_at: str = None,
+) -> None:
+    """Signed movement from central budget into an asset; negative means returned."""
+    if abs(amount) < 0.000001:
+        return
+    if created_at:
+        conn.execute(
+            """
+            INSERT INTO capital_movements (target_type, target_id, amount, notes, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (target_type, target_id, amount, notes, created_at),
+        )
+    else:
+        conn.execute(
+            """
+            INSERT INTO capital_movements (target_type, target_id, amount, notes)
+            VALUES (?, ?, ?, ?)
+            """,
+            (target_type, target_id, amount, notes),
+        )
+
+
 # ══════════════════════════════════════════
 #  الميزانية والخزينة
 # ══════════════════════════════════════════
@@ -49,9 +78,11 @@ def set_cash_vault(new_amount: float) -> None:
                     raise ValueError(f"الميزانية غير كافية لزيادة الكاش — المتاح: {budget['main_budget']:,.2f} ج")
                 # Deduct from main_budget
                 conn.execute("UPDATE budget SET main_budget = main_budget - ? WHERE id = 1", (diff,))
+                _record_capital_movement(conn, "cash", diff, notes="cash injection")
             elif diff < 0:
                 # Return to main_budget if reduced
                 conn.execute("UPDATE budget SET main_budget = main_budget + ? WHERE id = 1", (abs(diff),))
+                _record_capital_movement(conn, "cash", diff, notes="cash returned to central budget")
             
             conn.execute(
                 "UPDATE budget SET cash_vault = ? WHERE id = 1",
@@ -135,8 +166,22 @@ def add_platform(name: str, platform_type: str, initial_balance: float = 0,
                 "INSERT INTO platforms (name, type, balance, initial_balance, monthly_limit) VALUES (?, ?, ?, ?, ?)",
                 (name, platform_type, initial_balance, initial_balance, monthly_limit)
             )
+            platform_id = cursor.lastrowid
+
+            if initial_balance > 0:
+                conn.execute(
+                    "INSERT INTO machine_deposits (platform_id, amount, notes) VALUES (?, ?, ?)",
+                    (platform_id, initial_balance, "initial platform balance")
+                )
+                _record_capital_movement(
+                    conn,
+                    "platform",
+                    initial_balance,
+                    target_id=platform_id,
+                    notes="initial platform balance",
+                )
             conn.commit()
-            return cursor.lastrowid
+            return platform_id
         except Exception:
             conn.rollback()
             raise
@@ -168,7 +213,7 @@ def update_wallet_monthly_used(wallet_id: int, delta: float, conn=None) -> None:
         conn.commit()
 
 
-def deposit_to_platform(platform_id: int, amount: float, notes: str = "") -> None:
+def deposit_to_platform(platform_id: int, amount: float, notes: str = "", created_at: str = None) -> None:
     """
     إيداع مبلغ لمنصة (ماكينة أو محفظة أو انستا باي)
     - يخصم من الخزينة النقدية (الكاش)
@@ -195,9 +240,23 @@ def deposit_to_platform(platform_id: int, amount: float, notes: str = "") -> Non
             # خصم من الميزانية المركزية وليس الكاش
             conn.execute("UPDATE budget SET main_budget = main_budget - ? WHERE id = 1", (amount,))
             conn.execute("UPDATE platforms SET balance = balance + ? WHERE id = ?", (amount, platform_id))
-            conn.execute(
-                "INSERT INTO machine_deposits (platform_id, amount, notes) VALUES (?, ?, ?)",
-                (platform_id, amount, notes)
+            if created_at:
+                conn.execute(
+                    "INSERT INTO machine_deposits (platform_id, amount, notes, created_at) VALUES (?, ?, ?, ?)",
+                    (platform_id, amount, notes, created_at)
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO machine_deposits (platform_id, amount, notes) VALUES (?, ?, ?)",
+                    (platform_id, amount, notes)
+                )
+            _record_capital_movement(
+                conn,
+                "platform",
+                amount,
+                target_id=platform_id,
+                notes=notes or "platform injection",
+                created_at=created_at,
             )
             conn.commit()
         except Exception:

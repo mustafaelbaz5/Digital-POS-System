@@ -185,7 +185,7 @@ class PlatformMoreDialog(BaseDialog):
             cl.setContentsMargins(18, 14, 18, 14)
             cl.setSpacing(8)
 
-            has_comm = stats["total_commission"] > 0
+            has_comm = db.get_daily_manual_commission(self.platform["id"], self.date_str) > 0
 
             t_lbl = QLabel("💵 تسجيل عمولة يدوية")
             t_lbl.setStyleSheet(
@@ -333,7 +333,10 @@ class PlatformMoreDialog(BaseDialog):
         amount, ok = QInputDialog.getDouble(self, "إيداع", "المبلغ:", min=0.01, decimals=2)
         if ok and amount > 0:
             try:
-                db.deposit_to_platform(self.platform["id"], amount)
+                from datetime import datetime
+
+                created_at = f"{self.date_str} {datetime.now().strftime('%H:%M:%S')}"
+                db.deposit_to_platform(self.platform["id"], amount, created_at=created_at)
                 self.refresh_data()
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
