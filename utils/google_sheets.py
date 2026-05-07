@@ -230,6 +230,46 @@ def _optimize_view(sheet_id: int) -> list:
     ]
 
 
+def _net_balance_rule(sheet_id: int, row: int, col: int) -> dict:
+    """
+    Conditional formatting for net balance cell:
+    - Green if positive (مستحق له)
+    - Red if negative (مستحق عليه)
+    - Neutral if zero
+    """
+    return {
+        "addConditionalFormatRule": {
+            "rule": {
+                "ranges": [
+                    {
+                        "sheetId": sheet_id,
+                        "startRowIndex": row,
+                        "endRowIndex": row + 1,
+                        "startColumnIndex": col,
+                        "endColumnIndex": col + 1,
+                    }
+                ],
+                "gradientRule": {
+                    "minpoint": {
+                        "color": _hex_to_rgb("#FFCCCC"),  # Light red for negative
+                        "type": "MIN",
+                    },
+                    "midpoint": {
+                        "color": _hex_to_rgb("#FFFFFF"),  # White for zero
+                        "type": "PERCENTILE_50",
+                    },
+                    "maxpoint": {
+                        "color": _hex_to_rgb("#CCFFCC"),  # Light green for positive
+                        "type": "MAX",
+                    },
+                },
+            },
+            "index": 0,
+        }
+    }
+
+
+
 # ── Sheet Builders ───────────────────────────────────────────────────────────
 
 
@@ -430,78 +470,43 @@ def _build_customers(spreadsheet, ws, data: dict) -> dict:
         rows.append(["", "الإجماليات:", total_owed, total_credit, total_owed - total_credit, ""])
         rows.append(["", f"الرصيد النهائي ({status}):", "", "", abs(net), ""])
 
-        # Footer styling
-        reqs.append(_fmt(sid, f_idx, f_idx + 1, 1, 2, bold=True, bg="#E0E1DD"))
-        reqs.append(
-            _fmt(
-                sid,
-                f_idx,
-                f_idx + 1,
-                2,
-                3,
-                bold=True,
-                fg="#D0021B",
-                num_fmt='#,##0.00 "ج.م"',
-            )
-        )
-        reqs.append(
-            _fmt(
-                sid,
-                f_idx,
-                f_idx + 1,
-                3,
-                4,
-                bold=True,
-                fg="#008000",
-                num_fmt='#,##0.00 "ج.م"',
-            )
-        )
-        reqs.append(
-            _fmt(
-                sid,
-                f_idx,
-                f_idx + 1,
-                4,
-                5,
-                bold=True,
-                num_fmt='#,##0.00 "ج.م"',
-                align="CENTER",
-            )
-        )
-        reqs.append(_row_height(sid, f_idx, 35))
+        # ── Totals Row Styling (Dark background, white bold text) ──
+        reqs.append(_fmt(sid, f_idx, f_idx + 1, 0, col_count, bold=True, bg="#1B263B", fg="#FFFFFF", align="CENTER", font_size=11))
+        reqs.append(_fmt(sid, f_idx, f_idx + 1, 2, 3, bold=True, fg="#FFFFFF", bg="#1B263B", num_fmt='#,##0.00 "ج.م"'))
+        reqs.append(_fmt(sid, f_idx, f_idx + 1, 3, 4, bold=True, fg="#FFFFFF", bg="#1B263B", num_fmt='#,##0.00 "ج.م"'))
+        reqs.append(_fmt(sid, f_idx, f_idx + 1, 4, 5, bold=True, fg="#FFFFFF", bg="#1B263B", num_fmt='#,##0.00 "ج.م"', align="CENTER"))
+        reqs.append(_row_height(sid, f_idx, 38))
 
+        # ── Net Balance Row with High-Contrast Formatting ──
         net_row = f_idx + 1
+        # Merge label columns
         reqs.append(_merge(sid, net_row, 1, 4))
-        reqs.append(
-            _fmt(
-                sid,
-                net_row,
-                net_row + 1,
-                1,
-                5,
-                bold=True,
-                bg="#1B263B",
-                fg="#FFFFFF",
-                align="CENTER",
-            )
-        )
-        reqs.append(
-            _fmt(
-                sid,
-                net_row,
-                net_row + 1,
-                4,
-                5,
-                bold=True,
-                fg=net_fg,
-                num_fmt='#,##0.00 "ج.م"',
-                font_size=12,
-            )
-        )
-        reqs.append(_row_height(sid, net_row, 40))
-
-        # Block Border
-        reqs.append(_border(sid, hdr_idx, len(rows), 0, col_count))
+        
+        # Label styling (dark background)
+        reqs.append(_fmt(sid, net_row, net_row + 1, 1, 4, bold=True, bg="#1B263B", fg="#FFFFFF", align="CENTER", font_size=11))
+        
+        # High-contrast conditional formatting for net balance cell
+        # Positive = Green background with dark text, Negative = Red background with dark text
+        net_bg = "#E8F8E8" if net >= 0 else "#FFE8E8"  # Light green or light red
+        net_text_fg = "#1B5E20" if net >= 0 else "#B71C1C"  # Dark green or dark red
+        
+        reqs.append(_fmt(
+            sid,
+            net_row,
+            net_row + 1,
+            4,
+            5,
+            bold=True,
+            bg=net_bg,
+            fg=net_text_fg,
+            num_fmt='#,##0.00 "ج.م"',
+            font_size=12,
+            align="CENTER",
+        ))
+        reqs.append(_row_height(sid, net_row, 42))
+        
+        # Add double borders (top and bottom) to separate from transaction history
+        reqs.append(_border(sid, f_idx, len(rows), 0, col_count))
 
     if rows:
         ws.update(values=rows, range_name="A1", value_input_option="USER_ENTERED")
