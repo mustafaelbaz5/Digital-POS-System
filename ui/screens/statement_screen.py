@@ -2,6 +2,8 @@
 statement_screen.py — كشف حساب العميل (Master-Detail View)
 """
 
+import os
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
@@ -142,6 +144,12 @@ class CustomerStatementDialog(QDialog):
         layout.addLayout(info_col)
         layout.addStretch()
 
+        print_btn = QPushButton("🖨️ طباعة التقرير")
+        print_btn.setObjectName("btn_secondary")
+        print_btn.setFixedWidth(150)
+        print_btn.clicked.connect(self._print_report)
+        layout.addWidget(print_btn)
+
         close_btn = QPushButton("إغلاق")
         close_btn.setObjectName("btn_secondary")
         close_btn.setFixedWidth(100)
@@ -149,6 +157,17 @@ class CustomerStatementDialog(QDialog):
         layout.addWidget(close_btn)
 
         return layout
+
+    def _print_report(self):
+        try:
+            from utils.pdf_generator import PDFGenerator
+            gen = PDFGenerator(self._data)
+            path = gen.generate()
+            os.startfile(path)
+        except ImportError as e:
+            QMessageBox.warning(self, "مكتبة مفقودة", str(e))
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ في توليد PDF", str(e))
 
     def _make_master_cards(self) -> QHBoxLayout:
         layout = QHBoxLayout()

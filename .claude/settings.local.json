@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(Get-ChildItem -Path \"D:\\\\WORK\\\\pos_system\" -Recurse -Force)",
+      "Bash(Select-Object FullName, PSIsContainer)",
+      "Bash(ConvertTo-Json)",
+      "Bash(pip install *)"
     ]
   }
 }
