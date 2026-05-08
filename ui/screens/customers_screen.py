@@ -322,7 +322,7 @@ class GroupsTab(QWidget):
             ("اسم المجموعة", -1),  # Stretch
             ("القائد", 180),
             ("ملاحظات", 200),
-            ("إجراءات", 210),
+            ("إجراءات", 310),
         ]
         self.table = DataTable(cols)
         self.table.horizontalHeader().setVisible(True)
@@ -366,7 +366,6 @@ class GroupsTab(QWidget):
             )
             self.table.set_cell(row, 2, g.get("notes") or "—", COLORS["text_muted"])
 
-            # task 10: clear, well-spaced action buttons
             self.table.add_action_buttons(
                 row,
                 3,
@@ -380,6 +379,11 @@ class GroupsTab(QWidget):
                         "text": "📊 تقرير",
                         "callback": lambda _, gid=g["id"]: self._show_report(gid),
                         "role": "statement",
+                    },
+                    {
+                        "text": "🖨️ طباعة",
+                        "callback": lambda _, gid=g["id"], gname=g["name"]: self._print_group_report(gid, gname),
+                        "role": "secondary",
                     },
                 ],
             )
@@ -404,6 +408,19 @@ class GroupsTab(QWidget):
 
         GroupReportDialog(gid, self).exec()
 
+    def _print_group_report(self, gid: int, group_name: str):
+        import os
+        try:
+            data = db.get_group_summary(gid)
+            if not data:
+                QMessageBox.warning(self, "تنبيه", "لم يتم العثور على بيانات المجموعة")
+                return
+            from utils.pdf_generator import GroupPDFGenerator
+            path = GroupPDFGenerator(data).generate()
+            os.startfile(path)
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ في توليد PDF", str(e))
+
     def _ctx_menu(self, pos):
         row = self.table.rowAt(pos.y())
         if row < 0 or row >= len(self._groups):
@@ -412,6 +429,10 @@ class GroupsTab(QWidget):
         menu = QMenu(self)
         menu.addAction(
             QAction("📊  تقرير", self, triggered=lambda: self._show_report(g["id"]))
+        )
+        menu.addAction(
+            QAction("🖨️  طباعة PDF", self,
+                    triggered=lambda: self._print_group_report(g["id"], g["name"]))
         )
         menu.addAction(
             QAction("✏️  تعديل", self, triggered=lambda: self._edit_group(g))
@@ -445,7 +466,10 @@ class CustomerDialog(BaseDialog):
         title = "تعديل عميل" if customer else "➕ إضافة عميل جديد"
         super().__init__(title, parent)
         self.customer = customer
-        self.setMinimumWidth(460)
+        self.setMinimumWidth(500)
+        self._existing_codes: list[dict] = []   # {"id", "code"} loaded from DB
+        self._pending_new: list[str] = []        # codes to add on save
+        self._pending_del: list[int] = []        # code IDs to delete on save
         self._build_form()
         if customer:
             self._fill()
@@ -467,7 +491,7 @@ class CustomerDialog(BaseDialog):
             self.group_combo.addItem(g["name"], g["id"])
 
         self.notes_input = QTextEdit()
-        self.notes_input.setMaximumHeight(80)
+        self.notes_input.setMaximumHeight(72)
         self.notes_input.setPlaceholderText("ملاحظات (اختياري)")
 
         form.addRow("الاسم *:", self.name_input)
@@ -477,10 +501,130 @@ class CustomerDialog(BaseDialog):
 
         self.body.addLayout(form)
 
-        # Footer buttons
+        # ── Shipping Codes Section ──────────────────────────────
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet(f"color:{COLORS['border']}; margin-top:4px;")
+        self.body.addWidget(sep)
+
+        codes_hdr = QHBoxLayout()
+        codes_title = QLabel("🔑 كودات الشحن")
+        codes_title.setStyleSheet(
+            f"font-weight:bold; color:{COLORS['text_primary']}; font-size:{FONT['md']};"
+        )
+        codes_hdr.addWidget(codes_title)
+        codes_hdr.addStretch()
+        self.body.addLayout(codes_hdr)
+
+        # Dynamic list of code chips
+        self._codes_vbox = QVBoxLayout()
+        self._codes_vbox.setSpacing(4)
+        self.body.addLayout(self._codes_vbox)
+
+        # Add-code row
+        add_row = QHBoxLayout()
+        add_row.setSpacing(GAP_SM)
+        self._new_code_input = QLineEdit()
+        self._new_code_input.setPlaceholderText("أدخل كود جديد ثم اضغط ➕ ...")
+        self._new_code_input.setFixedHeight(36)
+        self._new_code_input.returnPressed.connect(self._add_pending_code)
+        add_row.addWidget(self._new_code_input, 1)
+
+        add_code_btn = QPushButton("➕ إضافة")
+        add_code_btn.setObjectName("btn_secondary")
+        add_code_btn.setFixedHeight(36)
+        add_code_btn.setFixedWidth(90)
+        add_code_btn.clicked.connect(self._add_pending_code)
+        add_row.addWidget(add_code_btn)
+        self.body.addLayout(add_row)
+
+        # Footer
         self.add_stretch()
         self.add_button("إلغاء", self.reject, role="secondary")
         self.add_button("حفظ ✓", self._save, role="primary")
+
+        self._render_codes()
+
+    # ── code chip helpers ───────────────────────────────────────
+
+    def _render_codes(self):
+        while self._codes_vbox.count():
+            item = self._codes_vbox.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        shown = [c for c in self._existing_codes if c["id"] not in self._pending_del]
+        all_items = [(c["code"], c["id"], False) for c in shown] + \
+                    [(code, None, True) for code in self._pending_new]
+
+        if not all_items:
+            empty = QLabel("لا توجد كودات مضافة")
+            empty.setStyleSheet(f"color:{COLORS['text_muted']}; padding:4px 2px; font-size:{FONT['xs']};")
+            self._codes_vbox.addWidget(empty)
+            return
+
+        for code_text, code_id, is_new in all_items:
+            chip = self._make_chip(code_text, code_id, is_new)
+            self._codes_vbox.addWidget(chip)
+
+    def _make_chip(self, code_text: str, code_id: int | None, is_new: bool) -> QWidget:
+        chip = QWidget()
+        chip.setFixedHeight(32)
+        chip.setStyleSheet(
+            f"background:{COLORS['bg_hover']}; border:1px solid {COLORS['border']};"
+            f"border-radius:6px;"
+        )
+        row = QHBoxLayout(chip)
+        row.setContentsMargins(10, 0, 6, 0)
+        row.setSpacing(6)
+
+        icon_color = COLORS["yellow"] if is_new else COLORS["accent"]
+        lbl = QLabel(f"🔑  {code_text}")
+        lbl.setStyleSheet(f"color:{icon_color}; font-weight:bold; font-size:{FONT['sm']};")
+        row.addWidget(lbl)
+
+        if is_new:
+            badge = QLabel("جديد")
+            badge.setStyleSheet(
+                f"color:{COLORS['yellow']}; font-size:{FONT['xs']};"
+                f"background:{COLORS['yellow_bg']}; border-radius:4px; padding:1px 6px;"
+            )
+            row.addWidget(badge)
+
+        row.addStretch()
+
+        del_btn = QPushButton("✕")
+        del_btn.setObjectName("btn_danger")
+        del_btn.setFixedSize(24, 24)
+        if is_new:
+            del_btn.clicked.connect(lambda _, c=code_text: self._remove_pending(c))
+        else:
+            del_btn.clicked.connect(lambda _, cid=code_id: self._mark_delete(cid))
+        row.addWidget(del_btn)
+        return chip
+
+    def _add_pending_code(self):
+        code = self._new_code_input.text().strip()
+        if not code:
+            return
+        existing_codes = {c["code"].lower() for c in self._existing_codes
+                          if c["id"] not in self._pending_del}
+        if code.lower() in existing_codes or code.lower() in [c.lower() for c in self._pending_new]:
+            QMessageBox.warning(self, "تنبيه", f"الكود '{code}' موجود بالفعل")
+            return
+        self._pending_new.append(code)
+        self._new_code_input.clear()
+        self._render_codes()
+
+    def _remove_pending(self, code: str):
+        self._pending_new = [c for c in self._pending_new if c != code]
+        self._render_codes()
+
+    def _mark_delete(self, code_id: int):
+        self._pending_del.append(code_id)
+        self._render_codes()
+
+    # ── fill / save ─────────────────────────────────────────────
 
     def _fill(self):
         self.name_input.setText(self.customer.get("name", ""))
@@ -491,6 +635,8 @@ class CustomerDialog(BaseDialog):
             idx = self.group_combo.findData(gid)
             if idx >= 0:
                 self.group_combo.setCurrentIndex(idx)
+        self._existing_codes = db.get_shipping_codes(self.customer["id"])
+        self._render_codes()
 
     def _save(self):
         name = self.name_input.text().strip()
@@ -498,22 +644,38 @@ class CustomerDialog(BaseDialog):
             QMessageBox.warning(self, "تنبيه", "اسم العميل مطلوب")
             return
         try:
-            (
-                db.update_customer(
-                    self.customer["id"],
-                    name,
-                    self.phone_input.text().strip(),
-                    self.group_combo.currentData(),
-                    self.notes_input.toPlainText().strip(),
-                )
-                if self.customer
-                else db.add_customer(
-                    name,
-                    self.phone_input.text().strip(),
-                    self.group_combo.currentData(),
-                    self.notes_input.toPlainText().strip(),
-                )
-            )
+            phone = self.phone_input.text().strip()
+            gid = self.group_combo.currentData()
+            notes = self.notes_input.toPlainText().strip()
+
+            if self.customer:
+                db.update_customer(self.customer["id"], name, phone, gid, notes)
+                cid = self.customer["id"]
+            else:
+                cid = db.add_customer(name, phone, gid, notes)
+
+            for code_id in self._pending_del:
+                try:
+                    db.delete_shipping_code(code_id)
+                except Exception:
+                    pass
+
+            code_errors = []
+            for code in self._pending_new:
+                try:
+                    db.add_shipping_code(cid, code)
+                except ValueError as e:
+                    code_errors.append(str(e))
+
+            if code_errors:
+                QMessageBox.warning(self, "تعارض في الكودات", "\n".join(code_errors))
+                # Reload so user sees what actually got saved
+                self._existing_codes = db.get_shipping_codes(cid)
+                self._pending_new = []
+                self._pending_del = []
+                self._render_codes()
+                return
+
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "خطأ", str(e))

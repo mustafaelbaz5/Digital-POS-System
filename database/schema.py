@@ -249,6 +249,22 @@ def initialize_database() -> None:
             except Exception:
                 pass
 
+        # Shipping codes table (1-to-Many: customer → codes)
+        try:
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS shipping_codes (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+                    code        TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+                    created_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_shipping_codes_customer ON shipping_codes(customer_id);
+                CREATE INDEX IF NOT EXISTS idx_shipping_codes_code     ON shipping_codes(code);
+            """)
+            conn.commit()
+        except Exception:
+            pass
+
         # Seed the capital ledger for existing installations once. Platform deposits
         # already represent central-budget injections; initial platform balances were
         # historically stored only on platforms.

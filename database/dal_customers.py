@@ -84,6 +84,107 @@ def get_customers_by_group(group_id: int) -> list[dict]:
         return [dict(r) for r in rows]
 
 
+# ══════════════════════════════════════════
+#  كودات الشحن  (Shipping Codes)
+# ══════════════════════════════════════════
+
+def get_shipping_codes(customer_id: int) -> list[dict]:
+    """جلب كودات الشحن الخاصة بعميل معين"""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT id, code, created_at FROM shipping_codes WHERE customer_id = ? ORDER BY code",
+            (customer_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_all_shipping_codes() -> list[dict]:
+    """جلب كل الكودات مع اسم العميل والمجموعة (للـ completer)"""
+    with get_connection() as conn:
+        rows = conn.execute("""
+            SELECT sc.id, sc.code, c.id AS customer_id,
+                   c.name AS customer_name, g.name AS group_name
+            FROM shipping_codes sc
+            JOIN customers c ON c.id = sc.customer_id
+            LEFT JOIN groups g ON g.id = c.group_id
+            WHERE c.is_active = 1
+            ORDER BY sc.code
+        """).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_customer_by_shipping_code(code: str) -> dict | None:
+    """البحث عن عميل بكود الشحن"""
+    with get_connection() as conn:
+        row = conn.execute("""
+            SELECT c.id, c.name, c.phone, c.total_debt,
+                   g.name AS group_name
+            FROM customers c
+            JOIN shipping_codes sc ON sc.customer_id = c.id
+            LEFT JOIN groups g ON g.id = c.group_id
+            WHERE sc.code = ? COLLATE NOCASE AND c.is_active = 1
+        """, (code.strip(),)).fetchone()
+        return dict(row) if row else None
+
+
+def add_shipping_code(customer_id: int, code: str) -> int:
+    """إضافة كود شحن جديد للعميل - يرجع الـ ID"""
+    code = code.strip()
+    if not code:
+        raise ValueError("الكود لا يمكن أن يكون فارغاً")
+    with get_connection() as conn:
+        try:
+            cursor = conn.execute(
+                "INSERT INTO shipping_codes (customer_id, code) VALUES (?, ?)",
+                (customer_id, code),
+            )
+            conn.commit()
+            return cursor.lastrowid
+        except Exception:
+            raise ValueError(f"الكود '{code}' مستخدم بالفعل لعميل آخر")
+
+
+def delete_shipping_code(code_id: int) -> None:
+    """حذف كود شحن"""
+    with get_connection() as conn:
+        conn.execute("DELETE FROM shipping_codes WHERE id = ?", (code_id,))
+        conn.commit()
+
+
+def get_group_summary(group_id: int) -> dict:
+    """جلب ملخص المجموعة مع أرصدة الأعضاء وتاريخ آخر نشاط"""
+    with get_connection() as conn:
+        group = conn.execute("""
+            SELECT g.id, g.name, g.notes,
+                   c.name AS leader_name
+            FROM groups g
+            LEFT JOIN customers c ON c.id = g.leader_id
+            WHERE g.id = ?
+        """, (group_id,)).fetchone()
+
+        members = conn.execute("""
+            SELECT c.id, c.name, c.phone, c.total_debt,
+                   strftime('%Y-%m-%d', MAX(t.created_at)) AS last_activity
+            FROM customers c
+            LEFT JOIN transactions t ON t.customer_id = c.id
+            WHERE c.group_id = ? AND c.is_active = 1
+            GROUP BY c.id
+            ORDER BY ABS(c.total_debt) DESC
+        """, (group_id,)).fetchall()
+
+    if not group:
+        return {}
+
+    members_list = [dict(m) for m in members]
+    total = sum(float(m["total_debt"] or 0) for m in members_list)
+
+    return {
+        "group": dict(group),
+        "members": members_list,
+        "total_balance": total,
+    }
+
+
 def get_customer_by_id(customer_id: int) -> dict | None:
     """جلب عميل بالـ ID"""
     with get_connection() as conn:
