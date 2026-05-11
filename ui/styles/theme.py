@@ -247,23 +247,24 @@ QScrollBar::handle:horizontal {{
 /* ── Buttons ── */
 QPushButton {{
     font-family: {FONT['family']};
-    border-radius: {BORDER_RADIUS};
+    border-radius: 6px;
     padding: 8px 16px;
-    border: 1px solid transparent; /* Defined in specific IDs */
+    border: 2px solid transparent;
 }}
 
 #btn_primary {{
     background: {COLORS['accent']};
     color: #ffffff;
-    border: 1px solid {COLORS['accent_hover']};
-    border-radius: {BORDER_RADIUS};
+    border: 2px solid {COLORS['accent']};
+    border-radius: 6px;
     padding: 0 24px;
     min-height: {BTN_HEIGHT}px;
     font-weight: bold;
     font-size: {FONT['md']};
 }}
 #btn_primary:hover {{
-    background: {COLORS['accent_hover']};
+    background: {COLORS['accent']};
+    border-color: {COLORS['accent']};
 }}
 #btn_primary:pressed {{
     background: {COLORS['accent_dim']};
@@ -277,15 +278,15 @@ QPushButton {{
 #btn_secondary {{
     background: {COLORS['bg_elevated']};
     color: {COLORS['text_primary']};
-    border: 1px solid {COLORS['border']};
-    border-radius: {BORDER_RADIUS};
+    border: 2px solid {COLORS['border']};
+    border-radius: 6px;
     padding: 0 20px;
     min-height: {BTN_HEIGHT}px;
     font-size: {FONT['md']};
 }}
 #btn_secondary:hover {{
-    background: {COLORS['bg_hover']};
-    border-color: {COLORS['border_light']};
+    background: {COLORS['bg_elevated']};
+    border-color: {COLORS['border']};
 }}
 #btn_secondary:pressed {{
     background: {COLORS['bg_dark']};
@@ -294,39 +295,40 @@ QPushButton {{
 #btn_ghost {{
     background: {COLORS['bg_elevated']};
     color: {COLORS['text_secondary']};
-    border: 1px solid {COLORS['border']};
-    border-radius: 8px;
+    border: 2px solid {COLORS['border']};
+    border-radius: 6px;
     padding: 4px 12px;
     font-size: {FONT['sm']};
 }}
 #btn_ghost:hover {{
-    background: {COLORS['bg_hover']};
-    color: {COLORS['text_primary']};
+    background: {COLORS['bg_elevated']};
+    border-color: {COLORS['border']};
+    color: {COLORS['text_secondary']};
 }}
 
 #btn_danger {{
     background: {COLORS['red_bg']};
     color: {COLORS['red']};
-    border: 1px solid {COLORS['red_border']};
-    border-radius: {BORDER_RADIUS};
+    border: 2px solid {COLORS['red_border']};
+    border-radius: 6px;
     min-height: {BTN_HEIGHT}px;
     font-weight: bold;
+}}
+#btn_danger:hover {{
+    background: {COLORS['red_bg']};
+    border-color: {COLORS['red_border']};
 }}
 
 #btn_statement {{
     background: #0969DA; /* Professional Blue */
     color: #ffffff;
-    border: 1px solid #0969DA;
+    border: 2px solid #0969DA;
     border-radius: 6px;
     font-weight: bold;
     font-size: {FONT['sm']};
 }}
 #btn_statement:hover {{
-    background: #0550AE;
-    border-color: #0550AE;
-}}
-#btn_statement:pressed {{
-    background: #0A3069;
+    background: #0969DA;
 }}
 
 /* ── In-Table Buttons (Static) ── */

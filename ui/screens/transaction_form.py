@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -58,197 +59,186 @@ class CompactTransactionTab(QWidget):
         self.load_data()
 
     def _build_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(8)  # Highly condensed
+        root = QVBoxLayout(self)
+        root.setContentsMargins(20, 20, 20, 20)
+        root.setSpacing(12)
 
-        # ── Row 1: Client & Payment
-        row1 = QHBoxLayout()
-        row1.setSpacing(8)
-
+        # ── 1. Customer Selection ──────────────────────────────────
+        cust_row = QHBoxLayout()
         lbl_c = QLabel("العميل:")
-        lbl_c.setStyleSheet(f"color:{COLORS['text_secondary']};")
-        row1.addWidget(lbl_c)
+        lbl_c.setStyleSheet(f"color:{COLORS['text_secondary']}; font-weight:bold; font-size:14px;")
+        cust_row.addWidget(lbl_c)
 
         self.customer_combo = QComboBox()
         self.customer_combo.setEditable(True)
         self.customer_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        self.customer_combo.lineEdit().setPlaceholderText(
-            "ابحث باسم العميل أو رقم التليفون..."
-        )
-        # Style the main line edit
-        self.customer_combo.lineEdit().setStyleSheet("padding: 5px; font-size: 14px;")
-        row1.addWidget(self.customer_combo, 2)
+        self.customer_combo.lineEdit().setPlaceholderText("ابحث باسم العميل أو رقم التليفون...")
+        self.customer_combo.lineEdit().setStyleSheet("padding: 8px; font-size: 15px;")
+        cust_row.addWidget(self.customer_combo, 1)
+        root.addLayout(cust_row)
+
+        # ── 2. Amounts ─────────────────────────────────────────────
+        amt_row = QHBoxLayout()
+        amt_row.setSpacing(10)
+        loc = QLocale(QLocale.Language.English)
 
         if not self.is_inbound:
-            lbl_p = QLabel("نوع الدفع:")
-            lbl_p.setStyleSheet(f"color:{COLORS['text_secondary']};")
-            row1.addWidget(lbl_p)
-
-            self.payment_combo = QComboBox()
-            self.payment_combo.addItem("⏳ مؤجل", "pending")
-            self.payment_combo.addItem(" مسدد", "paid")
-            row1.addWidget(self.payment_combo, 1)
+            lbl_a1_txt, lbl_a2_txt = "المصروف:", "المطلوب:"
         else:
-            lbl_d = QLabel("تسليم الكاش:")
-            lbl_d.setStyleSheet(f"color:{COLORS['text_secondary']};")
-            row1.addWidget(lbl_d)
+            lbl_a1_txt, lbl_a2_txt = "المستلم:", "المسلم:"
 
-            self.delivery_combo = QComboBox()
-            self.delivery_combo.addItem(" تم التسليم", True)
-            self.delivery_combo.addItem("⏳ لم يُسلَّم", False)
-            row1.addWidget(self.delivery_combo, 1)
-
-        layout.addLayout(row1)
-
-        # ── Row 2: Service & Amount
-        row2 = QHBoxLayout()
-        row2.setSpacing(8)
-
-        lbl_s = QLabel("الخدمة:")
-        lbl_s.setStyleSheet(f"color:{COLORS['text_secondary']};")
-        row2.addWidget(lbl_s)
-
-        self.service_input = QLineEdit()
-        self.service_input.setPlaceholderText("اسم الخدمة...")
-        row2.addWidget(self.service_input, 2)
-
+        # Amount 1
+        lbl_a1 = QLabel(lbl_a1_txt)
+        lbl_a1.setStyleSheet(f"color:{COLORS['text_secondary']};")
+        amt_row.addWidget(lbl_a1)
+        
         self.amount_spent = FocusSpinBox()
-        loc = QLocale(QLocale.Language.English)
         self.amount_spent.setLocale(loc)
         self.amount_spent.setGroupSeparatorShown(True)
         self.amount_spent.setRange(0, 999999)
         self.amount_spent.setDecimals(2)
         self.amount_spent.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
-        self.amount_spent.setStyleSheet(
-            f"font-weight:bold; color:{COLORS['accent']}; font-size:18px; padding: 4px;"
-        )
+        self.amount_spent.setStyleSheet(f"font-weight:bold; color:{COLORS['accent']}; font-size:20px; padding: 6px;")
         self.amount_spent.valueChanged.connect(self._update_profit)
+        amt_row.addWidget(self.amount_spent, 1)
 
+        # Amount 2
+        lbl_a2 = QLabel(lbl_a2_txt)
+        lbl_a2.setStyleSheet(f"color:{COLORS['text_secondary']};")
+        amt_row.addWidget(lbl_a2)
+
+        self.amount_req = FocusSpinBox()
+        self.amount_req.setLocale(loc)
+        self.amount_req.setGroupSeparatorShown(True)
+        self.amount_req.setRange(0, 999999)
+        self.amount_req.setDecimals(2)
+        self.amount_req.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
+        self.amount_req.setStyleSheet(f"font-weight:bold; color:{COLORS['accent']}; font-size:20px; padding: 6px;")
+        self.amount_req.valueChanged.connect(self._update_profit)
+        amt_row.addWidget(self.amount_req, 1)
+        
+        root.addLayout(amt_row)
+
+        # ── 3. Status & Profit ─────────────────────────────────────
+        status_row = QHBoxLayout()
+        
         if not self.is_inbound:
-            lbl_a1 = QLabel("المصروف:")
-            lbl_a1.setStyleSheet(f"color:{COLORS['text_secondary']};")
-            row2.addWidget(lbl_a1)
-            row2.addWidget(self.amount_spent, 1)
+            lp = QLabel("نوع الدفع:")
+            lp.setStyleSheet(f"color:{COLORS['text_secondary']};")
+            status_row.addWidget(lp)
 
-            self.amount_req = FocusSpinBox()
-            self.amount_req.setLocale(loc)
-            self.amount_req.setGroupSeparatorShown(True)
-            self.amount_req.setRange(0, 999999)
-            self.amount_req.setDecimals(2)
-            self.amount_req.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
-            self.amount_req.setStyleSheet(
-                f"font-weight:bold; color:{COLORS['accent']}; font-size:18px; padding: 4px;"
-            )
-            self.amount_req.valueChanged.connect(self._update_profit)
-            lbl_a2 = QLabel("المطلوب:")
-            lbl_a2.setStyleSheet(f"color:{COLORS['text_secondary']};")
-            row2.addWidget(lbl_a2)
-            row2.addWidget(self.amount_req, 1)
+            self.payment_combo = QComboBox()
+            self.payment_combo.addItem("⏳ مؤجل", "pending")
+            self.payment_combo.addItem("✓ مسدد", "paid")
+            status_row.addWidget(self.payment_combo)
         else:
-            self.amount_req = FocusSpinBox()  # used for received
-            self.amount_req.setLocale(loc)
-            self.amount_req.setGroupSeparatorShown(True)
-            self.amount_req.setRange(0, 999999)
-            self.amount_req.setDecimals(2)
-            self.amount_req.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
-            self.amount_req.setStyleSheet(
-                f"font-weight:bold; color:{COLORS['accent']}; font-size:18px; padding: 4px;"
-            )
-            self.amount_req.valueChanged.connect(self._update_profit)
-            lbl_a1 = QLabel("المستلم:")
-            lbl_a1.setStyleSheet(f"color:{COLORS['text_secondary']};")
-            row2.addWidget(lbl_a1)
-            row2.addWidget(self.amount_req, 1)
+            ld = QLabel("تسليم الكاش:")
+            ld.setStyleSheet(f"color:{COLORS['text_secondary']};")
+            status_row.addWidget(ld)
 
-            lbl_a2 = QLabel("المسلم:")
-            lbl_a2.setStyleSheet(f"color:{COLORS['text_secondary']};")
-            row2.addWidget(lbl_a2)
-            row2.addWidget(self.amount_spent, 1)  # used for delivered
+            self.delivery_combo = QComboBox()
+            self.delivery_combo.addItem("✓ تم التسليم", True)
+            self.delivery_combo.addItem("⏳ لم يُسلَّم", False)
+            status_row.addWidget(self.delivery_combo)
 
-        layout.addLayout(row2)
+        status_row.addStretch()
 
-        # Real-time profit
-        profit_layout = QHBoxLayout()
-        profit_layout.addStretch()
         self.profit_lbl = QLabel("الربح المتوقع: 0.00 ج")
         self.profit_lbl.setStyleSheet(
-            f"background:{COLORS['accent_dim']}; color:{COLORS['green']}; border-radius:6px; padding:4px 10px; font-weight:bold; font-size:13px;"
+            f"background:{COLORS['accent_dim']}; color:{COLORS['green']}; border-radius:6px; padding:4px 12px; font-weight:bold; font-size:13px;"
         )
-        profit_layout.addWidget(self.profit_lbl)
-        layout.addLayout(profit_layout)
+        status_row.addWidget(self.profit_lbl)
+        root.addLayout(status_row)
 
-        # ── Row 3: Reference & Notes
-        row3 = QHBoxLayout()
-        row3.setSpacing(8)
+        # ── 4. "Show More" toggle ──────────────────────────────────
+        more_row = QHBoxLayout()
+        self.more_btn = QPushButton("▼  عرض المزيد")
+        self.more_btn.setObjectName("btn_ghost")
+        self.more_btn.setFixedWidth(130)
+        self.more_btn.clicked.connect(self._toggle_more)
+        more_row.addWidget(self.more_btn)
+        more_row.addStretch()
+        root.addLayout(more_row)
 
-        lbl_r = QLabel("المرجع:")
-        lbl_r.setStyleSheet(f"color:{COLORS['text_secondary']};")
-        row3.addWidget(lbl_r)
+        # ── 5. Extras Panel (Hidden by Default) ───────────────────
+        self.extras_panel = QWidget()
+        self.extras_panel.setVisible(False)
+        ex = QVBoxLayout(self.extras_panel)
+        ex.setContentsMargins(0, 0, 0, 0)
+        ex.setSpacing(10)
 
+        # Row 1: Service & Reference
+        ex_row1 = QHBoxLayout()
+        ex_row1.setSpacing(10)
+
+        ls = QLabel("الخدمة:")
+        ls.setStyleSheet(f"color:{COLORS['text_secondary']};")
+        ex_row1.addWidget(ls)
+        self.service_input = QLineEdit()
+        self.service_input.setPlaceholderText("اسم الخدمة (اختياري)...")
+        ex_row1.addWidget(self.service_input, 2)
+
+        lr = QLabel("المرجع:")
+        lr.setStyleSheet(f"color:{COLORS['text_secondary']};")
+        ex_row1.addWidget(lr)
         self.ref_input = QLineEdit()
         self.ref_input.setPlaceholderText("اختياري...")
-        self.ref_input.setFixedWidth(120)
-        row3.addWidget(self.ref_input)
+        self.ref_input.setFixedWidth(140)
+        ex_row1.addWidget(self.ref_input)
+        ex.addLayout(ex_row1)
 
-        lbl_n = QLabel("ملاحظات:")
-        lbl_n.setStyleSheet(f"color:{COLORS['text_secondary']};")
-        row3.addWidget(lbl_n)
-
+        # Row 2: Notes
+        ex_row2 = QHBoxLayout()
+        ln = QLabel("ملاحظات:")
+        ln.setStyleSheet(f"color:{COLORS['text_secondary']};")
+        ex_row2.addWidget(ln)
         self.notes_input = QLineEdit()
         self.notes_input.setPlaceholderText("ملاحظات إضافية...")
-        row3.addWidget(self.notes_input)
+        ex_row2.addWidget(self.notes_input)
+        ex.addLayout(ex_row2)
 
-        layout.addLayout(row3)
+        root.addWidget(self.extras_panel)
 
-        # ── Row 4: Read-Only Date Display
-        row4 = QHBoxLayout()
-        row4.setContentsMargins(0, 15, 0, 15)
-        row4.setSpacing(10)
-
-        lbl_d = QLabel("تاريخ العملية:")
-        lbl_d.setStyleSheet(
-            f"color:{COLORS['text_secondary']}; font-weight:bold; font-size:14px;"
-        )
-        row4.addWidget(lbl_d)
+        # ── 6. Date Display ────────────────────────────────────────
+        date_row = QHBoxLayout()
+        date_row.setContentsMargins(0, 5, 0, 5)
+        
+        ld = QLabel("تاريخ العملية:")
+        ld.setStyleSheet(f"color:{COLORS['text_secondary']}; font-weight:bold;")
+        date_row.addWidget(ld)
 
         self.date_label = QLabel(self.selected_date)
         self.date_label.setStyleSheet(
-            f"font-size: 15px; font-weight: bold; background: {COLORS['bg_hover']};"
-            f"padding: 6px 16px; border-radius: 6px; color: {COLORS['accent']};"
+            f"font-size:14px; font-weight:bold; background:{COLORS['bg_hover']}; "
+            f"padding:4px 14px; border-radius:6px; color:{COLORS['accent']};"
         )
-        row4.addWidget(self.date_label)
+        date_row.addWidget(self.date_label)
+        date_row.addStretch()
+        root.addLayout(date_row)
 
-        row4.addStretch()
-        layout.addLayout(row4)
-
-        # ── Row 5: Add Button
+        # ── 7. Save Button ─────────────────────────────────────────
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         self.save_btn = QPushButton("➕ إضافة العملية (Enter)")
         self.save_btn.setObjectName("btn_primary")
-        self.save_btn.setMinimumHeight(44)
-        self.save_btn.setMinimumWidth(180)
+        self.save_btn.setMinimumHeight(46)
+        self.save_btn.setMinimumWidth(220)
         self.save_btn.clicked.connect(self._save)
         btn_row.addWidget(self.save_btn)
-        layout.addLayout(btn_row)
+        root.addLayout(btn_row)
 
-        self.setTabOrder(self.ref_input, self.notes_input)
-        self.setTabOrder(self.notes_input, self.save_btn)
-
-        # Enter-to-focus for rapid entry
-        self.customer_combo.lineEdit().returnPressed.connect(
-            self.service_input.setFocus
-        )
-        if not self.is_inbound:
-            self.service_input.returnPressed.connect(self.amount_spent.setFocus)
-        else:
-            self.service_input.returnPressed.connect(self.amount_req.setFocus)
-
-        # Adjust tab order for date
-        self.setTabOrder(self.service_input, self.amount_spent)
+        # Tab Order
+        self.setTabOrder(self.customer_combo, self.amount_spent)
         self.setTabOrder(self.amount_spent, self.amount_req)
         self.setTabOrder(self.amount_req, self.save_btn)
+        
+        # Shortcuts / Focus
+        self.customer_combo.lineEdit().returnPressed.connect(self.amount_spent.setFocus)
+
+    def _toggle_more(self):
+        visible = self.extras_panel.isVisible()
+        self.extras_panel.setVisible(not visible)
+        self.more_btn.setText("▲  إخفاء" if not visible else "▼  عرض المزيد")
 
     def _update_profit(self):
         spent = self.amount_spent.value()
@@ -322,19 +312,17 @@ class CompactTransactionTab(QWidget):
 
     def _save(self):
         cid = self._selected_customer_id()
-        service = self.service_input.text().strip()
+        service = self.service_input.text().strip() or ("تحويل" if not self.is_inbound else "استلام")
         spent = self.amount_spent.value()
         req = self.amount_req.value()
         ref = self.ref_input.text().strip()
         notes = self.notes_input.text().strip()
 
         if not cid or cid <= 0:
-            QMessageBox.warning(self, "تنبيه", "يجب اختيار عميل من القائمة لإتمام العملية. العمليات بدون عميل غير مسموح بها حالياً.")
+            QMessageBox.warning(self, "تنبيه", "يجب اختيار عميل من القائمة لإتمام العملية.")
             self.customer_combo.lineEdit().setFocus()
             return
-        if not service:
-            QMessageBox.warning(self, "تنبيه", "أدخل اسم الخدمة")
-            return
+            
         if spent <= 0 and req <= 0:
             QMessageBox.warning(self, "تنبيه", "أدخل المبلغ")
             return
@@ -349,9 +337,6 @@ class CompactTransactionTab(QWidget):
         try:
             if not self.is_inbound:
                 status = self.payment_combo.currentData()
-                if not cid and status == "pending":
-                    QMessageBox.warning(self, "تنبيه", "اختر العميل للعمليات المؤجلة")
-                    return
                 db.add_outbound_transaction(
                     platform_id=pid,
                     customer_id=cid,
@@ -366,11 +351,6 @@ class CompactTransactionTab(QWidget):
                 )
             else:
                 is_del = self.delivery_combo.currentData()
-                if not cid and not is_del:
-                    QMessageBox.warning(
-                        self, "تنبيه", "اختر العميل للعمليات غير المسلمة"
-                    )
-                    return
                 db.add_inbound_transaction(
                     wallet_id=pid,
                     customer_id=cid,
@@ -391,17 +371,16 @@ class CompactTransactionTab(QWidget):
             self.amount_req.setValue(0)
             self.ref_input.clear()
             self.notes_input.clear()
-
-            # Reset Selections (as requested)
             self.service_input.clear()
             self.customer_combo.setCurrentIndex(-1)
-            self.customer_combo.setEditText("")  # Clear search text
+            self.customer_combo.setEditText("") 
 
-            # Return focus to Client Search for rapid next entry
-            self.customer_combo.lineEdit().setFocus()
+            # Return focus to Client Search
+            QTimer.singleShot(50, lambda: self.customer_combo.lineEdit().setFocus())
 
         except Exception as e:
             show_toast(self, f"خطأ: {str(e)}", type="danger")
+
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -419,8 +398,8 @@ class MachineTransactionTab(QWidget):
 
     transaction_added = pyqtSignal()
 
-    _BTN_ACTIVE = "background:#059669;color:white;border:1px solid #059669;border-radius:4px;font-weight:bold;padding:4px 12px;"
-    _BTN_IDLE   = "background:#21262D;color:#8B949E;border:1px solid #30363D;border-radius:4px;padding:4px 12px;"
+    _BTN_ACTIVE = f"background:{COLORS['accent']}; color:white; border:2px solid {COLORS['accent']}; border-radius:6px; font-weight:bold; padding:4px 12px;"
+    _BTN_IDLE   = f"background:{COLORS['bg_hover']}; color:{COLORS['text_secondary']}; border:2px solid {COLORS['border']}; border-radius:6px; padding:4px 12px;"
 
     def __init__(self, platform: dict, selected_date: str = None, parent=None):
         super().__init__(parent)
@@ -436,22 +415,24 @@ class MachineTransactionTab(QWidget):
 
     def _build_ui(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(10, 10, 10, 10)
-        root.setSpacing(8)
+        root.setContentsMargins(20, 20, 20, 20)
+        root.setSpacing(10)
 
         # ── 0. Mode toggle ─────────────────────────────────────────
         toggle_row = QHBoxLayout()
-        toggle_row.setSpacing(0)
+        toggle_row.setSpacing(8)
 
         self._code_btn = QPushButton("🔑  بالكود")
-        self._code_btn.setFixedHeight(30)
+        self._code_btn.setFixedHeight(34)
         self._code_btn.setStyleSheet(self._BTN_ACTIVE)
+        self._code_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._code_btn.clicked.connect(lambda: self._switch_mode(True))
         toggle_row.addWidget(self._code_btn)
 
         self._name_btn = QPushButton("👤  بالاسم")
-        self._name_btn.setFixedHeight(30)
+        self._name_btn.setFixedHeight(34)
         self._name_btn.setStyleSheet(self._BTN_IDLE)
+        self._name_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._name_btn.clicked.connect(lambda: self._switch_mode(False))
         toggle_row.addWidget(self._name_btn)
 
@@ -861,6 +842,17 @@ class TransactionDialog(BaseDialog):
             pass
 
     def _build_content(self):
+        # ── Full-Page Scroll Wrapper ──
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        
+        container = QWidget()
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(0)
+
         if self.platform and self.platform["type"] in ("wallet", "instapay"):
             self.tabs = QTabWidget()
             self.out_tab = CompactTransactionTab(
@@ -875,14 +867,17 @@ class TransactionDialog(BaseDialog):
             self.in_tab.transaction_added.connect(self._on_added)
             self.tabs.addTab(self.in_tab, "📥 استلام وارد")
 
-            self.body.addWidget(self.tabs)
+            container_layout.addWidget(self.tabs)
         else:
             # Machine: new code-lookup tab
             self.machine_tab = MachineTransactionTab(
                 self.platform, selected_date=self.selected_date
             )
             self.machine_tab.transaction_added.connect(self._on_added)
-            self.body.addWidget(self.machine_tab)
+            container_layout.addWidget(self.machine_tab)
+
+        scroll.setWidget(container)
+        self.body.addWidget(scroll)
 
     def _on_added(self):
         # Continuous Flow: do not close
