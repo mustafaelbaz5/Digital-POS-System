@@ -127,7 +127,7 @@ class CustomersTab(QWidget):
             ("عليه 🔴", 120),
             ("له 🟢", 120),
             ("ملاحظات", 180),
-            ("الإجراءات", 295),
+            ("الإجراءات", 410),
         ]
         self.table = DataTable(cols)
         self.table.horizontalHeader().setVisible(True)
@@ -206,23 +206,25 @@ class CustomersTab(QWidget):
 
             self.table.set_cell(row, 5, c.get("notes") or "—", COLORS["text_muted"])
 
-            self.table.add_action_buttons(
-                row,
-                6,
-                [
-                    {
-                        "text": "📊 كشف الحساب",
-                        "callback": lambda _, cid=c["id"]: self._open_statement(cid),
-                        "role": "statement",
-                    },
-                    {
-                        "text": "المزيد",
-                        "callback": lambda _, cid=c["id"]: self._open_more(cid),
-                        "role": "secondary",
-                    },
-                ],
-                spacing=8,
-            )
+            actions = [
+                {
+                    "text": "📊 كشف الحساب",
+                    "callback": lambda _, cid=c["id"]: self._open_statement(cid),
+                    "role": "statement",
+                },
+                {
+                    "text": "المزيد",
+                    "callback": lambda _, cid=c["id"]: self._open_more(cid),
+                    "role": "secondary",
+                },
+            ]
+            if (c.get("total_debt") or 0) > 0:
+                actions.append({
+                    "text": "💚 تسديد سريع",
+                    "callback": lambda _, cid=c["id"]: self._quick_settle(cid),
+                    "role": "primary",
+                })
+            self.table.add_action_buttons(row, 6, actions, spacing=6)
 
         parts = [f"إجمالي: {len(customers)} عميل"]
         if total_owed:
@@ -252,6 +254,12 @@ class CustomersTab(QWidget):
         if customer:
             CustomerInfoDialog(customer, self).exec()
 
+    def _quick_settle(self, cid: int):
+        from ui.screens.settlement_dialog import QuickSettleDialog
+        customer = db.get_customer_by_id(cid)
+        if customer and QuickSettleDialog(customer, self).exec():
+            self.load_data()
+
     def _ctx_menu(self, pos):
         row = self.table.rowAt(pos.y())
         if row < 0 or row >= len(self._customers):
@@ -259,8 +267,13 @@ class CustomersTab(QWidget):
         c = self._customers[row]
         menu = QMenu(self)
         menu.addAction(
-            QAction("  كشف حساب", self, triggered=lambda: self._open_statement(c["id"]))
+            QAction("📊  كشف حساب", self, triggered=lambda: self._open_statement(c["id"]))
         )
+        menu.addAction(QAction("ℹ️  المزيد", self, triggered=lambda: self._open_more(c["id"])))
+        if (c.get("total_debt") or 0) > 0:
+            menu.addAction(
+                QAction("💚  تسديد سريع", self, triggered=lambda: self._quick_settle(c["id"]))
+            )
         menu.addAction(QAction("✏️  تعديل", self, triggered=lambda: self._edit(c)))
         menu.addSeparator()
         menu.addAction(QAction("🗑️  حذف", self, triggered=lambda: self._delete(c)))

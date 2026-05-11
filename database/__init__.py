@@ -27,5 +27,5 @@ from .dal_transactions import (
     cleanup_transactions_before,
     get_platform_day_stats, get_opening_balance, get_closing_balance,
     get_daily_manual_commission, add_manual_commission, get_platform_transactions_for_date,
-    get_pending_cash_liability, calculate_wallet_capacity,
+    get_pending_cash_liability, calculate_wallet_capacity, settle_customer_debt,
 )

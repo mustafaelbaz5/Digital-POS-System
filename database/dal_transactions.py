@@ -970,6 +970,96 @@ def get_unique_service_names() -> list[str]:
         return [r["service_name"] for r in rows]
 
 
+def settle_customer_debt(customer_id: int, payment_amount: float) -> dict:
+    """
+    تسديد سريع — محرك FIFO
+    يسدد المستحقات المعلقة بترتيب التاريخ (الأقدم أولاً).
+    - تسديد كامل: يغيّر payment_status إلى 'paid'.
+    - تسديد جزئي للعملية الأخيرة: يُخفّض amount_required ويضيف ملاحظة.
+    يرجع: {"settled_count", "partial_settled", "total_settled", "overpaid"}
+    """
+    if payment_amount <= 0:
+        raise ValueError("المبلغ يجب أن يكون أكبر من الصفر")
+
+    with get_connection() as conn:
+        try:
+            pending = conn.execute("""
+                SELECT id, amount_required, notes
+                FROM transactions
+                WHERE customer_id = ?
+                  AND operation_type = 'outbound'
+                  AND payment_status = 'pending'
+                ORDER BY created_at ASC
+            """, (customer_id,)).fetchall()
+
+            if not pending:
+                raise ValueError("لا توجد مبالغ مستحقة على هذا العميل")
+
+            remaining      = payment_amount
+            settled_count  = 0
+            partial_settled = False
+            total_settled  = 0.0
+
+            for txn in pending:
+                if remaining <= 0:
+                    break
+
+                txn_id     = txn["id"]
+                txn_amount = float(txn["amount_required"])
+
+                if remaining >= txn_amount:
+                    # ── Full settlement ──────────────────────────────────
+                    conn.execute(
+                        "UPDATE transactions SET payment_status = 'paid' WHERE id = ?",
+                        (txn_id,)
+                    )
+                    conn.execute(
+                        "UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1",
+                        (txn_amount,)
+                    )
+                    conn.execute(
+                        "UPDATE customers SET total_debt = total_debt - ? WHERE id = ?",
+                        (txn_amount, customer_id)
+                    )
+                    remaining     -= txn_amount
+                    total_settled += txn_amount
+                    settled_count += 1
+                else:
+                    # ── Partial settlement ───────────────────────────────
+                    partial    = remaining
+                    new_amount = txn_amount - partial
+                    old_notes  = txn["notes"] or ""
+                    sep        = " | " if old_notes else ""
+                    new_notes  = f"{old_notes}{sep}مدفوع جزئياً: {partial:,.0f} ج"
+
+                    conn.execute(
+                        "UPDATE transactions SET amount_required = ?, notes = ? WHERE id = ?",
+                        (new_amount, new_notes, txn_id)
+                    )
+                    conn.execute(
+                        "UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1",
+                        (partial,)
+                    )
+                    conn.execute(
+                        "UPDATE customers SET total_debt = total_debt - ? WHERE id = ?",
+                        (partial, customer_id)
+                    )
+                    total_settled  += partial
+                    remaining       = 0
+                    partial_settled = True
+
+            conn.commit()
+            return {
+                "settled_count":  settled_count,
+                "partial_settled": partial_settled,
+                "total_settled":  total_settled,
+                "overpaid":       max(0.0, remaining),
+            }
+        except Exception:
+            conn.rollback()
+            raise
+
+
 def get_pending_cash_liability() -> float:
     """
     احسب إجمالي الكاش المطلوب تسليمه للعملاء
