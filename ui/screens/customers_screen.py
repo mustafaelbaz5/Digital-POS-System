@@ -121,13 +121,13 @@ class CustomersTab(QWidget):
         # layout.addSpacing(GAP_SM)
 
         cols = [
-            ("الاسم", -1),  # Stretches to fill space
+            ("الاسم", -1),
             ("التليفون", 130),
             ("المجموعة", 130),
             ("عليه 🔴", 120),
             ("له 🟢", 120),
-            ("ملاحظات", 200),
-            ("الكشف", 150),
+            ("ملاحظات", 180),
+            ("الإجراءات", 295),
         ]
         self.table = DataTable(cols)
         self.table.horizontalHeader().setVisible(True)
@@ -206,13 +206,22 @@ class CustomersTab(QWidget):
 
             self.table.set_cell(row, 5, c.get("notes") or "—", COLORS["text_muted"])
 
-            # task 8: prominent statement button
-            self.table.add_action_button(
+            self.table.add_action_buttons(
                 row,
                 6,
-                "📊 كشف الحساب",
-                lambda _, cid=c["id"]: self._open_statement(cid),
-                role="statement",
+                [
+                    {
+                        "text": "📊 كشف الحساب",
+                        "callback": lambda _, cid=c["id"]: self._open_statement(cid),
+                        "role": "statement",
+                    },
+                    {
+                        "text": "المزيد",
+                        "callback": lambda _, cid=c["id"]: self._open_more(cid),
+                        "role": "secondary",
+                    },
+                ],
+                spacing=8,
             )
 
         parts = [f"إجمالي: {len(customers)} عميل"]
@@ -235,8 +244,13 @@ class CustomersTab(QWidget):
 
     def _open_statement(self, cid: int):
         from ui.screens.statement_screen import CustomerStatementDialog
-
         CustomerStatementDialog(cid, self).exec()
+
+    def _open_more(self, cid: int):
+        from ui.screens.customer_info_dialog import CustomerInfoDialog
+        customer = db.get_customer_by_id(cid)
+        if customer:
+            CustomerInfoDialog(customer, self).exec()
 
     def _ctx_menu(self, pos):
         row = self.table.rowAt(pos.y())
@@ -466,7 +480,7 @@ class CustomerDialog(BaseDialog):
         title = "تعديل عميل" if customer else "➕ إضافة عميل جديد"
         super().__init__(title, parent)
         self.customer = customer
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(680)
         self._existing_codes: list[dict] = []   # {"id", "code"} loaded from DB
         self._pending_new: list[str] = []        # codes to add on save
         self._pending_del: list[int] = []        # code IDs to delete on save

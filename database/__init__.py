@@ -16,7 +16,7 @@ from .dal_customers import (
     delete_customer, search_customers, get_export_data,
     get_group_summary,
     get_shipping_codes, get_all_shipping_codes, get_customer_by_shipping_code,
-    add_shipping_code, delete_shipping_code,
+    add_shipping_code, update_shipping_code, delete_shipping_code,
 )
 from .dal_transactions import (
     add_outbound_transaction, add_inbound_transaction,

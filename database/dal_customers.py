@@ -144,6 +144,22 @@ def add_shipping_code(customer_id: int, code: str) -> int:
             raise ValueError(f"الكود '{code}' مستخدم بالفعل لعميل آخر")
 
 
+def update_shipping_code(code_id: int, new_code: str) -> None:
+    """تعديل كود شحن موجود"""
+    new_code = new_code.strip()
+    if not new_code:
+        raise ValueError("الكود لا يمكن أن يكون فارغاً")
+    with get_connection() as conn:
+        try:
+            conn.execute(
+                "UPDATE shipping_codes SET code = ? WHERE id = ?",
+                (new_code, code_id),
+            )
+            conn.commit()
+        except Exception:
+            raise ValueError(f"الكود '{new_code}' مستخدم بالفعل لعميل آخر")
+
+
 def delete_shipping_code(code_id: int) -> None:
     """حذف كود شحن"""
     with get_connection() as conn:
