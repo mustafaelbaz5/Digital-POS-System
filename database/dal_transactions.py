@@ -62,22 +62,6 @@ def add_outbound_transaction(
                 (amount_spent, platform_id),
             )
 
-            platform_row = conn.execute(
-                "SELECT type, monthly_used, monthly_limit FROM platforms WHERE id = ?",
-                (platform_id,),
-            ).fetchone()
-            if platform_row["type"] in ("wallet", "instapay"):
-                new_used = platform_row["monthly_used"] + amount_spent
-                if new_used > platform_row["monthly_limit"]:
-                    raise ValueError(
-                        f"تجاوز الحد الشهري — المستخدم: {platform_row['monthly_used']:,.0f} / "
-                        f"الحد: {platform_row['monthly_limit']:,.0f} ج"
-                    )
-                conn.execute(
-                    "UPDATE platforms SET monthly_used = monthly_used + ? WHERE id = ?",
-                    (amount_spent, platform_id),
-                )
-
             if payment_status == "paid":
                 conn.execute(
                     "UPDATE budget SET cash_vault = cash_vault + ? WHERE id = 1",
@@ -125,6 +109,60 @@ def add_inbound_transaction(
                     f"الكاش غير كافٍ - الكاش الحالي: {budget['cash_vault']:.2f} ج"
                 )
 
+            # ── Receiving capacity check ──────────────────────────────────
+            from datetime import date as _date
+            _month_start = _date.today().replace(day=1).isoformat()
+
+            _cap_row = conn.execute(
+                "SELECT monthly_limit FROM platforms WHERE id = ?", (wallet_id,)
+            ).fetchone()
+            _total_limit = (_cap_row["monthly_limit"] or 0) if _cap_row else 0
+
+            _deps = conn.execute("""
+                SELECT COALESCE(SUM(amount), 0) AS total
+                FROM machine_deposits
+                WHERE platform_id = ?
+                  AND datetime(created_at) < datetime(?, 'start of day')
+            """, (wallet_id, _month_start)).fetchone()["total"]
+
+            _txns = conn.execute("""
+                SELECT
+                    COALESCE(SUM(CASE
+                        WHEN operation_type = 'inbound' THEN amount_required
+                        WHEN operation_type = 'manual_commission' THEN amount_spent
+                        ELSE 0 END), 0) AS total_in,
+                    COALESCE(SUM(CASE
+                        WHEN operation_type = 'outbound' THEN amount_spent
+                        ELSE 0 END), 0) AS total_out
+                FROM transactions
+                WHERE platform_id = ?
+                  AND datetime(created_at) < datetime(?, 'start of day')
+            """, (wallet_id, _month_start)).fetchone()
+
+            _legacy = conn.execute("""
+                SELECT COALESCE(SUM(amount), 0) AS total
+                FROM daily_commissions
+                WHERE platform_id = ?
+                  AND datetime(created_at) < datetime(?, 'start of day')
+            """, (wallet_id, _month_start)).fetchone()["total"]
+
+            _opening = _deps + _txns["total_in"] + _legacy - _txns["total_out"]
+
+            _monthly_inward = conn.execute("""
+                SELECT COALESCE(SUM(amount_required), 0) AS total
+                FROM transactions
+                WHERE platform_id = ? AND operation_type = 'inbound'
+                  AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now', 'localtime')
+            """, (wallet_id,)).fetchone()["total"]
+
+            _remaining = _total_limit - (_opening + _monthly_inward)
+            if amount_received > _remaining:
+                raise ValueError(
+                    f"تنبيه: هذه العملية ستتخطى الحد الشهري المسموح للاستقبال — "
+                    f"السعة المتبقية: {_remaining:,.0f} ج"
+                )
+            # ─────────────────────────────────────────────────────────────
+
             sql = """
                 INSERT INTO transactions
                     (operation_type, service_name, platform_id, customer_id,
@@ -153,8 +191,8 @@ def add_inbound_transaction(
             transaction_id = cursor.lastrowid
 
             conn.execute(
-                "UPDATE platforms SET balance = balance + ?, monthly_used = monthly_used + ? WHERE id = ?",
-                (amount_received, amount_received, wallet_id),
+                "UPDATE platforms SET balance = balance + ? WHERE id = ?",
+                (amount_received, wallet_id),
             )
 
             if is_delivered:
@@ -377,12 +415,6 @@ def delete_transaction(transaction_id: int) -> None:
                     "UPDATE platforms SET balance = balance + ? WHERE id = ?",
                     (spent, pid),
                 )
-                # استرجاع monthly_used للمحافظ
-                if row["p_type"] in ("wallet", "instapay"):
-                    conn.execute(
-                        "UPDATE platforms SET monthly_used = MAX(0, monthly_used - ?) WHERE id = ?",
-                        (spent, pid),
-                    )
                 # عكس تأثير الدفع
                 if status in ("cash", "paid"):
                     conn.execute(
@@ -399,10 +431,6 @@ def delete_transaction(transaction_id: int) -> None:
                 # استرجاع رصيد المحفظة (الذي تم استلامه)
                 conn.execute(
                     "UPDATE platforms SET balance = balance - ? WHERE id = ?",
-                    (req, pid),
-                )
-                conn.execute(
-                    "UPDATE platforms SET monthly_used = MAX(0, monthly_used - ?) WHERE id = ?",
                     (req, pid),
                 )
 
@@ -957,3 +985,42 @@ def get_pending_cash_liability() -> float:
         """
         ).fetchone()
         return row["total"] if row else 0
+
+
+def calculate_wallet_capacity(wallet_id: int) -> dict:
+    """
+    حساب السعة المتبقية للاستقبال (نموذج الطاقة الاستيعابية الواردة):
+      المستخدم  = رصيد أول الشهر + إجمالي الواردات الشهرية
+      المتبقي   = الحد الشهري - المستخدم
+    الصادر لا يؤثر على الحساب.
+    """
+    from datetime import date as _date
+    month_start = _date.today().replace(day=1).isoformat()
+
+    with get_connection() as conn:
+        cap_row = conn.execute(
+            "SELECT monthly_limit FROM platforms WHERE id = ?", (wallet_id,)
+        ).fetchone()
+        if not cap_row:
+            return {"total_limit": 0, "opening_balance": 0, "monthly_inward": 0, "used": 0, "remaining": 0}
+
+        total_limit = cap_row["monthly_limit"] or 0
+
+        monthly_inward = conn.execute("""
+            SELECT COALESCE(SUM(amount_required), 0) AS total
+            FROM transactions
+            WHERE platform_id = ? AND operation_type = 'inbound'
+              AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now', 'localtime')
+        """, (wallet_id,)).fetchone()["total"]
+
+    opening_balance = get_opening_balance(wallet_id, month_start)
+    used = opening_balance + monthly_inward
+    remaining = total_limit - used
+
+    return {
+        "total_limit": total_limit,
+        "opening_balance": opening_balance,
+        "monthly_inward": monthly_inward,
+        "used": used,
+        "remaining": remaining,
+    }

@@ -230,11 +230,12 @@ class PlatformMoreDialog(BaseDialog):
         al.setContentsMargins(18, 10, 18, 10)
         al.setSpacing(8)
 
-        dep = QPushButton("💰 إيداع")
-        dep.setObjectName("btn_secondary")
-        dep.setMinimumHeight(36)
-        dep.clicked.connect(self._deposit)
-        al.addWidget(dep)
+        if p_type not in ("wallet", "instapay"):
+            dep = QPushButton("💰 إيداع")
+            dep.setObjectName("btn_secondary")
+            dep.setMinimumHeight(36)
+            dep.clicked.connect(self._deposit)
+            al.addWidget(dep)
 
         if p_type in ("wallet", "instapay"):
             lb = QPushButton("✏️ تعديل الحد")
@@ -424,7 +425,7 @@ class PlatformListTab(QWidget):
             ("إجراءات", 200),        # Increased to fit buttons + 24px spacing
         ]
         if self.p_type in ("wallet", "instapay"):
-            cols.insert(1, ("المتبقي من الحد", 190))
+            cols.insert(1, ("السعة المتبقية للاستقبال", 210))
 
         self.table = DataTable(cols)
         self.table.setSortingEnabled(True)
@@ -458,9 +459,9 @@ class PlatformListTab(QWidget):
         if self._sort_mode == "balance_asc":
             return sorted(platforms, key=lambda p: p.get("balance", 0))
         if self._sort_mode == "limit_desc":
-            return sorted(platforms, key=lambda p: p.get("monthly_limit", 0) - p.get("monthly_used", 0), reverse=True)
+            return sorted(platforms, key=lambda p: p.get("remaining_capacity", 0), reverse=True)
         if self._sort_mode == "limit_asc":
-            return sorted(platforms, key=lambda p: p.get("monthly_limit", 0) - p.get("monthly_used", 0))
+            return sorted(platforms, key=lambda p: p.get("remaining_capacity", 0))
         return platforms
 
     def load(self, platforms: list):
@@ -477,10 +478,12 @@ class PlatformListTab(QWidget):
 
             col = 1
             if self.p_type in ("wallet", "instapay"):
-                rem = p.get("monthly_limit", 0) - p.get("monthly_used", 0)
-                pct = int(p.get("monthly_used", 0) / max(p.get("monthly_limit", 1), 1) * 100)
+                rem        = p.get("remaining_capacity", 0)
+                total_lim  = max(p.get("total_limit", 1), 1)
+                cap_used   = p.get("capacity_used", 0)
+                pct        = int(cap_used / total_lim * 100)
                 color = COLORS["red"] if pct > 90 else COLORS["yellow"] if pct > 70 else COLORS["blue"]
-                self.table.set_cell(row, col, f"{fmt_currency(rem)} ({pct}%)", color=color)
+                self.table.set_cell(row, col, f"{fmt_currency(rem)} ({100 - pct}%)", color=color)
                 col += 1
 
             self.table.set_cell(row, col, fmt_currency(p.get("balance", 0)), color=COLORS["green"], bold=True)
@@ -579,8 +582,12 @@ class PlatformsScreen(ScreenShell):
         platforms = db.get_all_platforms()
         date_str = self.get_selected_date()
         for p in platforms:
-            # We keep the real balance from p["balance"] as requested
             p["transaction_count"] = db.get_platform_day_stats(p["id"], date_str)["txn_count"]
+            if p["type"] in ("wallet", "instapay"):
+                cap = db.calculate_wallet_capacity(p["id"])
+                p["remaining_capacity"] = cap["remaining"]
+                p["capacity_used"]      = cap["used"]
+                p["total_limit"]        = cap["total_limit"]
 
         self._tab_machines.load( [p for p in platforms if p["type"] == "machine"])
         self._tab_wallets.load(  [p for p in platforms if p["type"] == "wallet"])

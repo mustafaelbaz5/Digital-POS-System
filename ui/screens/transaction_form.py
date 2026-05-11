@@ -921,28 +921,27 @@ class TransactionDialog(BaseDialog):
         """)
         hl.addWidget(bal_badge)
 
-        # Limit Badge
+        # Capacity Badge
         if p["type"] in ("wallet", "instapay"):
             hl.addSpacing(10)
-            used = p.get("monthly_used", 0)
-            limit = p.get("monthly_limit", 200000)
-            rem = limit - used
-            pct = int(used / limit * 100) if limit else 0
+            cap       = db.calculate_wallet_capacity(p["id"])
+            rem       = cap["remaining"]
+            total_lim = max(cap["total_limit"], 1)
+            pct_used  = int(cap["used"] / total_lim * 100)
+            pct_free  = 100 - pct_used
             lim_color = (
-                COLORS["red"]
-                if pct > 90
-                else COLORS["yellow"] if pct > 70 else COLORS["blue"]
+                COLORS["red"]    if pct_used > 90
+                else COLORS["yellow"] if pct_used > 70 else COLORS["blue"]
             )
             lim_bg = (
-                COLORS["red_bg"]
-                if pct > 90
-                else COLORS["yellow_bg"] if pct > 70 else COLORS["blue_bg"]
+                COLORS["red_bg"]    if pct_used > 90
+                else COLORS["yellow_bg"] if pct_used > 70 else COLORS["blue_bg"]
             )
 
-            lim_badge = QLabel(f" المتبقي: {fmt_currency(rem)} ({pct}%) ")
+            lim_badge = QLabel(f" السعة المتبقية للاستقبال: {fmt_currency(rem)} ({pct_free}%) ")
             lim_badge.setObjectName("header_limit")
             lim_badge.setStyleSheet(f"""
-                background: {lim_bg}; color: {lim_color}; 
+                background: {lim_bg}; color: {lim_color};
                 border: 1px solid {lim_color}; border-radius: 12px;
                 padding: 2px 12px; font-weight: bold; font-size: 13px;
             """)
