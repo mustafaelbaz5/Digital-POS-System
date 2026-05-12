@@ -97,7 +97,7 @@ class MainWindow(QMainWindow):
         # Brand
         brand = QLabel("نظام المدفوعات")
         brand.setObjectName("sidebar_brand")
-        brand.setAlignment(Qt.AlignmentFlag.AlignRight)
+        brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(brand)
 
         div = QFrame()
