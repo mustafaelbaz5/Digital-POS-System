@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
 import database as db
 from ui.components.widgets import BaseDialog, DataTable, ScreenShell
 from ui.styles.theme import COLORS, FONT, GAP_MD, GAP_SM, GAP_XS, ROW_HEIGHT
-from utils.formatters import fmt_currency
+from ui.utils.formatters import fmt_currency
 
 RTL = Qt.LayoutDirection.RightToLeft
 ALeft = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
@@ -426,7 +426,7 @@ class GroupsTab(QWidget):
             if not data:
                 QMessageBox.warning(self, "تنبيه", "لم يتم العثور على بيانات المجموعة")
                 return
-            from utils.pdf_generator import GroupPDFGenerator
+            from ui.utils.pdf_generator import GroupPDFGenerator
             path = GroupPDFGenerator(data).generate()
             os.startfile(path)
         except Exception as e:
@@ -477,7 +477,7 @@ class CustomerDialog(BaseDialog):
         title = "تعديل عميل" if customer else "➕ إضافة عميل جديد"
         super().__init__(title, parent)
         self.customer = customer
-        self.setMinimumWidth(680)
+        self.setMinimumWidth(700)
         self._existing_codes: list[dict] = []   # {"id", "code"} loaded from DB
         self._pending_new: list[str] = []        # codes to add on save
         self._pending_del: list[int] = []        # code IDs to delete on save

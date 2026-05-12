@@ -28,7 +28,7 @@ from PyQt6.QtWidgets import (
 import database as db
 from ui.components.widgets import BaseDialog, CardGroup, ScreenShell, StatCard
 from ui.styles.theme import COLORS, FONT, GAP_LG, GAP_MD, GAP_SM, ROW_HEIGHT, CARD_RADIUS
-from utils.formatters import fmt_currency
+from ui.utils.formatters import fmt_currency
 
 
 # ══════════════════════════════════════════
@@ -510,7 +510,7 @@ class DashboardScreen(ScreenShell):
 
         try:
             data = db.get_export_data()
-            from utils.google_sheets import export_to_sheets
+            from ui.utils.google_sheets import export_to_sheets
             url = export_to_sheets(data)
             progress.close()
             ExportSuccessDialog(url, self).exec()

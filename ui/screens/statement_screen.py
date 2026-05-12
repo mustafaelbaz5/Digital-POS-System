@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
 import database as db
 from ui.components.widgets import BaseDialog, DataTable
 from ui.styles.theme import CARD_RADIUS, COLORS, FONT, GAP_LG, GAP_MD
-from utils.formatters import fmt_currency
+from ui.utils.formatters import fmt_currency
 
 # ══════════════════════════════════════════
 #  Summary Card Component
@@ -145,7 +145,7 @@ class CustomerStatementDialog(QDialog):
         layout.addStretch()
 
         self.settle_btn = QPushButton("💚 تسديد سريع")
-        self.settle_btn.setObjectName("btn_primary")
+        self.settle_btn.setObjectName("btn_success")
         self.settle_btn.setFixedWidth(150)
         self.settle_btn.clicked.connect(self._quick_settle)
         layout.addWidget(self.settle_btn)
@@ -196,7 +196,7 @@ class CustomerStatementDialog(QDialog):
 
     def _print_report(self):
         try:
-            from utils.pdf_generator import PDFGenerator
+            from ui.utils.pdf_generator import PDFGenerator
             gen = PDFGenerator(self._data)
             path = gen.generate()
             os.startfile(path)
