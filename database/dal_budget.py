@@ -332,10 +332,39 @@ def update_platform_limit(platform_id: int, new_limit: float) -> None:
 
 
 def delete_platform(platform_id: int) -> None:
-    """حذف منصة (Soft Delete) مع تغيير الاسم لتجنب تكرار الأسماء مستقبلاً"""
+    """حذف منصة (Soft Delete) مع إعادة الرصيد للميزانية المركزية"""
     with get_connection() as conn:
-        conn.execute(
-            "UPDATE platforms SET name = name || ' (محذوف - ' || id || ')', is_active = 0 WHERE id = ?",
-            (platform_id,)
-        )
-        conn.commit()
+        try:
+            # 1. جلب الرصيد الحالي
+            platform = conn.execute(
+                "SELECT name, balance FROM platforms WHERE id = ?", (platform_id,)
+            ).fetchone()
+            
+            if not platform:
+                return
+
+            balance = platform["balance"] or 0
+            
+            # 2. إعادة الرصيد للميزانية المركزية إذا كان موجوداً
+            if balance != 0:
+                conn.execute(
+                    "UPDATE budget SET main_budget = main_budget + ? WHERE id = 1",
+                    (balance,)
+                )
+                _record_capital_movement(
+                    conn,
+                    "platform",
+                    -balance,  # القيمة السالبة تعني عودة الرصيد للميزانية المركزية
+                    target_id=platform_id,
+                    notes=f"إعادة الرصيد من منصة محذوفة: {platform['name']}",
+                )
+            
+            # 3. حذف المنصة (Soft Delete)
+            conn.execute(
+                "UPDATE platforms SET name = name || ' (محذوف - ' || id || ')', balance = 0, is_active = 0 WHERE id = ?",
+                (platform_id,)
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise

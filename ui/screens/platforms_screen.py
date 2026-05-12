@@ -355,11 +355,22 @@ class PlatformMoreDialog(BaseDialog):
                 QMessageBox.critical(self, "خطأ", str(e))
 
     def _delete(self):
+        # تحديث بيانات المنصة للتأكد من الرصيد الحالي
+        platform = db.get_platform_by_id(self.platform["id"])
+        if not platform:
+            return
+            
+        balance = platform.get("balance", 0)
+        msg = f"هل تريد حذف [{platform['name']}]؟"
+        
+        if balance != 0:
+            msg += f"\n⚠️ ملاحظة: سيتم تحويل الرصيد المتبقي ({fmt_currency(balance)}) إلى الميزانية المركزية."
+
         if (
             QMessageBox.question(
                 self,
                 "تأكيد الحذف",
-                f"هل تريد حذف [{self.platform['name']}]؟",
+                msg,
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             == QMessageBox.StandardButton.Yes
