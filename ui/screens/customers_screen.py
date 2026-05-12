@@ -218,12 +218,6 @@ class CustomersTab(QWidget):
                     "role": "secondary",
                 },
             ]
-            if (c.get("total_debt") or 0) > 0:
-                actions.append({
-                    "text": "💚 تسديد سريع",
-                    "callback": lambda _, cid=c["id"]: self._quick_settle(cid),
-                    "role": "primary",
-                })
             self.table.add_action_buttons(row, 6, actions, spacing=6)
 
         parts = [f"إجمالي: {len(customers)} عميل"]
@@ -254,12 +248,6 @@ class CustomersTab(QWidget):
         if customer:
             CustomerInfoDialog(customer, self).exec()
 
-    def _quick_settle(self, cid: int):
-        from ui.screens.settlement_dialog import QuickSettleDialog
-        customer = db.get_customer_by_id(cid)
-        if customer and QuickSettleDialog(customer, self).exec():
-            self.load_data()
-
     def _ctx_menu(self, pos):
         row = self.table.rowAt(pos.y())
         if row < 0 or row >= len(self._customers):
@@ -270,10 +258,6 @@ class CustomersTab(QWidget):
             QAction("📊  كشف حساب", self, triggered=lambda: self._open_statement(c["id"]))
         )
         menu.addAction(QAction("ℹ️  المزيد", self, triggered=lambda: self._open_more(c["id"])))
-        if (c.get("total_debt") or 0) > 0:
-            menu.addAction(
-                QAction("💚  تسديد سريع", self, triggered=lambda: self._quick_settle(c["id"]))
-            )
         menu.addAction(QAction("✏️  تعديل", self, triggered=lambda: self._edit(c)))
         menu.addSeparator()
         menu.addAction(QAction("🗑️  حذف", self, triggered=lambda: self._delete(c)))

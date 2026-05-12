@@ -144,6 +144,16 @@ class CustomerStatementDialog(QDialog):
         layout.addLayout(info_col)
         layout.addStretch()
 
+        self.settle_btn = QPushButton("💚 تسديد سريع")
+        self.settle_btn.setObjectName("btn_primary")
+        self.settle_btn.setFixedWidth(150)
+        self.settle_btn.clicked.connect(self._quick_settle)
+        layout.addWidget(self.settle_btn)
+
+        # Show settle button only if there is debt
+        t = self._data.get("totals", {})
+        self.settle_btn.setVisible((t.get("total_pending") or 0) > 0)
+
         print_btn = QPushButton("🖨️ طباعة التقرير")
         print_btn.setObjectName("btn_secondary")
         print_btn.setFixedWidth(150)
@@ -157,6 +167,32 @@ class CustomerStatementDialog(QDialog):
         layout.addWidget(close_btn)
 
         return layout
+
+    def _quick_settle(self):
+        from ui.screens.settlement_dialog import QuickSettleDialog
+
+        c = self._data["customer"]
+        if QuickSettleDialog(c, self).exec():
+            # Refresh data and UI
+            self._load_data()
+
+            # Update Header visibility
+            t = self._data.get("totals", {})
+            self.settle_btn.setVisible((t.get("total_pending") or 0) > 0)
+
+            # Update Master Cards
+            net = (t.get("total_pending") or 0) - (t.get("total_due") or 0)
+            self.card_owed.set_value(fmt_currency(t.get("total_pending", 0)))
+            self.card_owned.set_value(fmt_currency(t.get("total_due", 0)))
+            self.card_net.set_value(fmt_currency(net))
+            self.card_count.set_value(str(t.get("total_count", 0)))
+
+            # Refresh Table
+            self._fill_table()
+
+            # Optional: Signal parent to refresh if needed (but dialog is usually enough)
+            if hasattr(self.parent(), "load_data"):
+                self.parent().load_data()
 
     def _print_report(self):
         try:
@@ -410,6 +446,9 @@ class CustomerStatementDialog(QDialog):
     def _refresh_ui(self):
         t = self._data.get("totals", {})
         net = (t.get("total_pending") or 0) - (t.get("total_due") or 0)
+
+        # Update settle button visibility
+        self.settle_btn.setVisible((t.get("total_pending") or 0) > 0)
 
         self.card_owed.set_value(fmt_currency(t.get("total_pending", 0)))
         self.card_owned.set_value(fmt_currency(t.get("total_due", 0)))
