@@ -20,7 +20,6 @@ from ui.screens.customers_screen import CustomersScreen
 from ui.screens.dashboard import DashboardScreen
 from ui.screens.platforms_screen import PlatformsScreen
 from ui.screens.Reports_screen import ReportsScreen
-from ui.screens.transaction_screen import TransactionScreen
 from ui.styles.theme import (
     MAIN_STYLE,
     SIDEBAR_WIDTH,
@@ -31,7 +30,6 @@ from ui.styles.theme import (
 
 NAV_ITEMS = [
     ("dashboard", "لوحة التحكم", DashboardScreen),
-    ("transaction", "عملية جديدة", TransactionScreen),
     ("platforms", "المنصات", PlatformsScreen),
     ("customers", "العملاء", CustomersScreen),
     ("reports", "التقارير والجرد", ReportsScreen),
@@ -39,7 +37,6 @@ NAV_ITEMS = [
 
 NAV_SYMBOLS = {
     "dashboard": "◈",
-    "transaction": "⊕",
     "platforms": "◉",
     "customers": "◎",
     "reports": "◑",
@@ -118,7 +115,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         # Theme Toggle
-        self._theme_btn = QPushButton("🌙  الوضع الليلي")
+        self._theme_btn = QPushButton("☀️  الوضع النهاري")
         self._theme_btn.setObjectName("theme_toggle_btn")
         self._theme_btn.setFixedHeight(38)
         self._theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -204,10 +201,3 @@ class MainWindow(QMainWindow):
     def navigate_to(self, key: str):
         """Public API for navigation from any screen."""
         self._navigate(key)
-
-    def open_transaction_for_platform(self, platform_id: int):
-        """Navigate to transaction screen and pre-select a platform."""
-        self._navigate("transaction")
-        screen = self._screens.get("transaction")
-        if screen and hasattr(screen, "select_platform"):
-            screen.select_platform(platform_id)

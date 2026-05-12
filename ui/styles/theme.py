@@ -115,10 +115,10 @@ LIGHT_COLORS = {
 }
 
 # Mutable active colors dict — updated in-place on theme switch
-COLORS: dict = dict(DARK_COLORS)
+COLORS: dict = dict(LIGHT_COLORS)
 
 # Current theme state
-_current_theme: str = "dark"
+_current_theme: str = "light"
 
 
 def get_current_theme() -> str:
@@ -639,8 +639,8 @@ QMenu::item:selected {{
 """
 
 
-# Backward-compat: pre-built dark stylesheet
-MAIN_STYLE: str = build_main_style(DARK_COLORS)
+# Backward-compat: pre-built light stylesheet
+MAIN_STYLE: str = build_main_style(LIGHT_COLORS)
 
 
 # ──────────────────────────────────────────────────
