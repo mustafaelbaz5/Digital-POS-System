@@ -55,10 +55,12 @@ class DataTable(QTableWidget):
         self.horizontalHeader().setStyleSheet(f"""
             QHeaderView::section {{
                 background-color: {COLORS['bg_elevated']};
-                color: {COLORS['text_secondary']};
-                padding: 12px;
+                color: {COLORS['text_primary']};
+                padding: 14px 16px;
                 border: none;
+                border-bottom: 2px solid {COLORS['border']};
                 font-weight: bold;
+                font-size: 12px;
                 text-align: center;
             }}
         """)
@@ -67,20 +69,20 @@ class DataTable(QTableWidget):
         self.setStyleSheet(f"""
             QTableWidget {{
                 background-color: transparent;
-                alternate-background-color: {COLORS['bg_elevated']}40;
+                alternate-background-color: {COLORS['bg_alt_row']};
                 border: none;
                 gridline-color: transparent;
             }}
             QTableWidget::item {{
-                padding: 12px;
-                border-bottom: 1px solid {COLORS['border']}40;
+                padding: 12px 16px;
+                border-bottom: 1px solid {COLORS['border_light']};
                 color: {COLORS['text_primary']};
             }}
             QTableWidget::item:hover {{
-                background-color: transparent;
+                background-color: {COLORS['bg_hover']};
             }}
             QTableWidget::item:selected {{
-                background-color: transparent;
+                background-color: {COLORS['accent_dim']};
                 color: {COLORS['accent']};
             }}
         """)

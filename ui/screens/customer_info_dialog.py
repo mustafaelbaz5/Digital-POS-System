@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 import database as db
 from ui.components.widgets import BaseDialog
 from ui.styles.theme import COLORS, FONT, GAP_MD, GAP_SM
-from utils.formatters import fmt_currency
+from ui.utils.formatters import fmt_currency
 
 RTL = Qt.LayoutDirection.RightToLeft
 

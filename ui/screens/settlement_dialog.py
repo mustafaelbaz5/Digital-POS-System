@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
 import database as db
 from ui.components.widgets import BaseDialog
 from ui.styles.theme import COLORS, FONT, GAP_MD, GAP_SM
-from utils.formatters import fmt_currency
+from ui.utils.formatters import fmt_currency
 
 RTL = Qt.LayoutDirection.RightToLeft
 
@@ -155,7 +155,7 @@ class QuickSettleDialog(BaseDialog):
         self.add_stretch()
         self.add_button("إلغاء", self.reject, role="secondary")
 
-        confirm_btn = self.add_button("✓  تأكيد التسديد", self._confirm, role="primary")
+        confirm_btn = self.add_button("✓  تأكيد التسديد", self._confirm, role="success")
         confirm_btn.setMinimumHeight(42)
         confirm_btn.setMinimumWidth(160)
 

@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
 import database as db
 from ui.components.widgets import BaseDialog, DataTable, SingleDateWidget, ScreenShell
 from ui.styles.theme import COLORS, GAP_LG, GAP_MD, GAP_SM
-from utils.formatters import fmt_currency
+from ui.utils.formatters import fmt_currency
 
 
 # ══════════════════════════════════════════

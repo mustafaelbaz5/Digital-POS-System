@@ -30,7 +30,7 @@ from ui.components.widgets import (
     Toast,
 )
 from ui.styles.theme import COLORS, FONT, GAP_LG, GAP_MD, ROW_HEIGHT
-from utils.formatters import fmt_currency
+from ui.utils.formatters import fmt_currency
 
 # ══════════════════════════════════════════
 #  Tab 1: الجرد العام

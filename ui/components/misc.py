@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 
 from ui.components.base import BaseDialog
 from ui.styles.theme import COLORS, FONT, GAP_MD, GAP_SM, GAP_XS
-from utils.formatters import fmt_currency
+from ui.utils.formatters import fmt_currency
 
 AlignLeft = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
 

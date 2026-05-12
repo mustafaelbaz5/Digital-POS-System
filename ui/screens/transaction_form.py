@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import (
 import database as db
 from ui.components.widgets import BaseDialog, show_toast
 from ui.styles.theme import COLORS, FONT
-from utils.formatters import fmt_currency
+from ui.utils.formatters import fmt_currency
 
 
 class FocusSpinBox(QDoubleSpinBox):
