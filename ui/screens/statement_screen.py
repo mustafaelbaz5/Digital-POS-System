@@ -245,8 +245,7 @@ class CustomerStatementDialog(QDialog):
             ("الإجراءات", 100),
         ]
         self.table = DataTable(cols)
-        # Apply section color to table header
-        self.table.horizontalHeader().setStyleSheet(f"QHeaderView::section {{ background-color: {COLORS['clients']}; color: {COLORS['text_on_dark']}; }}")
+        self.table.set_section_color(COLORS["clients"])
         self.table.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )

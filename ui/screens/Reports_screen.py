@@ -102,7 +102,7 @@ class InventoryTab(QWidget):
             ("المتبقي", -1),
         ]
         self.platforms_table = DataTable(columns)
-        self.platforms_table.horizontalHeader().setStyleSheet(f"QHeaderView::section {{ background-color: {COLORS['accent']}; color: {COLORS['text_on_dark']}; }}")
+        self.platforms_table.set_section_color(COLORS["accent"])
         self.platforms_table.setVerticalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )

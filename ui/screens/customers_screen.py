@@ -129,10 +129,8 @@ class CustomersTab(QWidget):
         ]
         self.table = DataTable(cols)
         self.table.horizontalHeader().setVisible(True)
-        # Apply section color to table header
-        self.table.horizontalHeader().setStyleSheet(f"QHeaderView::section {{ background-color: {COLORS['clients']}; color: {COLORS['text_on_dark']}; }}")
+        self.table.set_section_color(COLORS["clients"])
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._ctx_menu)
 
@@ -333,16 +331,13 @@ class GroupsTab(QWidget):
         self.card.add_layout(tb_row)
 
         cols = [
-            ("اسم المجموعة", -1),  # Stretch
+            ("اسم المجموعة", -1),
             ("القائد", 180),
-            ("ملاحظات", 200),
-            ("إجراءات", 310),
+            ("إجراءات", 260),
         ]
         self.table = DataTable(cols)
         self.table.horizontalHeader().setVisible(True)
-        # Apply section color to table header
-        self.table.horizontalHeader().setStyleSheet(f"QHeaderView::section {{ background-color: {COLORS['clients']}; color: {COLORS['text_on_dark']}; }}")
-        self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
+        self.table.set_section_color(COLORS["clients"])
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._ctx_menu)
 
@@ -380,11 +375,10 @@ class GroupsTab(QWidget):
             self.table.set_cell(
                 row, 1, g.get("leader_name") or "—", COLORS["text_secondary"]
             )
-            self.table.set_cell(row, 2, g.get("notes") or "—", COLORS["text_muted"])
 
             self.table.add_action_buttons(
                 row,
-                3,
+                2,
                 [
                     {
                         "text": "✏️ تعديل",
@@ -482,7 +476,7 @@ class CustomerDialog(BaseDialog):
         title = "تعديل عميل" if customer else "➕ إضافة عميل جديد"
         super().__init__(title, parent)
         self.customer = customer
-        self.setMinimumWidth(700)
+        self.setMinimumWidth(750)
         self._existing_codes: list[dict] = []   # {"id", "code"} loaded from DB
         self._pending_new: list[str] = []        # codes to add on save
         self._pending_del: list[int] = []        # code IDs to delete on save

@@ -590,14 +590,9 @@ class PlatformsScreen(ScreenShell):
         c.addWidget(self.tabs)
 
     def _render_tabs(self):
-        # Specific header styles for each tab to match section identity
-        machines_style = f"QHeaderView::section {{ background-color: {COLORS['machines']}; color: {COLORS['text_on_dark']}; }}"
-        wallets_style = f"QHeaderView::section {{ background-color: {COLORS['wallets']}; color: {COLORS['text_on_dark']}; }}"
-        instapay_style = f"QHeaderView::section {{ background-color: {COLORS['instapay']}; color: {COLORS['text_on_dark']}; }}"
-
-        self._tab_machines.table.horizontalHeader().setStyleSheet(machines_style)
-        self._tab_wallets.table.horizontalHeader().setStyleSheet(wallets_style)
-        self._tab_instapay.table.horizontalHeader().setStyleSheet(instapay_style)
+        self._tab_machines.table.set_section_color(COLORS["machines"])
+        self._tab_wallets.table.set_section_color(COLORS["wallets"])
+        self._tab_instapay.table.set_section_color(COLORS["instapay"])
 
         # Apply specific focus colors to inputs if needed (handled by build_main_style mostly)
 

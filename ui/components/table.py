@@ -14,9 +14,22 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
 )
 
-from ui.styles.theme import COLORS, GAP_LG
+from ui.styles.theme import COLORS, GAP_MD, GAP_LG, ROW_HEIGHT
 
 AlignCenter = Qt.AlignmentFlag.AlignCenter
+
+_HEADER_BASE = """
+    QHeaderView::section {{
+        background-color: {bg};
+        color: {fg};
+        padding: 10px 14px;
+        border: none;
+        border-bottom: 2px solid {border};
+        font-weight: bold;
+        font-size: 13px;
+        letter-spacing: 0.3px;
+    }}
+"""
 
 
 class DataTable(QTableWidget):
@@ -50,30 +63,26 @@ class DataTable(QTableWidget):
         self.setShowGrid(False)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.horizontalHeader().setHighlightSections(False)
-        self.verticalHeader().setDefaultSectionSize(70)
+        self.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
 
-        self.horizontalHeader().setStyleSheet(f"""
-            QHeaderView::section {{
-                background-color: {COLORS['bg_elevated']};
-                color: {COLORS['text_primary']};
-                padding: 14px 16px;
-                border: none;
-                border-bottom: 2px solid {COLORS['border']};
-                font-weight: bold;
-                font-size: 12px;
-            }}
-        """)
+        self.horizontalHeader().setStyleSheet(
+            _HEADER_BASE.format(
+                bg=COLORS["bg_elevated"],
+                fg=COLORS["text_primary"],
+                border=COLORS["border"],
+            )
+        )
 
         self.setAlternatingRowColors(True)
         self.setStyleSheet(f"""
             QTableWidget {{
-                background-color: transparent;
+                background-color: {COLORS['bg_card']};
                 alternate-background-color: {COLORS['bg_alt_row']};
                 border: none;
                 gridline-color: transparent;
             }}
             QTableWidget::item {{
-                padding: 12px 16px;
+                padding: 8px 12px;
                 border-bottom: 1px solid {COLORS['border_light']};
                 color: {COLORS['text_primary']};
             }}
@@ -85,6 +94,16 @@ class DataTable(QTableWidget):
                 color: {COLORS['accent']};
             }}
         """)
+
+    def set_section_color(self, color: str):
+        """Apply a section-identity color to the header, preserving padding/style."""
+        self.horizontalHeader().setStyleSheet(
+            _HEADER_BASE.format(
+                bg=color,
+                fg=COLORS["text_on_dark"],
+                border="rgba(0,0,0,0.18)",
+            )
+        )
 
     def set_cell(
         self,
@@ -110,20 +129,18 @@ class DataTable(QTableWidget):
         self.setItem(row, col, item)
 
     def add_action_button(self, row: int, col: int, text: str, callback, role="ghost"):
-        """Convenience wrapper around add_action_buttons for a single button."""
         return self.add_action_buttons(
             row, col, [{"text": text, "callback": callback, "role": role}]
         )[0]
 
-    def add_action_buttons(self, row, col, buttons_data, spacing=GAP_LG):
-        """Add action buttons to a cell with configurable spacing."""
+    def add_action_buttons(self, row, col, buttons_data, spacing=GAP_MD):
         wrapper = QFrame()
         wrapper.setObjectName("cell_wrapper")
         wrapper.setStyleSheet(
             "#cell_wrapper { background: transparent; border: none; }"
         )
         layout = QHBoxLayout(wrapper)
-        layout.setContentsMargins(5, 0, 5, 0)
+        layout.setContentsMargins(6, 0, 6, 0)
         layout.setSpacing(spacing)
         layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
@@ -132,8 +149,8 @@ class DataTable(QTableWidget):
             btn = QPushButton(data.get("text", ""))
             btn.setObjectName(f"btn_{data.get('role', 'ghost')}")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setMinimumHeight(22)
-            btn.setMinimumWidth(120)
+            btn.setMinimumHeight(28)
+            btn.setMinimumWidth(80)
             btn.setSizePolicy(
                 QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
             )

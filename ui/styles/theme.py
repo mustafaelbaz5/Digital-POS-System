@@ -212,6 +212,13 @@ QMainWindow, QWidget, QDialog {{
     background: {C['bg_card']};
     border: 1px solid {C['border']};
     border-radius: 15px;
+    /* Qt doesn't support box-shadow; use a slightly deeper border for depth */
+}}
+
+#stat_card {{
+    background: {C['bg_card']};
+    border: 1px solid {C['border']};
+    border-radius: 12px;
 }}
 
 /* Section Header styling within CardGroup */
