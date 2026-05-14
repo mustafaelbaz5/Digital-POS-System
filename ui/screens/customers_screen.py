@@ -81,6 +81,10 @@ class CustomersTab(QWidget):
         layout.setContentsMargins(0, GAP_XS, 0, 0)
         layout.setSpacing(GAP_MD)
 
+        # Use CardGroup for the entire tab content
+        self.card = CardGroup("👥  إدارة العملاء", section_type="customer")
+        layout.addWidget(self.card)
+
         # ── Middle Layer: Add Button & Search
         tb_row = QHBoxLayout()
         tb_row.setContentsMargins(0, 0, 0, 0)
@@ -99,7 +103,7 @@ class CustomersTab(QWidget):
         self.group_filter.setFixedHeight(42)
         self.group_filter.setMinimumWidth(200)  # Expanded width
         self.group_filter.setStyleSheet(
-            f"background: {COLORS['bg_hover']}; font-weight: bold; font-size: 14px;"
+            f"background: {COLORS['bg_hover']}; font-weight: bold; font-size: 14px; border: 2px solid {COLORS['clients']};"
         )
         self.group_filter.currentIndexChanged.connect(self.load_data)
         tb_row.addWidget(self.group_filter)
@@ -108,17 +112,11 @@ class CustomersTab(QWidget):
         self.search.setPlaceholderText("🔍  بحث باسم أو تليفون...")
         self.search.setFixedHeight(42)
         self.search.setMinimumWidth(320)
+        self.search.setStyleSheet(f"border: 2px solid {COLORS['clients']};")
         self.search.textChanged.connect(self._load_table)
         tb_row.addWidget(self.search)
 
-        layout.addLayout(tb_row)
-        layout.addSpacing(GAP_SM)
-
-        # # ── Bottom Layer: Table Section
-        # from ui.components.widgets import SectionTitle
-        # self.table_title = SectionTitle("👥  قائمة العملاء")
-        # layout.addWidget(self.table_title)
-        # layout.addSpacing(GAP_SM)
+        self.card.add_layout(tb_row)
 
         cols = [
             ("الاسم", -1),
@@ -130,6 +128,8 @@ class CustomersTab(QWidget):
         ]
         self.table = DataTable(cols)
         self.table.horizontalHeader().setVisible(True)
+        # Apply section color to table header
+        self.table.horizontalHeader().setStyleSheet(f"QHeaderView::section {{ background-color: {COLORS['clients']}; color: {COLORS['text_on_dark']}; }}")
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -142,14 +142,14 @@ class CustomersTab(QWidget):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
         )
 
-        layout.addWidget(self.table)
+        self.card.add_widget(self.table)
 
         self.total_lbl = QLabel("")
         self.total_lbl.setStyleSheet(
             f"color:{COLORS['text_muted']}; font-size:{FONT['xs']}; padding:{GAP_SM}px {GAP_MD}px;"
         )
         self.total_lbl.setAlignment(ALeft)
-        layout.addWidget(self.total_lbl)
+        self.card.add_widget(self.total_lbl)
 
     def load_data(self):
         current = self.group_filter.currentData()
@@ -303,6 +303,10 @@ class GroupsTab(QWidget):
         layout.setContentsMargins(0, GAP_XS, 0, 0)
         layout.setSpacing(GAP_MD)
 
+        # Use CardGroup for the entire tab content
+        self.card = CardGroup("📂  إدارة المجموعات", section_type="group")
+        layout.addWidget(self.card)
+
         # ── Middle Layer: Add & Search
         tb_row = QHBoxLayout()
         tb_row.setContentsMargins(0, 0, 0, 0)
@@ -321,11 +325,11 @@ class GroupsTab(QWidget):
         self.group_search.setPlaceholderText("🔍  بحث باسم المجموعة...")
         self.group_search.setFixedHeight(42)
         self.group_search.setMinimumWidth(320)
+        self.group_search.setStyleSheet(f"border: 2px solid {COLORS['clients']};")
         self.group_search.textChanged.connect(self._filter)
         tb_row.addWidget(self.group_search)
 
-        layout.addLayout(tb_row)
-        layout.addSpacing(GAP_SM)
+        self.card.add_layout(tb_row)
 
         cols = [
             ("اسم المجموعة", -1),  # Stretch
@@ -335,6 +339,8 @@ class GroupsTab(QWidget):
         ]
         self.table = DataTable(cols)
         self.table.horizontalHeader().setVisible(True)
+        # Apply section color to table header
+        self.table.horizontalHeader().setStyleSheet(f"QHeaderView::section {{ background-color: {COLORS['clients']}; color: {COLORS['text_on_dark']}; }}")
         self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._ctx_menu)
@@ -346,7 +352,7 @@ class GroupsTab(QWidget):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
         )
 
-        layout.addWidget(self.table)
+        self.card.add_widget(self.table)
 
     def load_data(self):
         self._all_groups = db.get_all_groups()

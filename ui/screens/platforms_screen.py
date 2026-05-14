@@ -589,6 +589,18 @@ class PlatformsScreen(ScreenShell):
 
         c.addWidget(self.tabs)
 
+    def _render_tabs(self):
+        # Specific header styles for each tab to match section identity
+        machines_style = f"QHeaderView::section {{ background-color: {COLORS['machines']}; color: {COLORS['text_on_dark']}; }}"
+        wallets_style = f"QHeaderView::section {{ background-color: {COLORS['wallets']}; color: {COLORS['text_on_dark']}; }}"
+        instapay_style = f"QHeaderView::section {{ background-color: {COLORS['instapay']}; color: {COLORS['text_on_dark']}; }}"
+
+        self._tab_machines.table.horizontalHeader().setStyleSheet(machines_style)
+        self._tab_wallets.table.horizontalHeader().setStyleSheet(wallets_style)
+        self._tab_instapay.table.horizontalHeader().setStyleSheet(instapay_style)
+
+        # Apply specific focus colors to inputs if needed (handled by build_main_style mostly)
+
     def refresh(self):
         platforms = db.get_all_platforms()
         date_str = self.get_selected_date()
@@ -603,6 +615,7 @@ class PlatformsScreen(ScreenShell):
         self._tab_machines.load( [p for p in platforms if p["type"] == "machine"])
         self._tab_wallets.load(  [p for p in platforms if p["type"] == "wallet"])
         self._tab_instapay.load( [p for p in platforms if p["type"] == "instapay"])
+        self._render_tabs()
 
     def _add_platform(self):
         if AddPlatformDialog(self).exec():

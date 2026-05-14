@@ -170,8 +170,9 @@ class _SingleDateCell(QFrame):
         self._date = date
         self._label = label
         self.setFixedHeight(44)
+        self.setObjectName("date_cell")
         self.setStyleSheet(f"""
-            QFrame {{
+            #date_cell {{
                 background: {COLORS['bg_elevated']};
                 border: 1px solid {COLORS['border_light']};
                 border-radius: 8px;
@@ -196,7 +197,9 @@ class _SingleDateCell(QFrame):
             f"color:{COLORS['text_primary']};font-size:13px;"
             f"font-weight:bold;background:transparent;border:none;padding:0 6px;"
         )
-        self._lbl.mousePressEvent = lambda e: self._open_cal()
+        # Use installEventFilter or just override mousePressEvent by sub-classing label if needed.
+        # For simplicity, keeping the logic but using a safe method.
+        self._lbl.mousePressEvent = self._on_lbl_click
         layout.addWidget(self._lbl, 1)
 
         self._btn_next = _arrow_btn("<")
@@ -204,6 +207,9 @@ class _SingleDateCell(QFrame):
         layout.addWidget(self._btn_next)
 
         self._update_label()
+
+    def _on_lbl_click(self, event):
+        self._open_cal()
 
     def _update_label(self):
         today = QDate.currentDate()
@@ -256,8 +262,9 @@ class SingleDateWidget(QFrame):
         super().__init__(parent)
         self._date = QDate.currentDate()
         self.setFixedHeight(44)
+        self.setObjectName("single_date_widget")
         self.setStyleSheet(f"""
-            QFrame {{
+            #single_date_widget {{
                 background: {COLORS['bg_elevated']};
                 border: 1px solid {COLORS['border_light']};
                 border-radius: 8px;
@@ -282,7 +289,7 @@ class SingleDateWidget(QFrame):
             f"color:{COLORS['text_primary']}; font-size:13px;"
             f"font-weight:bold; background:transparent; border:none; padding:0 10px;"
         )
-        self._lbl.mousePressEvent = lambda e: self._open_cal()
+        self._lbl.mousePressEvent = self._on_lbl_click
         layout.addWidget(self._lbl, 1)
 
         self._btn_next = _arrow_btn("<")
@@ -290,6 +297,9 @@ class SingleDateWidget(QFrame):
         layout.addWidget(self._btn_next)
 
         self._update_label()
+
+    def _on_lbl_click(self, event):
+        self._open_cal()
 
     def _update_label(self):
         today = QDate.currentDate()

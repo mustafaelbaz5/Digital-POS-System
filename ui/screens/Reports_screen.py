@@ -55,14 +55,14 @@ class InventoryTab(QWidget):
         layout.addWidget(self.date_picker)
 
         # ── Mini stat cards
-        stats_group = CardGroup("📊  ملخص الفترة")
+        stats_group = CardGroup("📊  ملخص الفترة المالي", section_type="accent")
         self._cards_grid = QGridLayout()
         self._cards_grid.setSpacing(GAP_MD)
 
         self.card_cash = MiniStatCard("الخزينة النقدية", color=COLORS["green"])
-        self.card_machines = MiniStatCard("إجمالي الماكينات", color=COLORS["blue"])
-        self.card_wallets = MiniStatCard("إجمالي المحافظ", color=COLORS["purple"])
-        self.card_instapay = MiniStatCard("إجمالي انستا باي", color=COLORS["cyan"])
+        self.card_machines = MiniStatCard("إجمالي الماكينات", color=COLORS["machines"])
+        self.card_wallets = MiniStatCard("إجمالي المحافظ", color=COLORS["wallets"])
+        self.card_instapay = MiniStatCard("إجمالي انستا باي", color=COLORS["instapay"])
         self.card_debts = MiniStatCard("إجمالي الديون", color=COLORS["yellow"])
         self.card_profit = MiniStatCard("أرباح الفترة", color=COLORS["accent"])
         self.card_budget = MiniStatCard(
@@ -91,7 +91,7 @@ class InventoryTab(QWidget):
         layout.addWidget(self._make_match_bar())
 
         # ── Platforms table
-        platforms_group = CardGroup("🏢  تفاصيل المنصات")
+        platforms_group = CardGroup("🏢  تفاصيل أرصدة المنصات", section_type="accent")
 
         columns = [
             ("المنصة", 180),
@@ -102,6 +102,7 @@ class InventoryTab(QWidget):
             ("المتبقي", -1),
         ]
         self.platforms_table = DataTable(columns)
+        self.platforms_table.horizontalHeader().setStyleSheet(f"QHeaderView::section {{ background-color: {COLORS['accent']}; color: {COLORS['text_on_dark']}; }}")
         self.platforms_table.setVerticalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
@@ -227,22 +228,22 @@ class InventoryTab(QWidget):
             self._match_result.setText("  متطابق")
             self._match_result.setStyleSheet(
                 f"border-radius: 8px; padding: 8px 12px;"
-                f"background: {COLORS['green_bg']}; color: {COLORS['green']};"
-                f"font-size: 13px; font-weight: bold; border: 1px solid {COLORS['green_border']};"
+                f"background: {COLORS['settle']}; color: {COLORS['text_on_dark']};"
+                f"font-size: 13px; font-weight: bold;"
             )
         elif diff > 0:
             self._match_result.setText(f"📈 فائض\n{fmt_currency(diff)}")
             self._match_result.setStyleSheet(
                 f"border-radius: 8px; padding: 8px 12px;"
-                f"background: {COLORS['blue_bg']}; color: {COLORS['blue']};"
-                f"font-size: 13px; font-weight: bold; border: 1px solid {COLORS['blue_border']};"
+                f"background: {COLORS['save']}; color: {COLORS['text_on_dark']};"
+                f"font-size: 13px; font-weight: bold;"
             )
         else:
             self._match_result.setText(f"⚠️ عجز\n{fmt_currency(abs(diff))}")
             self._match_result.setStyleSheet(
                 f"border-radius: 8px; padding: 8px 12px;"
-                f"background: {COLORS['red_bg']}; color: {COLORS['red']};"
-                f"font-size: 13px; font-weight: bold; border: 1px solid {COLORS['red_border']};"
+                f"background: {COLORS['delete']}; color: {COLORS['text_on_dark']};"
+                f"font-size: 13px; font-weight: bold;"
             )
 
         self.platforms_table.clear_rows()

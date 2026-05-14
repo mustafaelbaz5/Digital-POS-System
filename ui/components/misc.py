@@ -75,7 +75,7 @@ class GroupLabel(QWidget):
 
         lbl = QLabel(text)
         lbl.setStyleSheet(
-            f"color:{color}; font-size:{FONT['xs']}; font-weight:bold; text-transform:uppercase;"
+            f"color:{color}; font-size:{FONT['xs']}; font-weight:bold;"
         )
         lbl.setAlignment(AlignLeft)
         layout.addWidget(lbl)

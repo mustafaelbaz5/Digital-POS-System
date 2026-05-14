@@ -61,7 +61,6 @@ class DataTable(QTableWidget):
                 border-bottom: 2px solid {COLORS['border']};
                 font-weight: bold;
                 font-size: 12px;
-                text-align: center;
             }}
         """)
 

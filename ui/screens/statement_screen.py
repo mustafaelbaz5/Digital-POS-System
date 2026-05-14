@@ -32,14 +32,7 @@ from ui.utils.formatters import fmt_currency
 class SummaryCard(QFrame):
     def __init__(self, label: str, value: str, color: str = None):
         super().__init__()
-        self.setObjectName("summary_card")
-        self.setStyleSheet(f"""
-            QFrame#summary_card {{
-                background: {COLORS['bg_elevated']};
-                border: 1px solid {COLORS['border']};
-                border-radius: {CARD_RADIUS};
-            }}
-        """)
+        self.setObjectName("card")
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 16, 20, 16)
@@ -47,14 +40,14 @@ class SummaryCard(QFrame):
 
         self.val_lbl = QLabel(value)
         self.val_lbl.setStyleSheet(
-            f"color: {color or COLORS['text_primary']}; font-size: {FONT['xl']}; font-weight: bold;"
+            f"color: {color or COLORS['text_primary']}; font-size: {FONT['xl']}; font-weight: bold; background: transparent; border: none;"
         )
         self.val_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.val_lbl)
 
         self.lbl = QLabel(label)
         self.lbl.setStyleSheet(
-            f"color: {COLORS['text_secondary']}; font-size: {FONT['sm']}; text-transform: uppercase; letter-spacing: 1px;"
+            f"color: {COLORS['text_secondary']}; font-size: {FONT['sm']}; background: transparent; border: none;"
         )
         self.lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.lbl)
@@ -62,23 +55,17 @@ class SummaryCard(QFrame):
     def set_featured(self, is_featured: bool):
         if is_featured:
             self.setStyleSheet(f"""
-                QFrame#summary_card {{
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {COLORS['bg_elevated']}, stop:1 {COLORS['bg_hover']});
-                    border: 2px solid {COLORS['accent']};
-                    border-radius: {CARD_RADIUS};
+                QFrame#card {{
+                    background: {COLORS['bg_card']};
+                    border: 2px solid {COLORS['clients']};
+                    border-radius: 15px;
                 }}
             """)
             self.val_lbl.setStyleSheet(
-                f"color: {COLORS['accent']}; font-size: 32px; font-weight: 900;"
+                f"color: {COLORS['clients']}; font-size: 32px; font-weight: 900; background: transparent; border: none;"
             )
         else:
-            self.setStyleSheet(f"""
-                QFrame#summary_card {{
-                    background: {COLORS['bg_elevated']};
-                    border: 1px solid {COLORS['border']};
-                    border-radius: {CARD_RADIUS};
-                }}
-            """)
+            self.setStyleSheet("")
     def set_value(self, value: str):
         self.val_lbl.setText(value)
 
@@ -96,6 +83,7 @@ class CustomerStatementDialog(QDialog):
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.setWindowTitle("كشف حساب العميل")
         self.setMinimumSize(1300, 850)
+        self.setObjectName("dialog")
 
         self._load_data()
         self._build_ui()
@@ -105,105 +93,91 @@ class CustomerStatementDialog(QDialog):
 
     def _build_ui(self):
         self.main_layout = QVBoxLayout(self)
-        self.main_layout.setContentsMargins(24, 24, 24, 24)
+        self.main_layout.setContentsMargins(0, 0, 0, 24)
         self.main_layout.setSpacing(GAP_LG)
 
-        # 1. Header (Identity)
+        # 1. Header (Identity) - Themed as Section Header
         self.main_layout.addLayout(self._make_header())
 
+        # Body container for content with margins
+        self.body_container = QVBoxLayout()
+        self.body_container.setContentsMargins(24, 0, 24, 0)
+        self.body_container.setSpacing(GAP_LG)
+        self.main_layout.addLayout(self.body_container)
+
         # 2. Master Section (Summary Cards)
-        self.main_layout.addLayout(self._make_master_cards())
+        self.body_container.addLayout(self._make_master_cards())
 
         # 3. Detail Section (Table)
-        self.main_layout.addLayout(self._make_detail_table())
+        self.body_container.addLayout(self._make_detail_table())
 
         # Initial fill
         self._fill_table()
 
-    def _make_header(self) -> QHBoxLayout:
-        layout = QHBoxLayout()
+    def _make_header(self) -> QVBoxLayout:
+        # Wrapper for colored header
+        header_wrap = QVBoxLayout()
+        
+        header_frame = QFrame()
+        header_frame.setFixedHeight(80)
+        header_frame.setStyleSheet(f"""
+            background: {COLORS['clients']};
+            border-top-left-radius: 14px;
+            border-top-right-radius: 14px;
+        """)
+        hl = QHBoxLayout(header_frame)
+        hl.setContentsMargins(24, 0, 24, 0)
 
         c = self._data["customer"]
         info_col = QVBoxLayout()
-        info_col.setSpacing(4)
+        info_col.setSpacing(2)
+        info_col.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         name_lbl = QLabel(c.get("name", "—"))
         name_lbl.setStyleSheet(
-            f"color: {COLORS['text_primary']}; font-size: {FONT['2xl']}; font-weight: bold;"
+            f"color: {COLORS['text_on_dark']}; font-size: {FONT['2xl']}; font-weight: bold; background: transparent;"
         )
         info_col.addWidget(name_lbl)
 
         sub_info = QLabel(
-            f"📞 {c.get('phone', '—')}  |  👥 {c.get('group_name', 'بدون مجموعة')}"
+            f"📞 {c.get('phone', '—')}  |  📂 {c.get('group_name', 'بدون مجموعة')}"
         )
         sub_info.setStyleSheet(
-            f"color: {COLORS['text_secondary']}; font-size: {FONT['md']};"
+            f"color: rgba(255,255,255,0.8); font-size: {FONT['md']}; background: transparent;"
         )
         info_col.addWidget(sub_info)
 
-        layout.addLayout(info_col)
-        layout.addStretch()
+        hl.addLayout(info_col)
+        hl.addStretch()
 
         self.settle_btn = QPushButton("💚 تسديد سريع")
         self.settle_btn.setObjectName("btn_success")
         self.settle_btn.setFixedWidth(150)
         self.settle_btn.clicked.connect(self._quick_settle)
-        layout.addWidget(self.settle_btn)
+        hl.addWidget(self.settle_btn)
 
         # Show settle button only if there is debt
         t = self._data.get("totals", {})
         self.settle_btn.setVisible((t.get("total_pending") or 0) > 0)
 
-        print_btn = QPushButton("🖨️ طباعة التقرير")
-        print_btn.setObjectName("btn_secondary")
-        print_btn.setFixedWidth(150)
+        print_btn = QPushButton("🖨️ طباعة")
+        print_btn.setObjectName("btn_primary")
+        print_btn.setFixedWidth(120)
         print_btn.clicked.connect(self._print_report)
-        layout.addWidget(print_btn)
+        hl.addWidget(print_btn)
 
-        close_btn = QPushButton("إغلاق")
-        close_btn.setObjectName("btn_secondary")
-        close_btn.setFixedWidth(100)
+        close_btn = QPushButton("✕")
+        close_btn.setFixedSize(36, 36)
+        close_btn.setStyleSheet(f"""
+            background: rgba(255,255,255,0.1); color: {COLORS['text_on_dark']};
+            border-radius: 18px; font-weight: bold; font-size: 16px;
+        """)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.clicked.connect(self.accept)
-        layout.addWidget(close_btn)
+        hl.addWidget(close_btn)
 
-        return layout
-
-    def _quick_settle(self):
-        from ui.screens.settlement_dialog import QuickSettleDialog
-
-        c = self._data["customer"]
-        if QuickSettleDialog(c, self).exec():
-            # Refresh data and UI
-            self._load_data()
-
-            # Update Header visibility
-            t = self._data.get("totals", {})
-            self.settle_btn.setVisible((t.get("total_pending") or 0) > 0)
-
-            # Update Master Cards
-            net = (t.get("total_pending") or 0) - (t.get("total_due") or 0)
-            self.card_owed.set_value(fmt_currency(t.get("total_pending", 0)))
-            self.card_owned.set_value(fmt_currency(t.get("total_due", 0)))
-            self.card_net.set_value(fmt_currency(net))
-            self.card_count.set_value(str(t.get("total_count", 0)))
-
-            # Refresh Table
-            self._fill_table()
-
-            # Optional: Signal parent to refresh if needed (but dialog is usually enough)
-            if hasattr(self.parent(), "load_data"):
-                self.parent().load_data()
-
-    def _print_report(self):
-        try:
-            from ui.utils.pdf_generator import PDFGenerator
-            gen = PDFGenerator(self._data)
-            path = gen.generate()
-            os.startfile(path)
-        except ImportError as e:
-            QMessageBox.warning(self, "مكتبة مفقودة", str(e))
-        except Exception as e:
-            QMessageBox.critical(self, "خطأ في توليد PDF", str(e))
+        header_wrap.addWidget(header_frame)
+        return header_wrap
 
     def _make_master_cards(self) -> QHBoxLayout:
         layout = QHBoxLayout()
@@ -221,12 +195,12 @@ class CustomerStatementDialog(QDialog):
         self.card_net = SummaryCard(
             "الصافي النهائي (المطلوب)",
             fmt_currency(net),
-            COLORS["accent"] if net >= 0 else COLORS["red"],
+            COLORS['clients'] if net >= 0 else COLORS["red"],
         )
         self.card_net.set_featured(True)
         
         self.card_count = SummaryCard(
-            "عدد العمليات", str(t.get("total_count", 0)), COLORS["blue"]
+            "عدد العمليات", str(t.get("total_count", 0)), COLORS["accent"]
         )
 
         layout.addWidget(self.card_owed)
@@ -241,7 +215,7 @@ class CustomerStatementDialog(QDialog):
         layout.setSpacing(GAP_MD)
 
         title_row = QHBoxLayout()
-        title = QLabel("سجل المعاملات التفصيلي")
+        title = QLabel("📋 سجل المعاملات التفصيلي")
         title.setStyleSheet(
             f"color: {COLORS['text_primary']}; font-size: {FONT['lg']}; font-weight: bold;"
         )
@@ -270,6 +244,8 @@ class CustomerStatementDialog(QDialog):
             ("الإجراءات", 100),
         ]
         self.table = DataTable(cols)
+        # Apply section color to table header
+        self.table.horizontalHeader().setStyleSheet(f"QHeaderView::section {{ background-color: {COLORS['clients']}; color: {COLORS['text_on_dark']}; }}")
         self.table.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )

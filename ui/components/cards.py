@@ -13,8 +13,16 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ui.components.misc import SectionTitle, make_divider
-from ui.styles.theme import CARD_RADIUS, COLORS, FONT, GAP_MD, GAP_SM, GAP_XS, MARGIN_CARD
+from ui.styles.theme import (
+    CARD_RADIUS,
+    COLORS,
+    FONT,
+    GAP_MD,
+    GAP_SM,
+    GAP_XS,
+    MARGIN_CARD,
+)
+from ui.styles import theme
 
 AlignLeft = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
 
@@ -25,31 +33,48 @@ AlignLeft = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
 
 
 class CardGroup(QFrame):
-    """حاوية تجمع عناصر داخل بطاقة منسقة مع عنوان اختياري."""
+    """حاوية تجمع عناصر داخل بطاقة منسقة مع عنوان ملون."""
 
-    def __init__(self, title: str = "", parent=None):
+    def __init__(self, title: str = "", section_type: str = "accent", parent=None):
         super().__init__(parent)
         self.setObjectName("card")
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
 
         self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(MARGIN_CARD, MARGIN_CARD, MARGIN_CARD, MARGIN_CARD)
+        self._layout.setContentsMargins(0, 0, 0, MARGIN_CARD)
         self._layout.setSpacing(GAP_MD)
 
         if title:
-            header = SectionTitle(title)
-            self._layout.addWidget(header)
-            self._layout.addWidget(make_divider())
-            self._layout.addSpacing(GAP_XS)
+            # Create a colored header
+            header_color = theme.get_section_color(section_type)
+            self.header = QFrame()
+            self.header.setObjectName("card_header")
+            self.header.setStyleSheet(f"background: {header_color};")
+            
+            hl = QHBoxLayout(self.header)
+            hl.setContentsMargins(20, 12, 20, 12)
+            
+            self.title_lbl = QLabel(title)
+            self.title_lbl.setObjectName("card_header_title")
+            hl.addWidget(self.title_lbl)
+            hl.addStretch()
+            
+            self._layout.addWidget(self.header)
+            
+        # Body container for content
+        self.body_layout = QVBoxLayout()
+        self.body_layout.setContentsMargins(20, 10, 20, 10)
+        self.body_layout.setSpacing(GAP_MD)
+        self._layout.addLayout(self.body_layout)
 
     def add_widget(self, widget: QWidget):
-        self._layout.addWidget(widget)
+        self.body_layout.addWidget(widget)
 
     def add_layout(self, layout):
-        self._layout.addLayout(layout)
+        self.body_layout.addLayout(layout)
 
     def layout(self) -> QVBoxLayout:
-        return self._layout
+        return self.body_layout
 
 
 # ══════════════════════════════════════════
@@ -139,26 +164,27 @@ class MiniStatCard(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 14, 18, 14)
         layout.setSpacing(6)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self._val_lbl = QLabel(value)
+        self._val_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._val_lbl.setStyleSheet(
+            f"color: {color or COLORS['text_primary']}; font-size: 20px; font-weight: 900; background: transparent; border:none;"
+        )
+        layout.addWidget(self._val_lbl)
 
         title_lbl = QLabel(title)
         title_lbl.setStyleSheet(
-            f"color: {COLORS['text_secondary']}; font-size: {FONT['xs']}; font-weight: bold;"
+            f"color: {COLORS['text_secondary']}; font-size: {FONT['xs']}; font-weight: bold; background: transparent; border:none;"
         )
-        title_lbl.setAlignment(AlignLeft)
+        title_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title_lbl)
-
-        self._val_lbl = QLabel(value)
-        self._val_lbl.setAlignment(AlignLeft)
-        self._val_lbl.setStyleSheet(
-            f"color: {color or COLORS['text_primary']}; font-size: 20px; font-weight: bold;"
-        )
-        layout.addWidget(self._val_lbl)
 
     def set_value(self, value: str, color: str = None):
         self._val_lbl.setText(value)
         if color:
             self._val_lbl.setStyleSheet(
-                f"color: {color}; font-size: 20px; font-weight: bold;"
+                f"color: {color}; font-size: 20px; font-weight: 900; background: transparent; border:none;"
             )
 
 
@@ -200,7 +226,7 @@ class PlatformCard(QWidget):
 
         name = QLabel(p["name"])
         name.setStyleSheet(
-            f"color:{COLORS['text_primary']}; font-size:{FONT['md']}; font-weight:bold;"
+            f"color:{COLORS['text_primary']}; font-size:{FONT['md']}; font-weight:bold; background:transparent; border:none;"
         )
         name.setAlignment(AlignLeft)
         hrow.addWidget(name)
@@ -209,7 +235,7 @@ class PlatformCard(QWidget):
         badge = QLabel(f" {type_text} ")
         badge.setStyleSheet(
             f"color:{type_color}; background:{type_color}20;"
-            f"border-radius:5px; font-size:{FONT['xs']}; font-weight:bold; padding:2px 6px;"
+            f"border-radius:5px; font-size:{FONT['xs']}; font-weight:bold; padding:2px 6px; border:none;"
         )
         hrow.addWidget(badge)
         layout.addLayout(hrow)
@@ -219,7 +245,7 @@ class PlatformCard(QWidget):
         bal = p.get("balance", 0)
         bal_lbl = QLabel(f"{bal:,.0f} ج")
         bal_lbl.setStyleSheet(
-            f"color:{COLORS['accent']}; font-size:{FONT['xl']}; font-weight:bold;"
+            f"color:{COLORS['accent']}; font-size:{FONT['xl']}; font-weight:bold; background:transparent; border:none;"
         )
         bal_lbl.setAlignment(AlignLeft)
         layout.addWidget(bal_lbl)

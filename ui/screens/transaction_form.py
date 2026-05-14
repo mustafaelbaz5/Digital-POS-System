@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
 
 import database as db
 from ui.components.widgets import BaseDialog, show_toast
-from ui.styles.theme import COLORS, FONT
+from ui.styles.theme import COLORS, FONT, get_section_color
 from ui.utils.formatters import fmt_currency
 
 
@@ -888,10 +888,24 @@ class TransactionDialog(BaseDialog):
         if not p:
             return
         self.platform = p
+        
+        # Get section color based on platform type
+        section_color = get_section_color(p["type"])
 
         header_frame = self.findChild(QFrame, "dialog_header")
         if not header_frame:
             return
+            
+        # Apply section color to header
+        header_frame.setStyleSheet(f"""
+            #dialog_header {{
+                background: {section_color};
+                border-bottom: none;
+                border-top-left-radius: 14px;
+                border-top-right-radius: 14px;
+            }}
+        """)
+        
         hl = header_frame.layout()
 
         # Clear existing
@@ -906,7 +920,7 @@ class TransactionDialog(BaseDialog):
         name_lbl = QLabel(p["name"])
         name_lbl.setObjectName("header_name")
         name_lbl.setStyleSheet(
-            f"color:{COLORS['text_primary']}; font-size:18px; font-weight:bold;"
+            f"color:{COLORS['text_on_dark']}; font-size:18px; font-weight:bold;"
         )
         hl.addWidget(name_lbl)
         hl.addSpacing(20)
@@ -915,8 +929,8 @@ class TransactionDialog(BaseDialog):
         bal_badge = QLabel(f" رصيد: {fmt_currency(p.get('balance',0))} ")
         bal_badge.setObjectName("header_bal")
         bal_badge.setStyleSheet(f"""
-            background: {COLORS['green_bg']}; color: {COLORS['green']}; 
-            border: 1px solid {COLORS['green']}; border-radius: 12px;
+            background: rgba(255, 255, 255, 0.15); color: {COLORS['text_on_dark']}; 
+            border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 12px;
             padding: 2px 12px; font-weight: bold; font-size: 13px;
         """)
         hl.addWidget(bal_badge)
@@ -929,20 +943,12 @@ class TransactionDialog(BaseDialog):
             total_lim = max(cap["total_limit"], 1)
             pct_used  = int(cap["used"] / total_lim * 100)
             pct_free  = 100 - pct_used
-            lim_color = (
-                COLORS["red"]    if pct_used > 90
-                else COLORS["yellow"] if pct_used > 70 else COLORS["blue"]
-            )
-            lim_bg = (
-                COLORS["red_bg"]    if pct_used > 90
-                else COLORS["yellow_bg"] if pct_used > 70 else COLORS["blue_bg"]
-            )
 
             lim_badge = QLabel(f" السعة المتبقية للاستقبال: {fmt_currency(rem)} ({pct_free}%) ")
             lim_badge.setObjectName("header_limit")
             lim_badge.setStyleSheet(f"""
-                background: {lim_bg}; color: {lim_color};
-                border: 1px solid {lim_color}; border-radius: 12px;
+                background: rgba(255, 255, 255, 0.1); color: {COLORS['text_on_dark']};
+                border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px;
                 padding: 2px 12px; font-weight: bold; font-size: 13px;
             """)
             hl.addWidget(lim_badge)
@@ -951,20 +957,22 @@ class TransactionDialog(BaseDialog):
 
         if pulse:
             name_lbl.setStyleSheet(
-                f"color:{COLORS['green']}; font-size:18px; font-weight:bold;"
+                f"color:{COLORS['ledger']}; font-size:18px; font-weight:bold;"
             )
             QTimer.singleShot(
                 600,
                 lambda: name_lbl.setStyleSheet(
-                    f"color:{COLORS['text_primary']}; font-size:18px; font-weight:bold;"
+                    f"color:{COLORS['text_on_dark']}; font-size:18px; font-weight:bold;"
                 ),
             )
 
-        # Redundant Close Button logic removed to fix double 'X' glitch.
-        # Since we clear the layout, we re-add it only once.
         close_btn = QPushButton("✕")
         close_btn.setObjectName("dialog_close_btn")
         close_btn.setFixedSize(30, 30)
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setStyleSheet(f"""
+            background: rgba(255, 255, 255, 0.1); color: {COLORS['text_on_dark']};
+            border-radius: 15px;
+        """)
         close_btn.clicked.connect(self.reject)
         hl.addWidget(close_btn)
