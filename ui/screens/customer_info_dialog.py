@@ -43,6 +43,13 @@ class CustomerInfoDialog(BaseDialog):
         pl.setContentsMargins(20, 16, 20, 16)
         pl.setSpacing(12)
 
+        profile_title = QLabel("بيانات العميل")
+        profile_title.setStyleSheet(
+            f"color:{COLORS['clients']}; font-size:{FONT['lg']}; font-weight:bold; "
+            "background:transparent; border:none;"
+        )
+        pl.addWidget(profile_title)
+
         def _info_row(label: str, value: str, val_color: str = None, bold: bool = False):
             row = QHBoxLayout()
             lbl = QLabel(label)
@@ -97,19 +104,27 @@ class CustomerInfoDialog(BaseDialog):
         self.body.addSpacing(10)
 
         # ══ Section B: Shipping Codes ════════════════════════════════════
+        codes_card = QFrame()
+        codes_card.setObjectName("card")
+        codes_layout = QVBoxLayout(codes_card)
+        codes_layout.setContentsMargins(20, 16, 20, 16)
+        codes_layout.setSpacing(GAP_MD)
+
         sec_hdr = QHBoxLayout()
         sec_title = QLabel("🔑  أكواد الشحن الخاصة بالعميل")
         sec_title.setStyleSheet(
-            f"font-weight:bold; color:{COLORS['text_primary']}; font-size:{FONT['md']};"
+            f"font-weight:bold; color:{COLORS['clients']}; font-size:{FONT['lg']};"
+            "background:transparent; border:none;"
         )
         sec_hdr.addWidget(sec_title)
         sec_hdr.addStretch()
-        self.body.addLayout(sec_hdr)
+        codes_layout.addLayout(sec_hdr)
 
         # Scrollable codes list
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setMinimumHeight(200)
+        scroll.setMaximumHeight(260)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setStyleSheet("QScrollArea { border: 1px solid " + COLORS['border'] + "; border-radius: 8px; background: transparent; }")
 
@@ -120,7 +135,7 @@ class CustomerInfoDialog(BaseDialog):
         self._codes_vbox.setSpacing(8)
 
         scroll.setWidget(self._codes_widget)
-        self.body.addWidget(scroll)
+        codes_layout.addWidget(scroll)
 
         # ── Add-code row
         add_row = QHBoxLayout()
@@ -139,7 +154,8 @@ class CustomerInfoDialog(BaseDialog):
         add_btn.setMinimumWidth(140)
         add_btn.clicked.connect(self._add_code)
         add_row.addWidget(add_btn)
-        self.body.addLayout(add_row)
+        codes_layout.addLayout(add_row)
+        self.body.addWidget(codes_card)
 
         # Footer
         self.add_stretch()
@@ -191,7 +207,7 @@ class CustomerInfoDialog(BaseDialog):
         hl.addWidget(code_lbl, 1)
 
         edit_btn = QPushButton("✏️")
-        edit_btn.setFixedSize(32, 32)
+        edit_btn.setFixedSize(28, 28)
         edit_btn.setToolTip("تعديل")
         edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         edit_btn.setStyleSheet(
@@ -202,12 +218,13 @@ class CustomerInfoDialog(BaseDialog):
         hl.addWidget(edit_btn)
 
         del_btn = QPushButton("🗑️")
-        del_btn.setFixedSize(32, 32)
+        del_btn.setIconSize(del_btn.sizeHint())
+        del_btn.setFixedSize(24, 24)
         del_btn.setToolTip("حذف")
         del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         del_btn.setStyleSheet(
-            f"background:{COLORS['red_bg']}; color:{COLORS['red']}; "
-            f"border:1px solid {COLORS['red_border']}; border-radius:6px; font-size:14px;"
+            f"background:{COLORS['delete']}; color:{COLORS['text_on_dark']}; "
+            "border:1px solid #8E0000; border-radius:6px; font-size:13px; padding:0;"
         )
         del_btn.clicked.connect(lambda _, c=code_dict: self._delete_code(c))
         hl.addWidget(del_btn)

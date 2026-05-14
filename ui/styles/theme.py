@@ -22,6 +22,15 @@ DARK_COLORS = {
     "text_primary": "#E6EDF3",
     "text_secondary": "#8B949E",
     "text_muted": "#484F58",
+    "text_on_dark": "#FFFFFF",
+    "save": "#1565C0",
+    "settle": "#2E7D32",
+    "delete": "#C62828",
+    "ledger": "#FFB020",
+    "machines": "#3F51B5",
+    "wallets": "#2E7D32",
+    "instapay": "#6A1B9A",
+    "clients": "#00695C",
     # SEMANTIC
     "green": "#10B981",
     "green_bg": "#064E3B20",
@@ -65,13 +74,13 @@ DARK_COLORS = {
 
 LIGHT_COLORS = {
     # SURFACES
-    "bg_dark": "#F4F7F6",           # Core Background (Ultra Light Grey)
+    "bg_dark": "#F0F2F5",           # Core Background (Light Grey)
     "bg_card": "#FFFFFF",            # Body of the card
     "bg_elevated": "#FFFFFF",        # White body
     "bg_input": "#FFFFFF",           # Input background
     "bg_hover": "#F0F2F5",           # Subtle hover
     "bg_button": "#F0F2F5",          # Secondary button background
-    "bg_alt_row": "#F9FAFB",         # Default alternate row
+    "bg_alt_row": "#F8F9FA",         # Default alternate row
     # BORDERS
     "border": "#E0E4E7",
     "border_light": "#F1F3F4",
@@ -140,6 +149,15 @@ def get_section_color(stype: str) -> str:
 def get_current_theme() -> str:
     return _current_theme
 
+def text_for_background(hex_color: str) -> str:
+    """Return high-contrast text color for a solid hex background."""
+    value = hex_color.lstrip("#")
+    if len(value) != 6:
+        return COLORS.get("text_primary", "#212121")
+    r, g, b = (int(value[i:i + 2], 16) for i in (0, 2, 4))
+    luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return "#FFFFFF" if luminance < 0.55 else "#212121"
+
 def set_theme(mode: str) -> None:
     """Switch theme. Updates COLORS dict in-place."""
     global _current_theme
@@ -176,7 +194,7 @@ ROW_HEIGHT = 60
 BTN_HEIGHT = 42
 INPUT_HEIGHT = 44
 BORDER_RADIUS = "10px"
-CARD_RADIUS = "14px"
+CARD_RADIUS = "15px"
 
 # Standard Spacing (Gaps)
 GAP_XS = 4
@@ -207,18 +225,27 @@ QMainWindow, QWidget, QDialog {{
     font-size: {FONT['md']};
 }}
 
+QWidget {{
+    direction: rtl;
+}}
+
 /* ── Card Containers ── */
 #card {{
     background: {C['bg_card']};
     border: 1px solid {C['border']};
     border-radius: 15px;
-    /* Qt doesn't support box-shadow; use a slightly deeper border for depth */
 }}
 
 #stat_card {{
     background: {C['bg_card']};
     border: 1px solid {C['border']};
-    border-radius: 12px;
+    border-radius: 15px;
+}}
+
+#card_highlight {{
+    background: {C['bg_card']};
+    border: 1px solid {C['border']};
+    border-radius: 15px;
 }}
 
 /* Section Header styling within CardGroup */
@@ -264,6 +291,11 @@ QPushButton {{
     color: #000000;
 }}
 
+#btn_statement {{
+    background: {C['clients']};
+    color: {C['text_on_dark']};
+}}
+
 #btn_ghost {{
     background: {C['bg_button']};
     color: {C['text_primary']};
@@ -275,6 +307,7 @@ QTableWidget {{
     background: {C['bg_card']};
     gridline-color: transparent;
     border: none;
+    alternate-background-color: {C['bg_alt_row']};
 }}
 QHeaderView::section {{
     background: {C['accent']};
@@ -289,7 +322,7 @@ QTableWidget::item {{
 }}
 
 /* ── Inputs (Thick Border & Focus) ── */
-QLineEdit, QDoubleSpinBox, QComboBox {{
+QLineEdit, QTextEdit, QPlainTextEdit, QDoubleSpinBox, QSpinBox, QComboBox, QDateEdit {{
     background: {C['bg_input']};
     color: {C['text_primary']};
     border: 2px solid {C['border']};
@@ -297,8 +330,52 @@ QLineEdit, QDoubleSpinBox, QComboBox {{
     padding: 8px 14px;
     min-height: 44px;
 }}
-QLineEdit:focus, QDoubleSpinBox:focus, QComboBox:focus {{
+QTextEdit, QPlainTextEdit {{
+    min-height: 80px;
+}}
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus, QComboBox:focus, QDateEdit:focus {{
     border-color: {C['accent']};
+}}
+
+QTabWidget::pane {{
+    border: none;
+    background: transparent;
+    margin-top: 12px;
+}}
+QTabBar::tab {{
+    background: {C['bg_button']};
+    color: {C['text_secondary']};
+    border: 1px solid {C['border']};
+    border-radius: 10px;
+    padding: 10px 18px;
+    margin-left: 6px;
+    font-weight: bold;
+}}
+QTabBar::tab:selected {{
+    background: {C['accent']};
+    color: {C['text_on_dark']};
+    border-color: {C['accent']};
+}}
+
+#dialog_header {{
+    background: {C['accent']};
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+}}
+#dialog_title {{
+    color: {C['text_on_dark']};
+    font-size: {FONT['lg']};
+    font-weight: bold;
+}}
+#dialog_close_btn {{
+    background: rgba(255, 255, 255, 0.14);
+    color: {C['text_on_dark']};
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 16px;
+    padding: 0;
+}}
+#dialog_close_btn:hover {{
+    background: rgba(255, 255, 255, 0.24);
 }}
 
 /* Scrollbars & Sidebar (kept minimal) */

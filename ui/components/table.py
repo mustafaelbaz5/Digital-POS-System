@@ -22,12 +22,12 @@ _HEADER_BASE = """
     QHeaderView::section {{
         background-color: {bg};
         color: {fg};
-        padding: 10px 14px;
+        padding: 12px 14px;
         border: none;
         border-bottom: 2px solid {border};
         font-weight: bold;
         font-size: 13px;
-        letter-spacing: 0.3px;
+        letter-spacing: 0;
     }}
 """
 
@@ -44,19 +44,20 @@ class DataTable(QTableWidget):
         self.setColumnCount(len(columns))
         self.setHorizontalHeaderLabels([c[0] for c in columns])
 
+        header = self.horizontalHeader()
+        header.setMinimumSectionSize(72)
         for i, col in enumerate(columns):
+            label = col[0]
             w = col[1] if len(col) > 1 else -1
-            if w == -1:
-                self.horizontalHeader().setSectionResizeMode(
-                    i, QHeaderView.ResizeMode.Stretch
-                )
+            if "إجراءات" in label:
+                self.setColumnWidth(i, max(w, 140))
+                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Fixed)
             else:
-                self.setColumnWidth(i, w)
-                self.horizontalHeader().setSectionResizeMode(
-                    i, QHeaderView.ResizeMode.Interactive
-                )
+                if w > 0:
+                    self.setColumnWidth(i, w)
+                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
 
-        self.horizontalHeader().setStretchLastSection(True)
+        self.horizontalHeader().setStretchLastSection(False)
         self.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.verticalHeader().setVisible(False)
@@ -142,15 +143,15 @@ class DataTable(QTableWidget):
         layout = QHBoxLayout(wrapper)
         layout.setContentsMargins(6, 0, 6, 0)
         layout.setSpacing(spacing)
-        layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         btns = []
         for data in buttons_data:
             btn = QPushButton(data.get("text", ""))
             btn.setObjectName(f"btn_{data.get('role', 'ghost')}")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setMinimumHeight(28)
-            btn.setMinimumWidth(80)
+            btn.setMinimumHeight(30)
+            btn.setMinimumWidth(74)
             btn.setSizePolicy(
                 QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
             )

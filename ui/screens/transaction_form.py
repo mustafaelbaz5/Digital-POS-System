@@ -812,8 +812,11 @@ class TransactionDialog(BaseDialog):
         super().__init__(title, parent)
 
         screen = QGuiApplication.primaryScreen().availableGeometry()
-        w = int(screen.width() * 0.7)
-        h = int(screen.height() * 0.65)
+        w = min(760, int(screen.width() * 0.75))
+        h = min(680, int(screen.height() * 0.75))
+        w = max(720, w)
+        h = max(560, h)
+        self.setMinimumSize(720, 560)
         self.resize(w, h)
 
         x = (screen.width() - w) // 2

@@ -3,9 +3,11 @@ ui/components/base.py — ScreenShell & BaseDialog
 """
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QDialog,
     QFrame,
+    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -27,7 +29,16 @@ class BaseDialog(QDialog):
         super().__init__(parent)
         self.setLayoutDirection(RTL)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.FramelessWindowHint)
+        self.setMinimumWidth(700)
         self._build(title)
+        self._apply_shadow()
+
+    def _apply_shadow(self):
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(32)
+        shadow.setOffset(0, 10)
+        shadow.setColor(QColor(18, 38, 63, 38))
+        self.setGraphicsEffect(shadow)
 
     def _build(self, title: str):
         self.root = QVBoxLayout(self)
@@ -71,6 +82,7 @@ class BaseDialog(QDialog):
     def add_button(self, text: str, callback, role="primary") -> QPushButton:
         btn = QPushButton(text)
         btn.setObjectName(f"btn_{role}")
+        btn.setMinimumHeight(42)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.clicked.connect(callback)
         self.footer.addWidget(btn)

@@ -37,7 +37,7 @@ class QuickSettleDialog(BaseDialog):
     def __init__(self, customer: dict, parent=None):
         super().__init__("💚  تسديد سريع", parent)
         self.customer = customer
-        self.setMinimumWidth(460)
+        self.setMinimumWidth(700)
         self._pending_total = self._load_pending_total()
         self._build_ui()
 

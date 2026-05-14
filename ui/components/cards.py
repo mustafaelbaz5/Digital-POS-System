@@ -3,8 +3,10 @@ ui/components/cards.py — Card components: CardGroup, StatCard, MiniStatCard, P
 """
 
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QFrame,
+    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -21,10 +23,43 @@ from ui.styles.theme import (
     GAP_SM,
     GAP_XS,
     MARGIN_CARD,
+    text_for_background,
 )
 from ui.styles import theme
 
 AlignLeft = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+
+
+def apply_card_shadow(widget: QWidget) -> None:
+    """Apply the shared soft elevation used by light-mode cards."""
+    shadow = QGraphicsDropShadowEffect(widget)
+    shadow.setBlurRadius(24)
+    shadow.setOffset(0, 6)
+    shadow.setColor(QColor(18, 38, 63, 30))
+    widget.setGraphicsEffect(shadow)
+
+
+class StyledCard(QFrame):
+    """Reusable white card shell with the global 15px radius and soft shadow."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("card")
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        apply_card_shadow(self)
+
+
+class StyledButton(QPushButton):
+    """Reusable themed button with optional semantic background color."""
+
+    def __init__(self, text: str = "", color: str = None, parent=None):
+        super().__init__(text, parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        if color:
+            self.setStyleSheet(
+                f"background:{color}; color:{text_for_background(color)};"
+                "border:none; border-radius:8px; padding:8px 16px; font-weight:bold;"
+            )
 
 
 # ══════════════════════════════════════════
@@ -39,9 +74,10 @@ class CardGroup(QFrame):
         super().__init__(parent)
         self.setObjectName("card")
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        apply_card_shadow(self)
 
         self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(0, 0, 0, MARGIN_CARD)
+        self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(GAP_MD)
 
         if title:
@@ -63,7 +99,7 @@ class CardGroup(QFrame):
             
         # Body container for content
         self.body_layout = QVBoxLayout()
-        self.body_layout.setContentsMargins(20, 10, 20, 10)
+        self.body_layout.setContentsMargins(MARGIN_CARD, 16, MARGIN_CARD, MARGIN_CARD)
         self.body_layout.setSpacing(GAP_MD)
         self._layout.addLayout(self.body_layout)
 
@@ -99,6 +135,7 @@ class StatCard(QWidget):
 
     def _build(self, title: str, value: str, icon: str):
         self.setObjectName("stat_card")
+        apply_card_shadow(self)
         self.setMinimumHeight(130)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
@@ -158,6 +195,7 @@ class MiniStatCard(QFrame):
     def __init__(self, title: str, value: str = "—", color: str = None, parent=None):
         super().__init__(parent)
         self.setObjectName("card")
+        apply_card_shadow(self)
         self.setMinimumWidth(160)
         self.setMinimumHeight(100)
 
@@ -205,6 +243,7 @@ class PlatformCard(QWidget):
 
     def _build(self, p: dict):
         self.setObjectName("card")
+        apply_card_shadow(self)
         self.setFixedWidth(240)
         self.setMinimumHeight(170)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)

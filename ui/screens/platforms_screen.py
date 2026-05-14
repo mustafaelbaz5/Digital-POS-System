@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 import database as db
-from ui.components.widgets import BaseDialog, DataTable, SingleDateWidget, ScreenShell
+from ui.components.widgets import BaseDialog, CardGroup, DataTable, SingleDateWidget, ScreenShell
 from ui.styles.theme import COLORS, GAP_LG, GAP_MD, GAP_SM
 from ui.utils.formatters import fmt_currency
 
@@ -400,6 +400,14 @@ class PlatformListTab(QWidget):
         layout.setContentsMargins(0, GAP_MD, 0, 0)
         layout.setSpacing(GAP_MD)
 
+        title, section = {
+            "machine": ("الماكينات", "machine"),
+            "wallet": ("المحافظ", "wallet"),
+            "instapay": ("انستا باي", "instapay"),
+        }.get(self.p_type, ("المنصات", "accent"))
+        self.card = CardGroup(title, section_type=section)
+        layout.addWidget(self.card)
+
         # ── Sort toolbar
         sb = QHBoxLayout()
         sb.setSpacing(GAP_SM)
@@ -425,7 +433,7 @@ class PlatformListTab(QWidget):
                 sb.addWidget(btn)
 
         sb.addStretch()
-        layout.addLayout(sb)
+        self.card.add_layout(sb)
         self._apply_sort_styles()
 
         # ── Table
@@ -443,7 +451,7 @@ class PlatformListTab(QWidget):
         self.table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        layout.addWidget(self.table)
+        self.card.add_widget(self.table)
 
     def _set_sort(self, mode: str):
         self._sort_mode = mode
@@ -502,10 +510,15 @@ class PlatformListTab(QWidget):
             self.table.set_cell(row, col, str(p.get("transaction_count", 0)))
             col += 1
 
-            self.table.add_action_buttons(row, col, [
+            buttons = self.table.add_action_buttons(row, col, [
                 {"text": "اضافة  عملية", "callback": lambda _, pid=p["id"]: self._open_transaction_form(pid), "role": "primary"},
                 {"text": " المزيد", "callback": lambda _, pid=p["id"]: self._open_more(pid), "role": "statement"},
             ])
+            section_color = COLORS["machines"] if self.p_type == "machine" else COLORS["wallets"] if self.p_type == "wallet" else COLORS["instapay"]
+            buttons[0].setStyleSheet(
+                f"background:{section_color}; color:{COLORS['text_on_dark']};"
+                "border:none; border-radius:8px; padding:6px 10px; font-weight:bold;"
+            )
 
         self.table.setSortingEnabled(True)
         self.table.setMinimumHeight(
@@ -625,7 +638,7 @@ class AddPlatformDialog(BaseDialog):
 
     def __init__(self, parent=None):
         super().__init__("➕ إضافة منصة جديدة", parent)
-        self.setMinimumWidth(440)
+        self.setMinimumWidth(700)
         self._build_form()
 
     def _build_form(self):

@@ -989,7 +989,7 @@ def settle_customer_debt(customer_id: int, payment_amount: float) -> dict:
                 WHERE customer_id = ?
                   AND operation_type = 'outbound'
                   AND payment_status = 'pending'
-                ORDER BY created_at ASC
+                ORDER BY datetime(created_at) ASC, id ASC
             """, (customer_id,)).fetchall()
 
             if not pending:

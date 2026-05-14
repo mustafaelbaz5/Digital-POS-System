@@ -2,16 +2,14 @@
 dashboard.py — لوحة التحكم الرئيسية (Redesigned v3)
 """
 
-from datetime import date, datetime
+from datetime import datetime
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QApplication,
     QFrame,
     QGridLayout,
     QHBoxLayout,
-    QHeaderView,
     QInputDialog,
     QLabel,
     QLineEdit,
@@ -19,15 +17,13 @@ from PyQt6.QtWidgets import (
     QProgressDialog,
     QPushButton,
     QSizePolicy,
-    QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
 import database as db
 from ui.components.widgets import BaseDialog, CardGroup, ScreenShell, StatCard
-from ui.styles.theme import COLORS, FONT, GAP_LG, GAP_MD, GAP_SM, ROW_HEIGHT, CARD_RADIUS
+from ui.styles.theme import COLORS, FONT, GAP_LG, GAP_MD, GAP_SM
 from ui.utils.formatters import fmt_currency
 
 
@@ -146,13 +142,19 @@ class DashboardScreen(ScreenShell):
         stats_group.add_layout(self._make_stats_grid())
         c.addWidget(stats_group)
 
-        # ── Row 2: Quick search + Quick actions ────────────────────────────
+        # ── Row 2: Quick search + top debts + quick actions ────────────────
         row2 = QHBoxLayout()
         row2.setSpacing(GAP_MD)
 
-        search_group = CardGroup("بحث سريع عن عميل")
+        search_group = CardGroup("بحث سريع عن عميل", section_type="customer")
         search_group.add_widget(self._make_search_panel())
         row2.addWidget(search_group, 1)
+
+        debtors_group = CardGroup("أعلى المديونيات", section_type="customer")
+        self._debtors_container = QVBoxLayout()
+        self._debtors_container.setSpacing(GAP_SM)
+        debtors_group.add_layout(self._debtors_container)
+        row2.addWidget(debtors_group, 1)
 
         actions_group = CardGroup("الإجراءات السريعة")
         actions_group.add_widget(self._make_actions_panel())
@@ -161,25 +163,6 @@ class DashboardScreen(ScreenShell):
         row2_widget = QWidget()
         row2_widget.setLayout(row2)
         c.addWidget(row2_widget)
-
-        # ── Row 3: Top Debtors + Recent Transactions ───────────────────────
-        row3 = QHBoxLayout()
-        row3.setSpacing(GAP_MD)
-
-        debtors_group = CardGroup("أعلى المديونيات")
-        self._debtors_container = QVBoxLayout()
-        self._debtors_container.setSpacing(GAP_SM)
-        debtors_group.add_layout(self._debtors_container)
-        row3.addWidget(debtors_group, 1)
-
-        ops_group = CardGroup("آخر العمليات")
-        self._ops_table = self._make_ops_table()
-        ops_group.add_widget(self._ops_table)
-        row3.addWidget(ops_group, 2)
-
-        row3_widget = QWidget()
-        row3_widget.setLayout(row3)
-        c.addWidget(row3_widget)
 
         c.addStretch()
 
@@ -322,81 +305,6 @@ class DashboardScreen(ScreenShell):
         layout.addStretch()
         return frame
 
-    # ── Ops Table ──────────────────────────────────────────────────────────
-
-    def _make_ops_table(self) -> QTableWidget:
-        columns = ["التاريخ", "العميل", "الخدمة", "المنصة", "المطلوب", "الربح", "الحالة"]
-        tbl = QTableWidget()
-        tbl.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        tbl.setColumnCount(len(columns))
-        tbl.setHorizontalHeaderLabels(columns)
-        tbl.setMaximumHeight(340)
-        tbl.setMinimumHeight(220)
-        tbl.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        tbl.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        tbl.verticalHeader().setVisible(False)
-        tbl.setShowGrid(False)
-        tbl.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-
-        header = tbl.horizontalHeader()
-        widths = [140, -1, 130, 120, -1, 100, -1]
-        for i, w in enumerate(widths):
-            if w == -1:
-                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
-            else:
-                tbl.setColumnWidth(i, w)
-                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Fixed)
-
-        tbl.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
-        return tbl
-
-    def _fill_ops_table(self):
-        txns = db.get_transactions(limit=12)
-        self._ops_table.setRowCount(len(txns))
-
-        for row, t in enumerate(txns):
-            op_type = t.get("operation_type")
-            is_manual = op_type in ("manual_commission", "inbound")
-            bg_color = COLORS["bg_hover"] if is_manual else None
-
-            def cell(col, text, color=None, bold=False, bg=bg_color):
-                item = QTableWidgetItem(str(text) if text else "—")
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                if color:
-                    item.setForeground(QColor(color))
-                if bg:
-                    item.setBackground(QColor(bg))
-                if bold:
-                    f = item.font()
-                    f.setBold(True)
-                    item.setFont(f)
-                self._ops_table.setItem(row, col, item)
-
-            raw_date = t.get("created_at") or ""
-            cell(0, raw_date[:16].replace("T", " "), color=COLORS["text_secondary"])
-            cell(1, t.get("customer_name") or "—", bold=True)
-            cell(2, t.get("service_name") or "—")
-            cell(3, t.get("platform_name") or "—", color=COLORS["text_secondary"])
-            cell(4, fmt_currency(t.get("amount_required", 0) or 0), bold=True)
-
-            profit = t.get("profit", 0) or 0
-            profit_text = fmt_currency(profit) if not is_manual else "—"
-            profit_color = COLORS["accent"] if profit >= 0 else COLORS["red"]
-            if is_manual:
-                profit_color = COLORS["text_secondary"]
-            cell(5, profit_text, color=profit_color)
-
-            st = t.get("payment_status", "")
-            if op_type == "inbound":
-                is_del = bool(t.get("is_delivered", 0))
-                st_text = "تم التسليم ✓" if is_del else "لم يسلم ⏳"
-                st_color = COLORS["green"] if is_del else COLORS["yellow"]
-            else:
-                st_text = "مؤجل ⏳" if st == "pending" else "تم السداد ✓"
-                st_color = COLORS["yellow"] if st == "pending" else COLORS["green"]
-            cell(6, st_text, color=st_color, bold=True)
-
     # ── Top Debtors ────────────────────────────────────────────────────────
 
     def _fill_debtors(self):
@@ -451,7 +359,6 @@ class DashboardScreen(ScreenShell):
         budget_str = fmt_currency(stats["main_budget"])
         self.set_subtitle(f"{self._today_str()}   |   الميزانية: {budget_str}")
 
-        self._fill_ops_table()
         self._fill_debtors()
 
     # ── Actions ────────────────────────────────────────────────────────────

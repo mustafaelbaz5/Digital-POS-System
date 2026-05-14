@@ -232,17 +232,16 @@ class CustomerStatementDialog(QDialog):
         layout.addLayout(title_row)
 
         cols = [
-            ("التاريخ", 150),
-            ("النوع", 100),
-            ("الخدمة", 160),
-            ("المنصة", 110),
-            ("المرجع", 90),
-            ("المصروف", 100),
-            ("المطلوب", 100),
-            ("الربح", 100),
-            ("الحالة", 110),
-            ("ملاحظات", -1),
-            ("الإجراءات", 100),
+            ("التاريخ", -1),
+            ("النوع", -1),
+            ("الخدمة", -1),
+            ("المنصة", -1),
+            ("المرجع", -1),
+            ("المصروف", -1),
+            ("المطلوب", -1),
+            ("الربح", -1),
+            ("الحالة", -1),
+            ("الإجراءات", 150),
         ]
         self.table = DataTable(cols)
         self.table.set_section_color(COLORS["clients"])
@@ -325,18 +324,8 @@ class CustomerStatementDialog(QDialog):
 
             self.table.set_cell(row, 8, st_text, color=st_color, bold=True, bg_color=bg)
 
-            # Notes
-            self.table.set_cell(
-                row,
-                9,
-                t.get("notes") or "—",
-                color=COLORS["text_muted"],
-                align=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                bg_color=bg,
-            )
-
             # Actions
-            self._add_actions_button(row, 10, t)
+            self._add_actions_button(row, 9, t)
 
     def _add_actions_button(self, row: int, col: int, t: dict):
         btn = QPushButton("⋮ إجراءات")

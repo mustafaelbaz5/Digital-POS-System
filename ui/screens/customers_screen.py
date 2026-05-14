@@ -95,6 +95,10 @@ class CustomersTab(QWidget):
         add_btn.setObjectName("btn_primary")
         add_btn.setFixedHeight(42)
         add_btn.setMinimumWidth(160)
+        add_btn.setStyleSheet(
+            f"background:{COLORS['clients']}; color:{COLORS['text_on_dark']};"
+            "border:none; border-radius:8px; font-weight:bold;"
+        )
         add_btn.clicked.connect(self._add_customer)
         tb_row.addWidget(add_btn)
 
@@ -315,6 +319,10 @@ class GroupsTab(QWidget):
         add_btn.setObjectName("btn_primary")
         add_btn.setFixedHeight(42)
         add_btn.setMinimumWidth(180)
+        add_btn.setStyleSheet(
+            f"background:{COLORS['clients']}; color:{COLORS['text_on_dark']};"
+            "border:none; border-radius:8px; font-weight:bold;"
+        )
         add_btn.clicked.connect(self._add_group)
         tb_row.addWidget(add_btn)
 
@@ -702,7 +710,7 @@ class GroupDialog(BaseDialog):
         title = "تعديل مجموعة" if group else "➕ إضافة مجموعة جديدة"
         super().__init__(title, parent)
         self.group = group
-        self.setMinimumWidth(400)
+        self.setMinimumWidth(700)
         self._build_form()
         if group:
             self._fill()
