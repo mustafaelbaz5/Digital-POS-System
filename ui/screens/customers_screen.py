@@ -122,15 +122,15 @@ class CustomersTab(QWidget):
 
         cols = [
             ("الاسم", -1),
-            ("التليفون", 130),
-            ("المجموعة", 130),
-            ("عليه 🔴", 120),
-            ("له 🟢", 120),
-            ("ملاحظات", 180),
-            ("الإجراءات", 410),
+            ("التليفون", 120),
+            ("المجموعة", 120),
+            ("عليه 🔴", 110),
+            ("له 🟢", 110),
+            ("الإجراءات", 280),
         ]
         self.table = DataTable(cols)
         self.table.horizontalHeader().setVisible(True)
+        self.table.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._ctx_menu)
@@ -204,8 +204,6 @@ class CustomersTab(QWidget):
                 self.table.set_cell(row, 3, "—", COLORS["text_muted"])
                 self.table.set_cell(row, 4, "—", COLORS["text_muted"])
 
-            self.table.set_cell(row, 5, c.get("notes") or "—", COLORS["text_muted"])
-
             actions = [
                 {
                     "text": "📊 كشف الحساب",
@@ -218,7 +216,7 @@ class CustomersTab(QWidget):
                     "role": "secondary",
                 },
             ]
-            self.table.add_action_buttons(row, 6, actions, spacing=6)
+            self.table.add_action_buttons(row, 5, actions, spacing=6)
 
         parts = [f"إجمالي: {len(customers)} عميل"]
         if total_owed:
