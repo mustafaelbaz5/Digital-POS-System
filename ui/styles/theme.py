@@ -155,7 +155,7 @@ def set_theme(mode: str) -> None:
 # ──────────────────────────────────────────────────
 
 FONT = {
-    "family": "Segoe UI, Cairo, Tajawal, sans-serif",
+    "family": "Tajawal, Cairo, Segoe UI, sans-serif",
     "xs": "10px",
     "sm": "12px",
     "md": "14px",

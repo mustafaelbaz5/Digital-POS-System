@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 import database as db
+from ui.components.cards import CardGroup
 from ui.components.widgets import BaseDialog, DataTable, ScreenShell
 from ui.styles.theme import COLORS, FONT, GAP_MD, GAP_SM, GAP_XS, ROW_HEIGHT
 from ui.utils.formatters import fmt_currency
