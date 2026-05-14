@@ -125,7 +125,7 @@ class DataTable(QTableWidget):
         layout = QHBoxLayout(wrapper)
         layout.setContentsMargins(5, 0, 5, 0)
         layout.setSpacing(spacing)
-        layout.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         btns = []
         for data in buttons_data:

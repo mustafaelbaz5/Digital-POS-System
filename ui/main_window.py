@@ -97,7 +97,7 @@ class MainWindow(QMainWindow):
         # Brand
         brand = QLabel("نظام المدفوعات")
         brand.setObjectName("sidebar_brand")
-        brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        brand.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(brand)
 
         div = QFrame()
@@ -107,8 +107,8 @@ class MainWindow(QMainWindow):
 
         # Navigation Buttons
         for key, label, _ in NAV_ITEMS:
-            symbol = NAV_SYMBOLS.get(key, "·")
-            btn = self._make_nav_btn(key, f"{symbol}  {label}")
+          
+            btn = self._make_nav_btn(key, f" {label}")
             layout.addWidget(btn)
             self._nav_btns[key] = btn
 

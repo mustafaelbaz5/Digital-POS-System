@@ -218,11 +218,13 @@ QMainWindow, QWidget, QDialog {{
 #card_header {{
     border-top-left-radius: 14px;
     border-top-right-radius: 14px;
-    padding: 10px 20px;
+    padding: 8px 16px;
+    min-height: 36px;
+    max-height: 36px;
 }}
 #card_header_title {{
     color: {C['text_on_dark']};
-    font-size: {FONT['lg']};
+    font-size: {FONT['md']};
     font-weight: bold;
 }}
 
@@ -308,7 +310,7 @@ QScrollBar::handle:vertical {{ background: {C['border']}; border-radius: 3px; }}
     margin: 12px 0;
 }}
 #nav_btn {{
-    text-align: right;
+    text-align: left;
     background: transparent;
     color: {C['text_primary']};
     border: 1px solid transparent;

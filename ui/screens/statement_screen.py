@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 
 import database as db
 from ui.components.widgets import BaseDialog, DataTable
+from ui.screens.settlement_dialog import QuickSettleDialog
 from ui.styles.theme import CARD_RADIUS, COLORS, FONT, GAP_LG, GAP_MD
 from ui.utils.formatters import fmt_currency
 
@@ -418,6 +419,15 @@ class CustomerStatementDialog(QDialog):
             db.cleanup_paid_transactions(self.customer_id)
             self._load_data()
             self._refresh_ui()
+
+    def _quick_settle(self):
+        dlg = QuickSettleDialog(self._data["customer"], self)
+        if dlg.exec():
+            self._load_data()
+            self._refresh_ui()
+
+    def _print_report(self):
+        QMessageBox.information(self, "طباعة", "ميزة الطباعة قريباً.")
 
     def _refresh_ui(self):
         t = self._data.get("totals", {})

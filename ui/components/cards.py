@@ -52,7 +52,7 @@ class CardGroup(QFrame):
             self.header.setStyleSheet(f"background: {header_color};")
             
             hl = QHBoxLayout(self.header)
-            hl.setContentsMargins(20, 12, 20, 12)
+            hl.setContentsMargins(16, 0, 16, 0)
             
             self.title_lbl = QLabel(title)
             self.title_lbl.setObjectName("card_header_title")
