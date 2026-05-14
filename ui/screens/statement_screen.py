@@ -4,9 +4,10 @@ statement_screen.py — كشف حساب العميل (Master-Detail View)
 
 import os
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
+    QApplication,
     QDialog,
     QFrame,
     QHBoxLayout,
@@ -22,7 +23,7 @@ from PyQt6.QtWidgets import (
 import database as db
 from ui.components.widgets import BaseDialog, DataTable
 from ui.screens.settlement_dialog import QuickSettleDialog
-from ui.styles.theme import CARD_RADIUS, COLORS, FONT, GAP_LG, GAP_MD
+from ui.styles.theme import COLORS, FONT, GAP_LG, GAP_MD
 from ui.utils.formatters import fmt_currency
 
 # ══════════════════════════════════════════
@@ -106,10 +107,13 @@ class CustomerStatementDialog(QDialog):
         self.body_container.setSpacing(GAP_LG)
         self.main_layout.addLayout(self.body_container)
 
-        # 2. Master Section (Summary Cards)
+        # 2. Statement actions
+        self.body_container.addWidget(self._make_action_bar())
+
+        # 3. Master Section (Summary Cards)
         self.body_container.addLayout(self._make_master_cards())
 
-        # 3. Detail Section (Table)
+        # 4. Detail Section (Table)
         self.body_container.addLayout(self._make_detail_table())
 
         # Initial fill
@@ -151,22 +155,6 @@ class CustomerStatementDialog(QDialog):
         hl.addLayout(info_col)
         hl.addStretch()
 
-        self.settle_btn = QPushButton("💚 تسديد سريع")
-        self.settle_btn.setObjectName("btn_success")
-        self.settle_btn.setFixedWidth(150)
-        self.settle_btn.clicked.connect(self._quick_settle)
-        hl.addWidget(self.settle_btn)
-
-        # Show settle button only if there is debt
-        t = self._data.get("totals", {})
-        self.settle_btn.setVisible((t.get("total_pending") or 0) > 0)
-
-        print_btn = QPushButton("🖨️ طباعة")
-        print_btn.setObjectName("btn_primary")
-        print_btn.setFixedWidth(120)
-        print_btn.clicked.connect(self._print_report)
-        hl.addWidget(print_btn)
-
         close_btn = QPushButton("✕")
         close_btn.setFixedSize(36, 36)
         close_btn.setStyleSheet(f"""
@@ -179,6 +167,42 @@ class CustomerStatementDialog(QDialog):
 
         header_wrap.addWidget(header_frame)
         return header_wrap
+
+    def _make_action_bar(self) -> QFrame:
+        action_bar = QFrame()
+        action_bar.setObjectName("statement_action_bar")
+
+        layout = QHBoxLayout(action_bar)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(15)
+
+        self.print_btn = QPushButton("\uf02f  طباعة")
+        self.print_btn.setObjectName("statement_print_btn")
+        self.print_btn.setFixedHeight(40)
+        self.print_btn.setMinimumWidth(150)
+        self.print_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.print_btn.clicked.connect(self._print_report)
+        layout.addWidget(self.print_btn)
+
+        self.settle_btn = QPushButton("\uf2b5  تسديد سريع")
+        self.settle_btn.setObjectName("statement_settle_btn")
+        self.settle_btn.setFixedHeight(40)
+        self.settle_btn.setMinimumWidth(180)
+        self.settle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.settle_btn.clicked.connect(self._quick_settle)
+        layout.addWidget(self.settle_btn)
+
+        t = self._data.get("totals", {})
+        self.settle_btn.setVisible((t.get("total_pending") or 0) > 0)
+
+        layout.addStretch()
+
+        self.print_status_lbl = QLabel("")
+        self.print_status_lbl.setObjectName("statement_print_status")
+        self.print_status_lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(self.print_status_lbl)
+
+        return action_bar
 
     def _make_master_cards(self) -> QHBoxLayout:
         layout = QHBoxLayout()
@@ -415,7 +439,36 @@ class CustomerStatementDialog(QDialog):
             self._refresh_ui()
 
     def _print_report(self):
-        QMessageBox.information(self, "طباعة", "ميزة الطباعة قريباً.")
+        self.print_btn.setEnabled(False)
+        self.print_status_lbl.setStyleSheet(
+            f"color:{COLORS['text_secondary']}; background:transparent; border:none;"
+        )
+        self.print_status_lbl.setText("جاري إنشاء الملف وإرساله للطابعة...")
+        QApplication.processEvents()
+
+        try:
+            from ui.utils.pdf_generator import PDFGenerator
+
+            path = PDFGenerator(self._data).generate()
+            path = os.path.abspath(os.path.normpath(path))
+            if not os.path.exists(path):
+                raise FileNotFoundError(path)
+
+            # Same reliable launch method used by group reports.
+            os.startfile(path)
+            self.print_status_lbl.setStyleSheet(
+                f"color:{COLORS['green']}; background:transparent; border:none;"
+            )
+            self.print_status_lbl.setText("تم إنشاء PDF وإرساله للطابعة.")
+            QTimer.singleShot(4500, lambda: self.print_status_lbl.setText(""))
+        except Exception as e:
+            self.print_status_lbl.setStyleSheet(
+                f"color:{COLORS['red']}; background:transparent; border:none;"
+            )
+            self.print_status_lbl.setText("تعذر إرسال الملف للطابعة.")
+            QMessageBox.critical(self, "خطأ في توليد PDF", str(e))
+        finally:
+            self.print_btn.setEnabled(True)
 
     def _refresh_ui(self):
         t = self._data.get("totals", {})

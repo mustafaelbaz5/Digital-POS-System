@@ -441,7 +441,7 @@ class PlatformListTab(QWidget):
             ("اسم المنصة", -1),      # Name stretches
             ("الرصيد الحالي", 180),
             ("العمليات", 100),
-            ("إجراءات", 200),        # Increased to fit buttons + 24px spacing
+            ("إجراءات", 300),        # Increased to fit buttons + 24px spacing
         ]
         if self.p_type in ("wallet", "instapay"):
             cols.insert(1, ("السعة المتبقية للاستقبال", 210))

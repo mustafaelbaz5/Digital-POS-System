@@ -20,6 +20,7 @@ from ui.styles.theme import GAP_LG, GAP_MD, GAP_SM, GAP_XS, MARGIN_CARD, MARGIN_
 
 RTL = Qt.LayoutDirection.RightToLeft
 AlignLeft = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+AlignRight = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
 
 
 class BaseDialog(QDialog):
@@ -52,8 +53,14 @@ class BaseDialog(QDialog):
         hl.setContentsMargins(GAP_MD, GAP_MD, GAP_MD, GAP_MD)
 
         title_lbl = QLabel(title)
-        title_lbl.setObjectName("dialog_title")
-        hl.addWidget(title_lbl)
+        title_lbl.setObjectName("dialogTitleLabel")
+        title_lbl.setAutoFillBackground(False)
+        title_lbl.setAlignment(AlignRight)
+        title_lbl.setStyleSheet(
+            "background-color: transparent; color: #FFFFFF; "
+            "font-weight: bold; font-size: 18px; border: none;"
+        )
+        hl.addWidget(title_lbl, 1, AlignRight)
         hl.addStretch()
 
         close_btn = QPushButton("✕")

@@ -296,6 +296,56 @@ QPushButton {{
     color: {C['text_on_dark']};
 }}
 
+#statement_action_bar {{
+    background: {C['bg_card']};
+    border: 1px solid {C['border']};
+    border-radius: 15px;
+}}
+
+#statement_print_btn {{
+    background: #3F51B5;
+    color: #FFFFFF;
+    border: 2px solid #303F9F;
+    border-radius: 10px;
+    min-height: 40px;
+    padding: 0 18px;
+    font-family: "Font Awesome 6 Free", "Font Awesome 5 Free", {FONT['family']};
+    font-weight: 900;
+}}
+#statement_print_btn:hover {{
+    background: #303F9F;
+}}
+#statement_print_btn:disabled {{
+    background: #9FA8DA;
+    border-color: #9FA8DA;
+}}
+
+#statement_settle_btn {{
+    background: #2E7D32;
+    color: #FFFFFF;
+    border: 2px solid #1B5E20;
+    border-radius: 10px;
+    min-height: 40px;
+    padding: 0 18px;
+    font-family: "Font Awesome 6 Free", "Font Awesome 5 Free", {FONT['family']};
+    font-weight: 900;
+}}
+#statement_settle_btn:hover {{
+    background: #1B5E20;
+}}
+#statement_settle_btn:disabled {{
+    background: #A5D6A7;
+    border-color: #A5D6A7;
+}}
+
+#statement_print_status {{
+    color: {C['text_secondary']};
+    font-size: {FONT['sm']};
+    font-weight: bold;
+    background: transparent;
+    border: none;
+}}
+
 #btn_ghost {{
     background: {C['bg_button']};
     color: {C['text_primary']};
@@ -362,10 +412,14 @@ QTabBar::tab:selected {{
     border-top-left-radius: 15px;
     border-top-right-radius: 15px;
 }}
-#dialog_title {{
-    color: {C['text_on_dark']};
-    font-size: {FONT['lg']};
+QLabel#dialogTitleLabel,
+QLabel#dialog_title {{
+    background-color: transparent;
+    color: #FFFFFF;
+    font-size: 18px;
     font-weight: bold;
+    border: none;
+    qproperty-alignment: 'AlignRight | AlignVCenter';
 }}
 #dialog_close_btn {{
     background: rgba(255, 255, 255, 0.14);
