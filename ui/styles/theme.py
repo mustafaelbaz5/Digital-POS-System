@@ -288,7 +288,7 @@ QPushButton {{
 
 #btn_secondary {{
     background: {C['ledger']};
-    color: #000000;
+    color: #FFFFFF;
 }}
 
 #btn_statement {{
