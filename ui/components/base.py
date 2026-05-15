@@ -60,7 +60,7 @@ class BaseDialog(QDialog):
             "background-color: transparent; color: #FFFFFF; "
             "font-weight: bold; font-size: 18px; border: none;"
         )
-        hl.addWidget(title_lbl, 1, AlignRight)
+        hl.addWidget(title_lbl)
         hl.addStretch()
 
         close_btn = QPushButton("✕")

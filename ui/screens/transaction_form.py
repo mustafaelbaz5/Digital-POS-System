@@ -923,7 +923,7 @@ class TransactionDialog(BaseDialog):
         name_lbl = QLabel(p["name"])
         name_lbl.setObjectName("header_name")
         name_lbl.setStyleSheet(
-            f"color:{COLORS['text_on_dark']}; font-size:18px; font-weight:bold;"
+            f"background: transparent; color:{COLORS['text_on_dark']}; font-size:18px; font-weight:bold;"
         )
         hl.addWidget(name_lbl)
         hl.addSpacing(20)
@@ -960,12 +960,12 @@ class TransactionDialog(BaseDialog):
 
         if pulse:
             name_lbl.setStyleSheet(
-                f"color:{COLORS['ledger']}; font-size:18px; font-weight:bold;"
+                f"background: transparent; color:{COLORS['ledger']}; font-size:18px; font-weight:bold;"
             )
             QTimer.singleShot(
                 600,
                 lambda: name_lbl.setStyleSheet(
-                    f"color:{COLORS['text_on_dark']}; font-size:18px; font-weight:bold;"
+                    f"background: transparent; color:{COLORS['text_on_dark']}; font-size:18px; font-weight:bold;"
                 ),
             )
 
