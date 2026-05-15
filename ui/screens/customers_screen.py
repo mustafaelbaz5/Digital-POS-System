@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QTabWidget,
     QTextEdit,
@@ -481,10 +482,10 @@ class GroupsTab(QWidget):
 class CustomerDialog(BaseDialog):
 
     def __init__(self, parent=None, customer: dict = None):
-        title = "تعديل عميل" if customer else "➕ إضافة عميل جديد"
+        title = "✏️  تعديل عميل" if customer else "➕  إضافة عميل جديد"
         super().__init__(title, parent)
         self.customer = customer
-        self.setMinimumWidth(750)
+        self.setFixedWidth(750)
         self._existing_codes: list[dict] = []   # {"id", "code"} loaded from DB
         self._pending_new: list[str] = []        # codes to add on save
         self._pending_del: list[int] = []        # code IDs to delete on save
@@ -493,8 +494,9 @@ class CustomerDialog(BaseDialog):
             self._fill()
 
     def _build_form(self):
+        # ── Basic Info Form ─────────────────────────────────────
         form = QFormLayout()
-        form.setSpacing(GAP_MD)
+        form.setSpacing(GAP_SM)
         form.setLabelAlignment(ALeft)
 
         self.name_input = QLineEdit()
@@ -509,7 +511,7 @@ class CustomerDialog(BaseDialog):
             self.group_combo.addItem(g["name"], g["id"])
 
         self.notes_input = QTextEdit()
-        self.notes_input.setMaximumHeight(72)
+        self.notes_input.setFixedHeight(60)
         self.notes_input.setPlaceholderText("ملاحظات (اختياري)")
 
         form.addRow("الاسم *:", self.name_input)
@@ -519,47 +521,62 @@ class CustomerDialog(BaseDialog):
 
         self.body.addLayout(form)
 
-        # ── Shipping Codes Section ──────────────────────────────
+        # ── Separator ───────────────────────────────────────────
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setStyleSheet(f"color:{COLORS['border']}; margin-top:4px;")
+        sep.setStyleSheet(f"background:{COLORS['border']}; max-height:1px; margin-top:4px;")
         self.body.addWidget(sep)
 
+        # ── Shipping Codes Header ────────────────────────────────
         codes_hdr = QHBoxLayout()
-        codes_title = QLabel("🔑 كودات الشحن")
+        codes_title = QLabel("🔑  كودات الشحن")
         codes_title.setStyleSheet(
             f"font-weight:bold; color:{COLORS['text_primary']}; font-size:{FONT['md']};"
+            "background:transparent; border:none;"
         )
         codes_hdr.addWidget(codes_title)
         codes_hdr.addStretch()
         self.body.addLayout(codes_hdr)
 
-        # Dynamic list of code chips
-        self._codes_vbox = QVBoxLayout()
+        # ── Codes ScrollArea ─────────────────────────────────────
+        codes_scroll = QScrollArea()
+        codes_scroll.setWidgetResizable(True)
+        codes_scroll.setFixedHeight(160)
+        codes_scroll.setStyleSheet(
+            f"QScrollArea {{ border: 1px solid {COLORS['border']}; "
+            f"border-radius: 8px; background: transparent; }}"
+        )
+        codes_container = QWidget()
+        codes_container.setStyleSheet("background: transparent;")
+        self._codes_vbox = QVBoxLayout(codes_container)
         self._codes_vbox.setSpacing(4)
-        self.body.addLayout(self._codes_vbox)
+        self._codes_vbox.setContentsMargins(6, 6, 6, 6)
+        self._codes_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
+        codes_scroll.setWidget(codes_container)
+        self.body.addWidget(codes_scroll)
 
-        # Add-code row
+        # ── Add-Code Row ─────────────────────────────────────────
         add_row = QHBoxLayout()
         add_row.setSpacing(GAP_SM)
         self._new_code_input = QLineEdit()
         self._new_code_input.setPlaceholderText("أدخل كود جديد ثم اضغط ➕ ...")
-        self._new_code_input.setFixedHeight(36)
+        self._new_code_input.setFixedHeight(40)
         self._new_code_input.returnPressed.connect(self._add_pending_code)
         add_row.addWidget(self._new_code_input, 1)
 
-        add_code_btn = QPushButton("➕ إضافة")
-        add_code_btn.setObjectName("btn_secondary")
-        add_code_btn.setFixedHeight(36)
-        add_code_btn.setFixedWidth(90)
+        add_code_btn = QPushButton("➕  إضافة")
+        add_code_btn.setObjectName("btn_success")
+        add_code_btn.setFixedHeight(40)
+        add_code_btn.setMinimumWidth(100)
+        add_code_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         add_code_btn.clicked.connect(self._add_pending_code)
         add_row.addWidget(add_code_btn)
         self.body.addLayout(add_row)
 
-        # Footer
+        # ── Footer ───────────────────────────────────────────────
         self.add_stretch()
-        self.add_button("إلغاء", self.reject, role="secondary")
-        self.add_button("حفظ ✓", self._save, role="primary")
+        self.add_button("✕  إلغاء", self.reject, role="danger")
+        self.add_button("💾  حفظ", self._save, role="success")
 
         self._render_codes()
 

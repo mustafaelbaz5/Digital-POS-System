@@ -285,6 +285,15 @@ QPushButton {{
     background: {C['delete']};
     color: {C['text_on_dark']};
 }}
+#btn_danger:hover {{ background: #B71C1C; }}
+
+#btn_machines {{
+    background: {C['machines']};
+    color: {C['text_on_dark']};
+    font-family: "Font Awesome 6 Free", "Font Awesome 5 Free", {FONT['family']};
+    font-weight: 900;
+}}
+#btn_machines:hover {{ background: #303F9F; }}
 
 #btn_secondary {{
     background: {C['ledger']};
