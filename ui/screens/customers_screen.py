@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import (
 import database as db
 from ui.components.cards import CardGroup
 from ui.components.widgets import BaseDialog, DataTable, ScreenShell
-from ui.styles.theme import COLORS, FONT, GAP_MD, GAP_SM, GAP_XS, ROW_HEIGHT
+from ui.styles.theme import COLORS, FONT, GAP_MD, GAP_SM, GAP_XS
 from ui.utils.formatters import fmt_currency
 
 RTL = Qt.LayoutDirection.RightToLeft
@@ -148,12 +148,32 @@ class CustomersTab(QWidget):
 
         self.card.add_widget(self.table)
 
-        self.total_lbl = QLabel("")
-        self.total_lbl.setStyleSheet(
-            f"color:{COLORS['text_muted']}; font-size:{FONT['xs']}; padding:{GAP_SM}px {GAP_MD}px;"
+        # ── Compact Footer ────────────────────────────────────────
+        self.footer_bar = QFrame()
+        self.footer_bar.setObjectName("customers_footer")
+        self.footer_bar.setFixedHeight(40)
+        self.footer_bar.setStyleSheet(
+            "QFrame#customers_footer {"
+            "  background: #F8FAF9;"
+            "  border-top: 1px solid #E2E8F0;"
+            "  border-bottom-left-radius: 12px;"
+            "  border-bottom-right-radius: 12px;"
+            "}"
         )
-        self.total_lbl.setAlignment(ALeft)
-        self.card.add_widget(self.total_lbl)
+        footer_layout = QHBoxLayout(self.footer_bar)
+        footer_layout.setContentsMargins(16, 0, 16, 0)
+        footer_layout.setSpacing(0)
+
+        self.total_lbl = QLabel("")
+        self.total_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.total_lbl.setStyleSheet(
+            f"color: {COLORS['clients']}; font-size: 13px; font-weight: bold;"
+            "background: transparent; border: none;"
+        )
+        footer_layout.addStretch()
+        footer_layout.addWidget(self.total_lbl)
+        footer_layout.addStretch()
+        self.card.add_widget(self.footer_bar)
 
     def load_data(self):
         current = self.group_filter.currentData()
@@ -222,12 +242,12 @@ class CustomersTab(QWidget):
             ]
             self.table.add_action_buttons(row, 5, actions, spacing=6)
 
-        parts = [f"إجمالي: {len(customers)} عميل"]
+        count_str = f"👥  إجمالي: {len(customers)} عميل"
         if total_owed:
-            parts.append(f"عليهم: {fmt_currency(total_owed)}")
+            count_str += f"   ·   🔴 عليهم: {fmt_currency(total_owed)}"
         if total_due:
-            parts.append(f"لهم: {fmt_currency(total_due)}")
-        self.total_lbl.setText("  ·  ".join(parts))
+            count_str += f"   ·   🟢 لهم: {fmt_currency(total_due)}"
+        self.total_lbl.setText(count_str)
 
         # Update table height to fit all rows (Full-Page Scroll)
         self.table.setMinimumHeight(
@@ -311,10 +331,22 @@ class GroupsTab(QWidget):
         self.card = CardGroup("📂  إدارة المجموعات", section_type="group")
         layout.addWidget(self.card)
 
+        # ── Groups toolbar with floating padding
+        groups_wrapper = QFrame()
+        groups_wrapper.setStyleSheet(
+            f"QFrame {{ background: {COLORS['bg_hover']}; border: 1px solid {COLORS['border']}; "
+            "border-radius: 10px; }"
+        )
+        groups_wrapper.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
+        
+        wrapper_layout = QVBoxLayout(groups_wrapper)
+        wrapper_layout.setContentsMargins(12, 10, 12, 10)
+        wrapper_layout.setSpacing(0)
+
         # ── Middle Layer: Add & Search
         tb_row = QHBoxLayout()
         tb_row.setContentsMargins(0, 0, 0, 0)
-        tb_row.setSpacing(GAP_MD)
+        tb_row.setSpacing(GAP_SM)
 
         add_btn = QPushButton("➕ إضافة مجموعة")
         add_btn.setObjectName("btn_primary")
@@ -337,7 +369,8 @@ class GroupsTab(QWidget):
         self.group_search.textChanged.connect(self._filter)
         tb_row.addWidget(self.group_search)
 
-        self.card.add_layout(tb_row)
+        wrapper_layout.addLayout(tb_row)
+        self.card.add_widget(groups_wrapper)
 
         cols = [
             ("اسم المجموعة", -1),
@@ -398,11 +431,6 @@ class GroupsTab(QWidget):
                         "text": "📊 تقرير",
                         "callback": lambda _, gid=g["id"]: self._show_report(gid),
                         "role": "statement",
-                    },
-                    {
-                        "text": "🖨️ طباعة",
-                        "callback": lambda _, gid=g["id"], gname=g["name"]: self._print_group_report(gid, gname),
-                        "role": "secondary",
                     },
                 ],
             )

@@ -68,6 +68,7 @@ class SummaryCard(QFrame):
             )
         else:
             self.setStyleSheet("")
+
     def set_value(self, value: str):
         self.val_lbl.setText(value)
 
@@ -122,7 +123,7 @@ class CustomerStatementDialog(QDialog):
     def _make_header(self) -> QVBoxLayout:
         # Wrapper for colored header
         header_wrap = QVBoxLayout()
-        
+
         header_frame = QFrame()
         header_frame.setFixedHeight(80)
         header_frame.setStyleSheet(f"""
@@ -220,10 +221,10 @@ class CustomerStatementDialog(QDialog):
         self.card_net = SummaryCard(
             "الصافي النهائي (المطلوب)",
             fmt_currency(net),
-            COLORS['clients'] if net >= 0 else COLORS["red"],
+            COLORS["clients"] if net >= 0 else COLORS["red"],
         )
         self.card_net.set_featured(True)
-        
+
         self.card_count = SummaryCard(
             "عدد العمليات", str(t.get("total_count", 0)), COLORS["accent"]
         )
@@ -300,7 +301,9 @@ class CustomerStatementDialog(QDialog):
             is_out = op == "outbound"
             type_text = "📤 شحن صادر" if is_out else "📥 استلام"
             type_color = COLORS["blue"] if is_out else COLORS["purple"]
-            self.table.set_cell(row, 1, type_text, color=type_color, bold=True, bg_color=bg)
+            self.table.set_cell(
+                row, 1, type_text, color=type_color, bold=True, bg_color=bg
+            )
 
             # Service
             self.table.set_cell(
@@ -313,7 +316,11 @@ class CustomerStatementDialog(QDialog):
 
             # Platform
             self.table.set_cell(
-                row, 3, t.get("platform_name") or "—", color=COLORS["text_secondary"], bg_color=bg
+                row,
+                3,
+                t.get("platform_name") or "—",
+                color=COLORS["text_secondary"],
+                bg_color=bg,
             )
 
             # Reference
@@ -322,7 +329,9 @@ class CustomerStatementDialog(QDialog):
 
             # Spent (المصروف)
             spent = t.get("amount_spent", 0)
-            self.table.set_cell(row, 5, fmt_currency(spent), color=COLORS["text_secondary"], bg_color=bg)
+            self.table.set_cell(
+                row, 5, fmt_currency(spent), color=COLORS["text_secondary"], bg_color=bg
+            )
 
             # Required (المطلوب)
             req = t.get("amount_required", 0)
@@ -500,6 +509,7 @@ class GroupReportDialog(BaseDialog):
         group = next((g for g in groups if g["id"] == group_id), {})
         super().__init__(f"تقرير مجموعة — {group.get('name', '—')}", parent)
         self.group_id = group_id
+        self._group_name = group.get("name", "المجموعة")
         self.setMinimumSize(850, 600)
         self._build_content()
 
@@ -551,6 +561,60 @@ class GroupReportDialog(BaseDialog):
         tl.addWidget(total_lbl)
         self.body.addWidget(total_frame)
 
-        # Footer
+        # ── Status label for print feedback
+        self._print_status = QLabel("")
+        self._print_status.setStyleSheet(
+            "background: transparent; border: none; font-size: 12px;"
+        )
+        self._print_status.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+
+        # Footer — Print button + status + Close
         self.add_stretch()
+        footer_row = QHBoxLayout()
+        footer_row.setSpacing(12)
+
+        self._print_btn = QPushButton("🖨️  طباعة PDF")
+        self._print_btn.setObjectName("statement_print_btn")
+        self._print_btn.setFixedHeight(40)
+        self._print_btn.setMinimumWidth(160)
+        self._print_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._print_btn.clicked.connect(self._print_report)
+        footer_row.addWidget(self._print_btn)
+
+        footer_row.addWidget(self._print_status)
+        footer_row.addStretch()
+        self.body.addLayout(footer_row)
+
         self.add_button("إغلاق", self.accept, role="primary")
+
+    def _print_report(self):
+        self._print_btn.setEnabled(False)
+        self._print_status.setStyleSheet(
+            f"color:{COLORS['text_secondary']}; background:transparent; border:none;"
+        )
+        self._print_status.setText("جاري إنشاء الملف...")
+        QApplication.processEvents()
+        try:
+            data = db.get_group_summary(self.group_id)
+            if not data:
+                raise ValueError("لم يتم العثور على بيانات المجموعة")
+            from ui.utils.pdf_generator import GroupPDFGenerator
+
+            path = GroupPDFGenerator(data).generate()
+            path = os.path.abspath(os.path.normpath(path))
+            if not os.path.exists(path):
+                raise FileNotFoundError(path)
+            os.startfile(path)
+            self._print_status.setStyleSheet(
+                f"color:{COLORS['green']}; background:transparent; border:none;"
+            )
+            self._print_status.setText("✓ تم إنشاء PDF بنجاح")
+            QTimer.singleShot(4500, lambda: self._print_status.setText(""))
+        except Exception as e:
+            self._print_status.setStyleSheet(
+                f"color:{COLORS['red']}; background:transparent; border:none;"
+            )
+            self._print_status.setText("تعذّر إنشاء الملف")
+            QMessageBox.critical(self, "خطأ في توليد PDF", str(e))
+        finally:
+            self._print_btn.setEnabled(True)

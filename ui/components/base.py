@@ -159,9 +159,11 @@ class ScreenShell(QWidget):
         title_block.setSpacing(GAP_XS)
 
         self._title_lbl = QLabel(title)
+        self._title_lbl.setTextFormat(Qt.TextFormat.RichText)
         self._title_lbl.setObjectName("screen_title")
         self._title_lbl.setAlignment(AlignLeft)
         title_block.addWidget(self._title_lbl)
+
 
         if subtitle:
             self._sub_lbl = QLabel(subtitle)
