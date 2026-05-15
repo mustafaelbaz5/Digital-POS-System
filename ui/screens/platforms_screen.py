@@ -211,7 +211,7 @@ class PlatformMoreDialog(BaseDialog):
             cr.addWidget(self.comm_input, 2)
 
             cb = QPushButton("  تسجيل عمولة")
-            cb.setObjectName("btn_secondary")
+            cb.setObjectName("btn_primary")
             cb.setFixedHeight(40)
             cb.setCursor(Qt.CursorShape.PointingHandCursor)
             cb.clicked.connect(self._save_commission)
@@ -228,28 +228,29 @@ class PlatformMoreDialog(BaseDialog):
         af = QFrame()
         af.setObjectName("card")
         al = QHBoxLayout(af)
-        al.setContentsMargins(18, 10, 18, 10)
-        al.setSpacing(8)
+        al.setContentsMargins(18, 16, 18, 16)
+        al.setSpacing(12)
 
         if p_type not in ("wallet", "instapay"):
-            dep = QPushButton("💰  إيداع")
-            dep.setObjectName("btn_secondary")
-            dep.setFixedHeight(40)
+            dep = QPushButton("💰 إيداع")
+            dep.setObjectName("btn_primary")          # ← غيرته لـ primary
+            dep.setFixedHeight(42)
             dep.setCursor(Qt.CursorShape.PointingHandCursor)
             dep.clicked.connect(self._deposit)
             al.addWidget(dep)
 
         if p_type in ("wallet", "instapay"):
-            lb = QPushButton("✏️  تعديل الحد")
+            lb = QPushButton("✏️ تعديل الحد")
             lb.setObjectName("btn_secondary")
-            lb.setFixedHeight(40)
+            lb.setFixedHeight(42)
             lb.setCursor(Qt.CursorShape.PointingHandCursor)
             lb.clicked.connect(self._edit_limit)
             al.addWidget(lb)
 
-        db_btn = QPushButton("🗑  حذف")
-        db_btn.setObjectName("btn_danger")
-        db_btn.setFixedHeight(40)
+        # زرار الحذف
+        db_btn = QPushButton("🗑 حذف")
+        db_btn.setObjectName("btn_primary")
+        db_btn.setFixedHeight(42)
         db_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         db_btn.clicked.connect(self._delete)
         al.addWidget(db_btn)

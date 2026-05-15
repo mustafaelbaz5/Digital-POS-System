@@ -226,7 +226,6 @@ QMainWindow, QWidget, QDialog {{
 }}
 
 QWidget {{
-    direction: rtl;
 }}
 
 /* ── Card Containers ── */
@@ -264,36 +263,49 @@ QWidget {{
 
 /* ── Buttons (High-Visibility Deep Palette) ── */
 QPushButton {{
-    font-family: {FONT['family']};
-    border-radius: 8px;
-    padding: 8px 16px;
+    font-family: "Font Awesome 6 Free", "Font Awesome 5 Free", {FONT['family']};
     font-weight: bold;
+    border-radius: 10px;
+    padding: 8px 16px;
 }}
 
 #btn_primary {{
     background: {C['save']};
-    color: {C['text_on_dark']};
+    color: {C['text_primary']};
+    border: 2px solid #0D47A1;
+    border-radius: 10px;
+    padding: 8px 20px;
+    font-weight: 900;
 }}
-#btn_primary:hover {{ background: {C['accent_hover']}; }}
+#btn_primary:hover {{ background: {C['accent_hover']}; border-color: #082849; }}
 
 #btn_success {{
     background: {C['settle']};
     color: {C['text_on_dark']};
+    font-weight: 900;
 }}
 
 #btn_danger {{
     background: {C['delete']};
-    color: {C['text_on_dark']};
+    color: {C['text_primary']};
+    border: 2px solid #B71C1C;
+    border-radius: 10px;
+    padding: 8px 20px;
+    font-weight: 900;
 }}
-#btn_danger:hover {{ background: #B71C1C; }}
+#btn_danger:hover {{ background: #B71C1C; border-color: #8B0000; }}
+
 
 #btn_machines {{
-    background: {C['machines']};
-    color: {C['text_on_dark']};
+    background: #303F9F;
+    color:  #303F9F;
+    border: 2px solid #303F9F;
+    border-radius: 10px;
+    padding: 8px 20px;
     font-family: "Font Awesome 6 Free", "Font Awesome 5 Free", {FONT['family']};
     font-weight: 900;
 }}
-#btn_machines:hover {{ background: #303F9F; }}
+#btn_machines:hover {{ background: #303F9F; border-color: #1A237E; }}
 
 #btn_secondary {{
     background: {C['ledger']};
