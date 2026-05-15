@@ -145,14 +145,14 @@ class ScreenShell(QWidget):
 
     def _build(self, title: str, subtitle: str):
         root = QVBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 0)
+        root.setContentsMargins(0, 4, 0, 0)
         root.setSpacing(0)
 
         # ─── Header bar
         self._header = QWidget()
         self._header.setObjectName("screen_header")
         hl = QHBoxLayout(self._header)
-        hl.setContentsMargins(MARGIN_CONTENT, 0, MARGIN_CONTENT, 0)
+        hl.setContentsMargins(MARGIN_CONTENT, 10, MARGIN_CONTENT, 25)
         hl.setSpacing(GAP_MD)
 
         title_block = QVBoxLayout()

@@ -58,7 +58,8 @@ class PlatformMoreDialog(BaseDialog):
         scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
 
         self.container = QWidget()
-        self.container.setStyleSheet("background: transparent;")
+        self.container.setObjectName("more_content_container")
+        self.container.setStyleSheet("#more_content_container { background: transparent; }")
         self.scroll_layout = QVBoxLayout(self.container)
         self.scroll_layout.setContentsMargins(0, 0, 0, 0)
         self.scroll_layout.setSpacing(GAP_MD)
@@ -232,25 +233,25 @@ class PlatformMoreDialog(BaseDialog):
         al.setSpacing(12)
 
         if p_type not in ("wallet", "instapay"):
-            dep = QPushButton("💰 إيداع")
-            dep.setObjectName("btn_primary")          # ← غيرته لـ primary
-            dep.setFixedHeight(42)
+            dep = QPushButton("💰  إيداع")
+            dep.setObjectName("btn_primary")
+            dep.setFixedHeight(40)
             dep.setCursor(Qt.CursorShape.PointingHandCursor)
             dep.clicked.connect(self._deposit)
             al.addWidget(dep)
 
         if p_type in ("wallet", "instapay"):
-            lb = QPushButton("✏️ تعديل الحد")
+            lb = QPushButton("✏️  تعديل الحد")
             lb.setObjectName("btn_secondary")
-            lb.setFixedHeight(42)
+            lb.setFixedHeight(40)
             lb.setCursor(Qt.CursorShape.PointingHandCursor)
             lb.clicked.connect(self._edit_limit)
             al.addWidget(lb)
 
         # زرار الحذف
-        db_btn = QPushButton("🗑 حذف")
-        db_btn.setObjectName("btn_primary")
-        db_btn.setFixedHeight(42)
+        db_btn = QPushButton("  حذف")
+        db_btn.setObjectName("btn_danger")
+        db_btn.setFixedHeight(40)
         db_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         db_btn.clicked.connect(self._delete)
         al.addWidget(db_btn)

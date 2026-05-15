@@ -10,7 +10,7 @@ from pathlib import Path
 import gspread
 
 # Configuration
-_CREDS_PATH = Path(__file__).parent.parent / "credentials.json"
+_CREDS_PATH = Path(__file__).parent.parent.parent / "credentials.json"
 _SHEET_NAME = "الحسابات"
 _SHEET_NAMES = ["📊 الملخص", "👤 العملاء", "🏷️ المجموعات"]
 

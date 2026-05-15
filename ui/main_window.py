@@ -82,7 +82,8 @@ class MainWindow(QMainWindow):
         self.stack.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        self.stack.setContentsMargins(0, 0, 0, 0)
+        # Add margins to separate the screen from the sidebar and edges
+        self.stack.setContentsMargins(20, 16, 20, 20)
         main_layout.addWidget(self.stack, 1)
 
     def _build_sidebar(self) -> QWidget:

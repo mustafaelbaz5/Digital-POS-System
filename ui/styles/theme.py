@@ -173,7 +173,7 @@ def set_theme(mode: str) -> None:
 # ──────────────────────────────────────────────────
 
 FONT = {
-    "family": "Tajawal, Cairo, Segoe UI, sans-serif",
+    "family": "Tajawal, Cairo, Segoe UI,",
     "xs": "10px",
     "sm": "12px",
     "md": "14px",
@@ -261,6 +261,23 @@ QWidget {{
     font-weight: bold;
 }}
 
+/* ── Screen Headers ── */
+#screen_header {{
+    background: transparent;
+}}
+#screen_title {{
+    color: {C['text_primary']};
+    font-size: 24px;
+    font-weight: 900;
+    background: transparent;
+}}
+#screen_subtitle {{
+    color: {C['text_secondary']};
+    font-size: 14px;
+    font-weight: bold;
+    background: transparent;
+}}
+
 /* ── Buttons (High-Visibility Deep Palette) ── */
 QPushButton {{
     font-family: "Font Awesome 6 Free", "Font Awesome 5 Free", {FONT['family']};
@@ -271,13 +288,10 @@ QPushButton {{
 
 #btn_primary {{
     background: {C['save']};
-    color: {C['text_primary']};
-    border: 2px solid #0D47A1;
-    border-radius: 10px;
-    padding: 8px 20px;
+    color: {C['text_on_dark']};
     font-weight: 900;
 }}
-#btn_primary:hover {{ background: {C['accent_hover']}; border-color: #082849; }}
+#btn_primary:hover {{ background: {C['accent_hover']}; }}
 
 #btn_success {{
     background: {C['settle']};
@@ -287,13 +301,11 @@ QPushButton {{
 
 #btn_danger {{
     background: {C['delete']};
-    color: {C['text_primary']};
-    border: 2px solid #B71C1C;
-    border-radius: 10px;
-    padding: 8px 20px;
+    color: {C['text_on_dark']};
+    border: none;
     font-weight: 900;
 }}
-#btn_danger:hover {{ background: #B71C1C; border-color: #8B0000; }}
+#btn_danger:hover {{ background: #B71C1C; }}
 
 
 #btn_machines {{
