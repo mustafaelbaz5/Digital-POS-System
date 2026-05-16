@@ -303,4 +303,21 @@ def initialize_database() -> None:
         except Exception as e:
             print(f"[DB] capital movements seed skipped: {e}")
 
+        # payments_history — audit trail for settle_customer_debt entries
+        try:
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS payments_history (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    customer_id INTEGER NOT NULL REFERENCES customers(id),
+                    amount      REAL    NOT NULL,
+                    notes       TEXT,
+                    created_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_payments_history_customer ON payments_history(customer_id);
+                CREATE INDEX IF NOT EXISTS idx_payments_history_created  ON payments_history(created_at);
+            """)
+            conn.commit()
+        except Exception as e:
+            print(f"[DB] payments_history setup: {e}")
+
     print(f"[DB] Database ready: {DB_PATH}")

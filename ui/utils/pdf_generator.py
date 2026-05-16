@@ -71,6 +71,10 @@ class PDFGenerator:
             customer_data.get("transactions", []),
             key=lambda t: t.get("created_at", ""),
         )
+        self.payments = sorted(
+            customer_data.get("payments", []),
+            key=lambda p: p.get("created_at", ""),
+        )
         self.totals = customer_data.get("totals", {})
 
     # ── public entry point ─────────────────────────────────────────
@@ -85,32 +89,53 @@ class PDFGenerator:
     # ── shared ledger computation ──────────────────────────────────
 
     def _compute_ledger_rows(self) -> tuple[list[dict], float]:
-        rows: list[dict] = []
-        balance = 0.0
+        all_entries: list[dict] = []
         for t in self.transactions:
             op = t.get("operation_type", "")
             if op not in ("outbound", "inbound"):
                 continue
-            date_str = (t.get("created_at") or "")[:10]
-            service = t.get("service_name") or "—"
+            service  = t.get("service_name") or "—"
             platform = t.get("platform_name") or ""
-            details = f"{service} ({platform})" if platform else service
-            debit = credit = 0.0
             if op == "outbound":
-                debit = float(t.get("amount_required") or 0)
-                balance += debit
+                details = f"{service} ({platform})" if platform else service
+                all_entries.append({
+                    "created_at": t.get("created_at", ""),
+                    "date":       (t.get("created_at") or "")[:10],
+                    "details":    details,
+                    "debit":      float(t.get("amount_required") or 0),
+                    "credit":     0.0,
+                })
             else:
-                credit = float(t.get("amount_spent") or 0)
-                balance -= credit
-            rows.append(
-                {
-                    "date": date_str,
-                    "details": details,
-                    "debit": debit,
-                    "credit": credit,
-                    "balance": balance,
-                }
-            )
+                all_entries.append({
+                    "created_at": t.get("created_at", ""),
+                    "date":       (t.get("created_at") or "")[:10],
+                    "details":    "دفعة من العميل",
+                    "debit":      0.0,
+                    "credit":     float(t.get("amount_spent") or 0),
+                })
+
+        for p in self.payments:
+            all_entries.append({
+                "created_at": p.get("created_at", ""),
+                "date":       (p.get("created_at") or "")[:10],
+                "details":    "تسديد سريع",
+                "debit":      0.0,
+                "credit":     float(p.get("amount") or 0),
+            })
+
+        all_entries.sort(key=lambda e: e["created_at"])
+
+        rows: list[dict] = []
+        balance = 0.0
+        for e in all_entries:
+            balance += e["debit"] - e["credit"]
+            rows.append({
+                "date":    e["date"],
+                "details": e["details"],
+                "debit":   e["debit"],
+                "credit":  e["credit"],
+                "balance": balance,
+            })
         return rows, balance
 
     def _temp_path(self, ext: str = "pdf") -> str:

@@ -1,14 +1,15 @@
 """
-statement_screen.py — كشف حساب العميل (Master-Detail View)
+statement_screen.py — كشف حساب العميل (Ledger + Operations Dual-Tab)
 """
 
 import os
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import QLocale, Qt, QTimer
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
+    QDoubleSpinBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -16,6 +17,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSizePolicy,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -23,8 +25,11 @@ from PyQt6.QtWidgets import (
 import database as db
 from ui.components.widgets import BaseDialog, DataTable
 from ui.screens.settlement_dialog import QuickSettleDialog
-from ui.styles.theme import COLORS, FONT, GAP_LG, GAP_MD
+from ui.styles.theme import COLORS, FONT, GAP_LG, GAP_MD, GAP_SM
 from ui.utils.formatters import fmt_currency
+
+RTL = Qt.LayoutDirection.RightToLeft
+
 
 # ══════════════════════════════════════════
 #  Summary Card Component
@@ -42,14 +47,16 @@ class SummaryCard(QFrame):
 
         self.val_lbl = QLabel(value)
         self.val_lbl.setStyleSheet(
-            f"color: {color or COLORS['text_primary']}; font-size: {FONT['xl']}; font-weight: bold; background: transparent; border: none;"
+            f"color: {color or COLORS['text_primary']}; font-size: {FONT['xl']}; "
+            f"font-weight: bold; background: transparent; border: none;"
         )
         self.val_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.val_lbl)
 
         self.lbl = QLabel(label)
         self.lbl.setStyleSheet(
-            f"color: {COLORS['text_secondary']}; font-size: {FONT['sm']}; background: transparent; border: none;"
+            f"color: {COLORS['text_secondary']}; font-size: {FONT['sm']}; "
+            f"background: transparent; border: none;"
         )
         self.lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.lbl)
@@ -64,7 +71,8 @@ class SummaryCard(QFrame):
                 }}
             """)
             self.val_lbl.setStyleSheet(
-                f"color: {COLORS['clients']}; font-size: 32px; font-weight: 900; background: transparent; border: none;"
+                f"color: {COLORS['clients']}; font-size: 32px; "
+                f"font-weight: 900; background: transparent; border: none;"
             )
         else:
             self.setStyleSheet("")
@@ -74,7 +82,7 @@ class SummaryCard(QFrame):
 
 
 # ══════════════════════════════════════════
-#  كشف حساب العميل (Master-Detail)
+#  كشف حساب العميل — Dual-Tab Ledger View
 # ══════════════════════════════════════════
 
 
@@ -83,55 +91,133 @@ class CustomerStatementDialog(QDialog):
     def __init__(self, customer_id: int, parent=None):
         super().__init__(parent)
         self.customer_id = customer_id
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.setLayoutDirection(RTL)
         self.setWindowTitle("كشف حساب العميل")
         self.setMinimumSize(1300, 850)
         self.setObjectName("dialog")
-
         self._load_data()
         self._build_ui()
 
+    # ── Data ──────────────────────────────────────────────────────
+
     def _load_data(self):
         self._data = db.get_customer_statement(self.customer_id)
+        self._ledger_rows = self._compute_ledger()
+        self._allocations = self._compute_fifo_allocations()
+
+    def _compute_ledger(self) -> list[dict]:
+        """Merge outbound ops, inbound ops, and quick-pay settlements into a
+        unified running-balance ledger sorted newest-first for display."""
+        all_entries: list[dict] = []
+
+        for t in self._data.get("transactions", []):
+            op = t.get("operation_type", "")
+            if op == "outbound":
+                all_entries.append({
+                    "created_at":  t.get("created_at", ""),
+                    "description": t.get("service_name") or "عملية شحن",
+                    "debit":       float(t.get("amount_required") or 0),
+                    "credit":      0.0,
+                })
+            elif op == "inbound":
+                all_entries.append({
+                    "created_at":  t.get("created_at", ""),
+                    "description": "💰  دفعة من العميل",
+                    "debit":       0.0,
+                    "credit":      float(t.get("amount_spent") or 0),
+                })
+
+        for p in self._data.get("payments", []):
+            all_entries.append({
+                "created_at":  p.get("created_at", ""),
+                "description": "💳  تسديد سريع",
+                "debit":       0.0,
+                "credit":      float(p.get("amount") or 0),
+            })
+
+        # Compute running balance ascending, then reverse for newest-first display
+        all_entries.sort(key=lambda e: e["created_at"])
+
+        rows: list[dict] = []
+        balance = 0.0
+        for e in all_entries:
+            balance += e["debit"] - e["credit"]
+            rows.append({
+                "date":        e["created_at"][:16].replace("T", " "),
+                "description": e["description"],
+                "debit":       e["debit"],
+                "credit":      e["credit"],
+                "balance":     balance,
+            })
+
+        rows.reverse()
+        return rows
+
+    def _compute_fifo_allocations(self) -> dict:
+        """FIFO: how much of each outbound op is covered by inbound payments."""
+        txns = sorted(
+            self._data.get("transactions", []),
+            key=lambda t: t.get("created_at", ""),
+        )
+        outbounds = [
+            (t["id"], float(t.get("amount_required") or 0))
+            for t in txns if t.get("operation_type") == "outbound"
+        ]
+        pool = sum(
+            float(t.get("amount_spent") or 0)
+            for t in txns if t.get("operation_type") == "inbound"
+        )
+        allocations: dict = {}
+        for txn_id, required in outbounds:
+            covered = min(pool, required)
+            allocations[txn_id] = {
+                "paid": covered,
+                "remaining": max(0.0, required - covered),
+            }
+            pool = max(0.0, pool - required)
+        return allocations
+
+    # ── UI Build ──────────────────────────────────────────────────
 
     def _build_ui(self):
-        self.main_layout = QVBoxLayout(self)
-        self.main_layout.setContentsMargins(0, 0, 0, 24)
-        self.main_layout.setSpacing(GAP_LG)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 24)
+        root.setSpacing(GAP_LG)
 
-        # 1. Header (Identity) - Themed as Section Header
-        self.main_layout.addLayout(self._make_header())
+        root.addLayout(self._make_header())
 
-        # Body container for content with margins
-        self.body_container = QVBoxLayout()
-        self.body_container.setContentsMargins(24, 0, 24, 0)
-        self.body_container.setSpacing(GAP_LG)
-        self.main_layout.addLayout(self.body_container)
+        body = QVBoxLayout()
+        body.setContentsMargins(24, 0, 24, 0)
+        body.setSpacing(GAP_LG)
+        root.addLayout(body)
 
-        # 2. Statement actions
-        self.body_container.addWidget(self._make_action_bar())
+        body.addWidget(self._make_action_bar())
+        body.addLayout(self._make_master_cards())
 
-        # 3. Master Section (Summary Cards)
-        self.body_container.addLayout(self._make_master_cards())
+        # ── Dual-tab area ─────────────────────────────────────────
+        self.tabs = QTabWidget()
+        self.tabs.setLayoutDirection(RTL)
 
-        # 4. Detail Section (Table)
-        self.body_container.addLayout(self._make_detail_table())
+        self.tabs.addTab(self._make_ledger_tab(),     "📒  سجل الحساب")
+        self.tabs.addTab(self._make_operations_tab(), "📋  المعاملات")
 
-        # Initial fill
+        body.addWidget(self.tabs)
+
+        self._fill_ledger()
         self._fill_table()
 
-    def _make_header(self) -> QVBoxLayout:
-        # Wrapper for colored header
-        header_wrap = QVBoxLayout()
+    # ── Header ────────────────────────────────────────────────────
 
-        header_frame = QFrame()
-        header_frame.setFixedHeight(80)
-        header_frame.setStyleSheet(f"""
+    def _make_header(self) -> QVBoxLayout:
+        wrap = QVBoxLayout()
+        frame = QFrame()
+        frame.setFixedHeight(80)
+        frame.setStyleSheet(f"""
             background: {COLORS['clients']};
             border-top-left-radius: 14px;
             border-top-right-radius: 14px;
         """)
-        hl = QHBoxLayout(header_frame)
+        hl = QHBoxLayout(frame)
         hl.setContentsMargins(24, 0, 24, 0)
 
         c = self._data["customer"]
@@ -141,17 +227,16 @@ class CustomerStatementDialog(QDialog):
 
         name_lbl = QLabel(c.get("name", "—"))
         name_lbl.setStyleSheet(
-            f"color: {COLORS['text_on_dark']}; font-size: {FONT['2xl']}; font-weight: bold; background: transparent;"
+            f"color: {COLORS['text_on_dark']}; font-size: {FONT['2xl']}; "
+            f"font-weight: bold; background: transparent;"
         )
         info_col.addWidget(name_lbl)
 
-        sub_info = QLabel(
-            f"📞 {c.get('phone', '—')}  |  📂 {c.get('group_name', 'بدون مجموعة')}"
-        )
-        sub_info.setStyleSheet(
+        sub = QLabel(f"📞 {c.get('phone', '—')}  |  📂 {c.get('group_name', 'بدون مجموعة')}")
+        sub.setStyleSheet(
             f"color: rgba(255,255,255,0.8); font-size: {FONT['md']}; background: transparent;"
         )
-        info_col.addWidget(sub_info)
+        info_col.addWidget(sub)
 
         hl.addLayout(info_col)
         hl.addStretch()
@@ -166,18 +251,19 @@ class CustomerStatementDialog(QDialog):
         close_btn.clicked.connect(self.accept)
         hl.addWidget(close_btn)
 
-        header_wrap.addWidget(header_frame)
-        return header_wrap
+        wrap.addWidget(frame)
+        return wrap
+
+    # ── Action Bar ────────────────────────────────────────────────
 
     def _make_action_bar(self) -> QFrame:
-        action_bar = QFrame()
-        action_bar.setObjectName("statement_action_bar")
-
-        layout = QHBoxLayout(action_bar)
+        bar = QFrame()
+        bar.setObjectName("statement_action_bar")
+        layout = QHBoxLayout(bar)
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(15)
 
-        self.print_btn = QPushButton("\uf02f  طباعة")
+        self.print_btn = QPushButton("  طباعة")
         self.print_btn.setObjectName("statement_print_btn")
         self.print_btn.setFixedHeight(40)
         self.print_btn.setMinimumWidth(150)
@@ -185,7 +271,7 @@ class CustomerStatementDialog(QDialog):
         self.print_btn.clicked.connect(self._print_report)
         layout.addWidget(self.print_btn)
 
-        self.settle_btn = QPushButton("\uf2b5  تسديد سريع")
+        self.settle_btn = QPushButton("  تسديد سريع")
         self.settle_btn.setObjectName("statement_settle_btn")
         self.settle_btn.setFixedHeight(40)
         self.settle_btn.setMinimumWidth(180)
@@ -203,7 +289,9 @@ class CustomerStatementDialog(QDialog):
         self.print_status_lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(self.print_status_lbl)
 
-        return action_bar
+        return bar
+
+    # ── Master Cards ──────────────────────────────────────────────
 
     def _make_master_cards(self) -> QHBoxLayout:
         layout = QHBoxLayout()
@@ -213,10 +301,14 @@ class CustomerStatementDialog(QDialog):
         net = (t.get("total_pending") or 0) - (t.get("total_due") or 0)
 
         self.card_owed = SummaryCard(
-            "إجمالي المطلوب منه", fmt_currency(t.get("total_pending", 0)), COLORS["red"]
+            "إجمالي المطلوب منه",
+            fmt_currency(t.get("total_pending", 0)),
+            COLORS["red"],
         )
         self.card_owned = SummaryCard(
-            "إجمالي مبالغ العميل", fmt_currency(t.get("total_due", 0)), COLORS["green"]
+            "إجمالي مبالغ العميل",
+            fmt_currency(t.get("total_due", 0)),
+            COLORS["green"],
         )
         self.card_net = SummaryCard(
             "الصافي النهائي (المطلوب)",
@@ -233,40 +325,183 @@ class CustomerStatementDialog(QDialog):
         layout.addWidget(self.card_owned)
         layout.addWidget(self.card_net)
         layout.addWidget(self.card_count)
-
         return layout
 
-    def _make_detail_table(self) -> QVBoxLayout:
-        layout = QVBoxLayout()
-        layout.setSpacing(GAP_MD)
+    # ══════════════════════════════════════════
+    #  Tab 1 — سجل الحساب (Accounting Ledger)
+    # ══════════════════════════════════════════
 
-        title_row = QHBoxLayout()
-        title = QLabel("📋 سجل المعاملات التفصيلي")
-        title.setStyleSheet(
-            f"color: {COLORS['text_primary']}; font-size: {FONT['lg']}; font-weight: bold;"
+    def _make_ledger_tab(self) -> QWidget:
+        widget = QWidget()
+        widget.setLayoutDirection(RTL)
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, GAP_MD, 0, 0)
+        layout.setSpacing(GAP_SM)
+
+        cols = [
+            ("التاريخ",      150),
+            ("البيان",        -1),
+            ("عليه (مدين)",  150),
+            ("له (دائن)",    150),
+            ("الرصيد",       150),
+        ]
+        self.ledger_table = DataTable(cols)
+        self.ledger_table.set_section_color(COLORS["clients"])
+        self.ledger_table.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        title_row.addWidget(title)
-        title_row.addStretch()
+        layout.addWidget(self.ledger_table)
 
-        cleanup_btn = QPushButton("🗑️ تنظيف المسدد")
+        # ── Inline settle form ────────────────────────────────────
+        self._settle_card = QFrame()
+        self._settle_card.setObjectName("card")
+        cl = QVBoxLayout(self._settle_card)
+        cl.setContentsMargins(18, 14, 18, 14)
+        cl.setSpacing(GAP_SM)
+
+        hdr = QHBoxLayout()
+        title_lbl = QLabel("💳  تسديد دفعة")
+        title_lbl.setStyleSheet(
+            f"font-size:{FONT['md']}; font-weight:bold; "
+            f"color:{COLORS['text_primary']}; background:transparent; border:none;"
+        )
+        hdr.addWidget(title_lbl)
+        hdr.addStretch()
+        self._settle_hint = QLabel()
+        self._settle_hint.setStyleSheet(
+            f"font-size:{FONT['sm']}; color:{COLORS['text_muted']}; "
+            f"background:transparent; border:none;"
+        )
+        hdr.addWidget(self._settle_hint)
+        cl.addLayout(hdr)
+
+        input_row = QHBoxLayout()
+        input_row.setSpacing(GAP_MD)
+
+        self._settle_spin = QDoubleSpinBox()
+        self._settle_spin.setLocale(QLocale(QLocale.Language.English))
+        self._settle_spin.setGroupSeparatorShown(True)
+        self._settle_spin.setRange(0.01, 9_999_999)
+        self._settle_spin.setDecimals(2)
+        self._settle_spin.setSuffix("  ج.م")
+        self._settle_spin.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
+        self._settle_spin.setMinimumHeight(44)
+        self._settle_spin.setStyleSheet(
+            f"font-size:{FONT['lg']}; font-weight:bold; color:{COLORS['accent']};"
+        )
+        input_row.addWidget(self._settle_spin, 1)
+
+        self._settle_btn = QPushButton("💚  تسديد الآن")
+        self._settle_btn.setObjectName("btn_success")
+        self._settle_btn.setFixedHeight(44)
+        self._settle_btn.setMinimumWidth(160)
+        self._settle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._settle_btn.clicked.connect(self._ledger_settle)
+        input_row.addWidget(self._settle_btn)
+
+        cl.addLayout(input_row)
+
+        self._settle_feedback = QLabel("")
+        self._settle_feedback.setStyleSheet(
+            f"font-size:{FONT['sm']}; background:transparent; border:none;"
+        )
+        cl.addWidget(self._settle_feedback)
+
+        layout.addWidget(self._settle_card)
+        return widget
+
+    def _fill_ledger(self):
+        rows = self._ledger_rows
+        self.ledger_table.clear_rows()
+        self.ledger_table.setRowCount(len(rows))
+
+        for i, r in enumerate(rows):
+            is_debit = r["debit"] > 0
+
+            # Date
+            self.ledger_table.set_cell(
+                i, 0, r["date"], color=COLORS["text_secondary"]
+            )
+            # Description — bold for operations (debt rows)
+            self.ledger_table.set_cell(i, 1, r["description"], bold=is_debit)
+
+            # عليه / له — mutually exclusive per row
+            if is_debit:
+                self.ledger_table.set_cell(
+                    i, 2, fmt_currency(r["debit"]), color=COLORS["red"], bold=True
+                )
+                self.ledger_table.set_cell(i, 3, "—", color=COLORS["text_muted"])
+            else:
+                self.ledger_table.set_cell(i, 2, "—", color=COLORS["text_muted"])
+                self.ledger_table.set_cell(
+                    i, 3, fmt_currency(r["credit"]), color=COLORS["green"], bold=True
+                )
+
+            # Running balance — red = customer owes, green = credit
+            bal = r["balance"]
+            if bal > 0.005:
+                bal_color, bal_text = COLORS["red"], fmt_currency(bal)
+            elif bal < -0.005:
+                bal_color, bal_text = COLORS["green"], fmt_currency(abs(bal))
+            else:
+                bal_color, bal_text = COLORS["text_muted"], "—"
+            self.ledger_table.set_cell(i, 4, bal_text, color=bal_color, bold=True)
+
+        # Update running-balance indicator label
+        if rows:
+            final = rows[-1]["balance"]
+            if final > 0.005:
+                self._ledger_bal_lbl.setText(f"الرصيد الحالي: {fmt_currency(final)}  (عليه)")
+                self._ledger_bal_lbl.setStyleSheet(
+                    f"color:{COLORS['red']}; font-size:{FONT['lg']}; "
+                    f"font-weight:bold; background:transparent; border:none;"
+                )
+            elif final < -0.005:
+                self._ledger_bal_lbl.setText(f"الرصيد الحالي: {fmt_currency(abs(final))}  (له)")
+                self._ledger_bal_lbl.setStyleSheet(
+                    f"color:{COLORS['green']}; font-size:{FONT['lg']}; "
+                    f"font-weight:bold; background:transparent; border:none;"
+                )
+            else:
+                self._ledger_bal_lbl.setText("الرصيد الحالي: متوازن ✓")
+                self._ledger_bal_lbl.setStyleSheet(
+                    f"color:{COLORS['text_muted']}; font-size:{FONT['lg']}; "
+                    f"font-weight:bold; background:transparent; border:none;"
+                )
+        else:
+            self._ledger_bal_lbl.setText("")
+
+    # ══════════════════════════════════════════
+    #  Tab 2 — المعاملات (Operations)
+    # ══════════════════════════════════════════
+
+    def _make_operations_tab(self) -> QWidget:
+        widget = QWidget()
+        widget.setLayoutDirection(RTL)
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, GAP_MD, 0, 0)
+        layout.setSpacing(GAP_SM)
+
+        toolbar = QHBoxLayout()
+        toolbar.addStretch()
+        cleanup_btn = QPushButton("🗑️  تنظيف المسدد")
         cleanup_btn.setObjectName("btn_danger")
         cleanup_btn.setFixedHeight(32)
         cleanup_btn.clicked.connect(self._cleanup)
-        title_row.addWidget(cleanup_btn)
-
-        layout.addLayout(title_row)
+        toolbar.addWidget(cleanup_btn)
+        layout.addLayout(toolbar)
 
         cols = [
-            ("التاريخ", -1),
-            ("النوع", -1),
-            ("الخدمة", -1),
-            ("المنصة", -1),
-            ("المرجع", -1),
-            ("المصروف", -1),
-            ("المطلوب", -1),
-            ("الربح", -1),
-            ("الحالة", -1),
-            ("الإجراءات", 150),
+            ("التاريخ",    130),
+            ("النوع",      100),
+            ("الخدمة",      -1),
+            ("المنصة",     110),
+            ("المرجع",     100),
+            ("المصروف",    110),
+            ("المطلوب",    110),
+            ("الربح",       90),
+            ("الحالة",     185),
+            ("الإجراءات",  140),
         ]
         self.table = DataTable(cols)
         self.table.set_section_color(COLORS["clients"])
@@ -274,8 +509,7 @@ class CustomerStatementDialog(QDialog):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
         layout.addWidget(self.table)
-
-        return layout
+        return widget
 
     def _fill_table(self):
         txns = self._data.get("transactions", [])
@@ -289,70 +523,78 @@ class CustomerStatementDialog(QDialog):
 
             # Date
             self.table.set_cell(
-                row,
-                0,
+                row, 0,
                 (t.get("created_at") or "")[:16].replace("T", " "),
-                color=COLORS["text_secondary"],
-                bg_color=bg,
+                color=COLORS["text_secondary"], bg_color=bg,
             )
 
             # Type
-            op = t.get("operation_type", "")
             is_out = op == "outbound"
-            type_text = "📤 شحن صادر" if is_out else "📥 استلام"
-            type_color = COLORS["blue"] if is_out else COLORS["purple"]
             self.table.set_cell(
-                row, 1, type_text, color=type_color, bold=True, bg_color=bg
+                row, 1,
+                "📤 شحن صادر" if is_out else "📥 استلام",
+                color=COLORS["blue"] if is_out else COLORS["purple"],
+                bold=True, bg_color=bg,
             )
 
             # Service
             self.table.set_cell(
-                row,
-                2,
-                t.get("service_name") or "—",
+                row, 2, t.get("service_name") or "—",
                 align=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
                 bg_color=bg,
             )
 
             # Platform
             self.table.set_cell(
-                row,
-                3,
-                t.get("platform_name") or "—",
-                color=COLORS["text_secondary"],
-                bg_color=bg,
+                row, 3, t.get("platform_name") or "—",
+                color=COLORS["text_secondary"], bg_color=bg,
             )
 
             # Reference
             ref = "🃏 كارت" if t.get("is_card") else (t.get("reference_no") or "—")
             self.table.set_cell(row, 4, ref, color=COLORS["text_muted"], bg_color=bg)
 
-            # Spent (المصروف)
-            spent = t.get("amount_spent", 0)
+            # Spent
             self.table.set_cell(
-                row, 5, fmt_currency(spent), color=COLORS["text_secondary"], bg_color=bg
+                row, 5, fmt_currency(t.get("amount_spent", 0)),
+                color=COLORS["text_secondary"], bg_color=bg,
             )
 
-            # Required (المطلوب)
-            req = t.get("amount_required", 0)
-            self.table.set_cell(row, 6, fmt_currency(req), bold=True, bg_color=bg)
+            # Required — display-only, NEVER overwritten
+            self.table.set_cell(
+                row, 6, fmt_currency(t.get("amount_required", 0)),
+                bold=True, bg_color=bg,
+            )
 
-            # Profit (الربح)
+            # Profit
             profit = t.get("profit", 0)
-            profit_text = fmt_currency(profit) if not is_manual else "—"
-            profit_color = COLORS["cyan"] if profit >= 0 else COLORS["red"]
-            if is_manual:
-                profit_color = COLORS["text_secondary"]
-            self.table.set_cell(row, 7, profit_text, color=profit_color, bg_color=bg)
+            self.table.set_cell(
+                row, 7,
+                fmt_currency(profit) if not is_manual else "—",
+                color=COLORS["cyan"] if (not is_manual and profit >= 0) else COLORS["red"]
+                      if (not is_manual and profit < 0) else COLORS["text_secondary"],
+                bg_color=bg,
+            )
 
-            # Status
+            # Status with partial-payment badge
             if is_out:
+                alloc = self._allocations.get(t["id"], {
+                    "paid": 0.0,
+                    "remaining": float(t.get("amount_required") or 0),
+                })
                 status = t.get("payment_status", "pending")
-                st_text = "مؤجل ⏳" if status == "pending" else "تم السداد ✓"
-                st_color = COLORS["yellow"] if status == "pending" else COLORS["green"]
+                if status == "paid":
+                    st_text, st_color = "مسدد ✓", COLORS["green"]
+                elif alloc["paid"] > 0.005:
+                    paid_str = fmt_currency(alloc["paid"])
+                    rem_str  = fmt_currency(alloc["remaining"])
+                    st_text  = f"جزئي  |  مدفوع: {paid_str}  |  متبقي: {rem_str}"
+                    st_color = COLORS["yellow"]
+                else:
+                    st_text, st_color = "مؤجل ⏳", COLORS["yellow"]
             else:
                 is_del = bool(t.get("is_delivered", 0))
-                st_text = "تم التسليم ✓" if is_del else "لم يسلم ⏳"
+                st_text  = "تم التسليم ✓" if is_del else "لم يسلم ⏳"
                 st_color = COLORS["green"] if is_del else COLORS["yellow"]
 
             self.table.set_cell(row, 8, st_text, color=st_color, bold=True, bg_color=bg)
@@ -360,13 +602,14 @@ class CustomerStatementDialog(QDialog):
             # Actions
             self._add_actions_button(row, 9, t)
 
+    # ── Actions Menu ──────────────────────────────────────────────
+
     def _add_actions_button(self, row: int, col: int, t: dict):
         btn = QPushButton("⋮ إجراءات")
         btn.setObjectName("btn_ghost")
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setFixedHeight(26)
 
-        # Wrap button in layout for padding
         wrap = QWidget()
         wrap.setObjectName("cell_wrapper_1")
         wrap.setStyleSheet("#cell_wrapper_1 { background: transparent; }")
@@ -376,39 +619,34 @@ class CustomerStatementDialog(QDialog):
 
         def show_menu():
             menu = QMenu(self)
-
             if t["operation_type"] == "outbound":
                 if t["payment_status"] == "pending":
-                    act_pay = QAction(" تحديد كمسدد", self)
-                    act_pay.triggered.connect(
-                        lambda: self._update_status(t["id"], "paid")
-                    )
-                    menu.addAction(act_pay)
+                    a = QAction("✓ تحديد كمسدد", self)
+                    a.triggered.connect(lambda: self._update_status(t["id"], "paid"))
+                    menu.addAction(a)
                 else:
-                    act_unpay = QAction("⏳ تحديد كمؤجل", self)
-                    act_unpay.triggered.connect(
-                        lambda: self._update_status(t["id"], "pending")
-                    )
-                    menu.addAction(act_unpay)
-            else:  # inbound
+                    a = QAction("⏳ تحديد كمؤجل", self)
+                    a.triggered.connect(lambda: self._update_status(t["id"], "pending"))
+                    menu.addAction(a)
+            else:
                 if not t.get("is_delivered", 0):
-                    act_del = QAction("🤝 تحديد كتم التسليم", self)
-                    act_del.triggered.connect(lambda: self._update_status(t["id"], 1))
-                    menu.addAction(act_del)
+                    a = QAction("🤝 تحديد كتم التسليم", self)
+                    a.triggered.connect(lambda: self._update_status(t["id"], 1))
+                    menu.addAction(a)
                 else:
-                    act_undel = QAction("⏳ تحديد كـ لم يُسلّم", self)
-                    act_undel.triggered.connect(lambda: self._update_status(t["id"], 0))
-                    menu.addAction(act_undel)
-
+                    a = QAction("⏳ تحديد كـ لم يُسلّم", self)
+                    a.triggered.connect(lambda: self._update_status(t["id"], 0))
+                    menu.addAction(a)
             menu.addSeparator()
-            act_del = QAction("🗑️ حذف العملية", self)
-            act_del.triggered.connect(lambda: self._delete_txn(t["id"]))
-            menu.addAction(act_del)
-
+            a_del = QAction("🗑️ حذف العملية", self)
+            a_del.triggered.connect(lambda: self._delete_txn(t["id"]))
+            menu.addAction(a_del)
             menu.exec(btn.mapToGlobal(btn.rect().bottomRight()))
 
         btn.clicked.connect(show_menu)
         self.table.setCellWidget(row, col, wrap)
+
+    # ── Mutating Actions ──────────────────────────────────────────
 
     def _update_status(self, tid: int, val):
         try:
@@ -454,16 +692,12 @@ class CustomerStatementDialog(QDialog):
         )
         self.print_status_lbl.setText("جاري إنشاء الملف وإرساله للطابعة...")
         QApplication.processEvents()
-
         try:
             from ui.utils.pdf_generator import PDFGenerator
-
             path = PDFGenerator(self._data).generate()
             path = os.path.abspath(os.path.normpath(path))
             if not os.path.exists(path):
                 raise FileNotFoundError(path)
-
-            # Same reliable launch method used by group reports.
             os.startfile(path)
             self.print_status_lbl.setStyleSheet(
                 f"color:{COLORS['green']}; background:transparent; border:none;"
@@ -479,27 +713,29 @@ class CustomerStatementDialog(QDialog):
         finally:
             self.print_btn.setEnabled(True)
 
+    # ── Refresh ───────────────────────────────────────────────────
+
     def _refresh_ui(self):
-        t = self._data.get("totals", {})
+        t   = self._data.get("totals", {})
         net = (t.get("total_pending") or 0) - (t.get("total_due") or 0)
 
-        # Update settle button visibility
         self.settle_btn.setVisible((t.get("total_pending") or 0) > 0)
 
         self.card_owed.set_value(fmt_currency(t.get("total_pending", 0)))
         self.card_owned.set_value(fmt_currency(t.get("total_due", 0)))
         self.card_net.set_value(fmt_currency(net))
-        # Keep it special and larger than other cards
         self.card_net.val_lbl.setStyleSheet(
-            f"color: {COLORS['accent'] if net >= 0 else COLORS['red']}; font-size: 32px; font-weight: 900;"
+            f"color: {COLORS['accent'] if net >= 0 else COLORS['red']}; "
+            f"font-size: 32px; font-weight: 900; background:transparent; border:none;"
         )
         self.card_count.set_value(str(t.get("total_count", 0)))
 
+        self._fill_ledger()
         self._fill_table()
 
 
 # ══════════════════════════════════════════
-#  Remaining Dialogs (GroupReport, etc.)
+#  GroupReportDialog (unchanged)
 # ══════════════════════════════════════════
 
 
@@ -514,37 +750,32 @@ class GroupReportDialog(BaseDialog):
         self._build_content()
 
     def _build_content(self):
+        from ui.utils.formatters import fmt_currency as _fc
         customers = db.get_customers_by_group(self.group_id)
         total_debt = sum(c.get("total_debt", 0) or 0 for c in customers)
 
         columns = [
-            ("الاسم", 220),
-            ("التليفون", 160),
-            ("المديونية", 150),
-            ("ملاحظات", -1),
+            ("الاسم",      220),
+            ("التليفون",   160),
+            ("المديونية",  150),
+            ("ملاحظات",     -1),
         ]
         self.table = DataTable(columns)
         self.table.setRowCount(len(customers))
         for row, c in enumerate(customers):
             debt = c.get("total_debt", 0) or 0
             self.table.set_cell(row, 0, c["name"], bold=True)
+            self.table.set_cell(row, 1, c.get("phone") or "—", color=COLORS["text_secondary"])
             self.table.set_cell(
-                row, 1, c.get("phone") or "—", color=COLORS["text_secondary"]
-            )
-            self.table.set_cell(
-                row,
-                2,
-                fmt_currency(debt),
+                row, 2, _fc(debt),
                 color=(
-                    COLORS["red"]
-                    if debt > 0
-                    else COLORS["green"] if debt < 0 else COLORS["text_muted"]
+                    COLORS["red"]   if debt > 0
+                    else COLORS["green"] if debt < 0
+                    else COLORS["text_muted"]
                 ),
                 bold=debt != 0,
             )
-            self.table.set_cell(
-                row, 3, c.get("notes") or "—", color=COLORS["text_muted"]
-            )
+            self.table.set_cell(row, 3, c.get("notes") or "—", color=COLORS["text_muted"])
 
         self.body.addWidget(self.table)
 
@@ -552,7 +783,7 @@ class GroupReportDialog(BaseDialog):
         total_frame.setObjectName("card_highlight")
         tl = QHBoxLayout(total_frame)
         tl.setContentsMargins(16, 12, 16, 12)
-        total_lbl = QLabel(f"إجمالي المجموعة: {fmt_currency(total_debt)}")
+        total_lbl = QLabel(f"إجمالي المجموعة: {_fc(total_debt)}")
         total_lbl.setStyleSheet(
             f"color:{COLORS['red'] if total_debt > 0 else COLORS['green']};"
             f"font-size:18px;font-weight:bold;"
@@ -561,14 +792,12 @@ class GroupReportDialog(BaseDialog):
         tl.addWidget(total_lbl)
         self.body.addWidget(total_frame)
 
-        # ── Status label for print feedback
         self._print_status = QLabel("")
         self._print_status.setStyleSheet(
             "background: transparent; border: none; font-size: 12px;"
         )
         self._print_status.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        # Footer — Print button + status + Close
         self.add_stretch()
         footer_row = QHBoxLayout()
         footer_row.setSpacing(12)
@@ -580,7 +809,6 @@ class GroupReportDialog(BaseDialog):
         self._print_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._print_btn.clicked.connect(self._print_report)
         footer_row.addWidget(self._print_btn)
-
         footer_row.addWidget(self._print_status)
         footer_row.addStretch()
         self.body.addLayout(footer_row)
@@ -599,7 +827,6 @@ class GroupReportDialog(BaseDialog):
             if not data:
                 raise ValueError("لم يتم العثور على بيانات المجموعة")
             from ui.utils.pdf_generator import GroupPDFGenerator
-
             path = GroupPDFGenerator(data).generate()
             path = os.path.abspath(os.path.normpath(path))
             if not os.path.exists(path):

@@ -553,6 +553,16 @@ def get_customer_statement(customer_id: int) -> dict:
             (customer_id,),
         ).fetchall()
 
+        payments = conn.execute(
+            """
+            SELECT id, amount, created_at
+            FROM payments_history
+            WHERE customer_id = ?
+            ORDER BY created_at DESC
+            """,
+            (customer_id,),
+        ).fetchall()
+
         totals = conn.execute(
             """
             SELECT
@@ -567,9 +577,10 @@ def get_customer_statement(customer_id: int) -> dict:
         ).fetchone()
 
         return {
-            "customer": dict(customer),
+            "customer":     dict(customer),
             "transactions": [dict(t) for t in transactions],
-            "totals": dict(totals),
+            "totals":       dict(totals),
+            "payments":     [dict(p) for p in payments],
         }
 
 
@@ -1047,6 +1058,12 @@ def settle_customer_debt(customer_id: int, payment_amount: float) -> dict:
                     total_settled  += partial
                     remaining       = 0
                     partial_settled = True
+
+            if total_settled > 0:
+                conn.execute(
+                    "INSERT INTO payments_history (customer_id, amount) VALUES (?, ?)",
+                    (customer_id, total_settled),
+                )
 
             conn.commit()
             return {
