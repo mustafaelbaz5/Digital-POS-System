@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMenu,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QSizePolicy,
     QTabWidget,
@@ -102,7 +103,6 @@ class CustomerStatementDialog(QDialog):
     def _load_data(self):
         self._data = db.get_customer_statement(self.customer_id)
         self._ledger_rows = self._compute_ledger()
-        self._allocations = self._compute_fifo_allocations()
 
     def _compute_ledger(self) -> list[dict]:
         """Merge outbound ops, inbound ops, and quick-pay settlements into a
@@ -151,30 +151,6 @@ class CustomerStatementDialog(QDialog):
 
         rows.reverse()
         return rows
-
-    def _compute_fifo_allocations(self) -> dict:
-        """FIFO: how much of each outbound op is covered by inbound payments."""
-        txns = sorted(
-            self._data.get("transactions", []),
-            key=lambda t: t.get("created_at", ""),
-        )
-        outbounds = [
-            (t["id"], float(t.get("amount_required") or 0))
-            for t in txns if t.get("operation_type") == "outbound"
-        ]
-        pool = sum(
-            float(t.get("amount_spent") or 0)
-            for t in txns if t.get("operation_type") == "inbound"
-        )
-        allocations: dict = {}
-        for txn_id, required in outbounds:
-            covered = min(pool, required)
-            allocations[txn_id] = {
-                "paid": covered,
-                "remaining": max(0.0, required - covered),
-            }
-            pool = max(0.0, pool - required)
-        return allocations
 
     # ── UI Build ──────────────────────────────────────────────────
 
@@ -417,8 +393,9 @@ class CustomerStatementDialog(QDialog):
             ("المرجع",     100),
             ("المصروف",    110),
             ("المطلوب",    110),
+            ("المسدد",     110),
             ("الربح",       90),
-            ("الحالة",     185),
+            ("الحالة",     220),
             ("الإجراءات",  140),
         ]
         self.table = DataTable(cols)
@@ -484,41 +461,85 @@ class CustomerStatementDialog(QDialog):
                 bold=True, bg_color=bg,
             )
 
-            # Profit
+            # Amount paid (col 7)
+            amount_paid = float(t.get("amount_paid") or 0)
+            if is_out and amount_paid > 0:
+                self.table.set_cell(
+                    row, 7, fmt_currency(amount_paid),
+                    color=COLORS["green"], bold=True, bg_color=bg,
+                )
+            else:
+                self.table.set_cell(row, 7, "—", color=COLORS["text_muted"], bg_color=bg)
+
+            # Profit (col 8)
             profit = t.get("profit", 0)
             self.table.set_cell(
-                row, 7,
+                row, 8,
                 fmt_currency(profit) if not is_manual else "—",
                 color=COLORS["cyan"] if (not is_manual and profit >= 0) else COLORS["red"]
                       if (not is_manual and profit < 0) else COLORS["text_secondary"],
                 bg_color=bg,
             )
 
-            # Status with partial-payment badge
+            # Status + progress widget (col 9)
             if is_out:
-                alloc = self._allocations.get(t["id"], {
-                    "paid": 0.0,
-                    "remaining": float(t.get("amount_required") or 0),
-                })
-                status = t.get("payment_status", "pending")
+                required = float(t.get("amount_required") or 0)
+                status   = t.get("payment_status", "pending")
                 if status == "paid":
-                    st_text, st_color = "مسدد ✓", COLORS["green"]
-                elif alloc["paid"] > 0.005:
-                    paid_str = fmt_currency(alloc["paid"])
-                    rem_str  = fmt_currency(alloc["remaining"])
-                    st_text  = f"جزئي  |  مدفوع: {paid_str}  |  متبقي: {rem_str}"
-                    st_color = COLORS["yellow"]
+                    self.table.set_cell(row, 9, "مسدد ✓", color=COLORS["green"], bold=True, bg_color=bg)
+                elif amount_paid > 0.005:
+                    self.table.setCellWidget(row, 9, self._make_progress_widget(amount_paid, required, bg))
                 else:
-                    st_text, st_color = "مؤجل ⏳", COLORS["yellow"]
+                    self.table.set_cell(row, 9, "مؤجل ⏳", color=COLORS["yellow"], bold=True, bg_color=bg)
             else:
-                is_del = bool(t.get("is_delivered", 0))
-                st_text  = "تم التسليم ✓" if is_del else "لم يسلم ⏳"
+                is_del  = bool(t.get("is_delivered", 0))
+                st_text = "تم التسليم ✓" if is_del else "لم يسلم ⏳"
                 st_color = COLORS["green"] if is_del else COLORS["yellow"]
+                self.table.set_cell(row, 9, st_text, color=st_color, bold=True, bg_color=bg)
 
-            self.table.set_cell(row, 8, st_text, color=st_color, bold=True, bg_color=bg)
+            # Actions (col 10)
+            self._add_actions_button(row, 10, t)
 
-            # Actions
-            self._add_actions_button(row, 9, t)
+    # ── Payment Progress Widget ───────────────────────────────────
+
+    def _make_progress_widget(self, paid: float, required: float, bg: str | None) -> QWidget:
+        pct = min(100, int(paid / required * 100)) if required > 0 else 0
+        remaining = required - paid
+
+        wrap = QWidget()
+        wrap.setStyleSheet(f"background: {bg or 'transparent'};")
+        vlay = QVBoxLayout(wrap)
+        vlay.setContentsMargins(8, 4, 8, 4)
+        vlay.setSpacing(3)
+
+        lbl = QLabel(
+            f"جزئي ◑   مدفوع: {fmt_currency(paid)}   |   متبقي: {fmt_currency(remaining)}"
+        )
+        lbl.setStyleSheet(
+            f"color:{COLORS['yellow']}; font-size:{FONT['sm']}; "
+            f"font-weight:bold; background:transparent;"
+        )
+        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        vlay.addWidget(lbl)
+
+        bar = QProgressBar()
+        bar.setRange(0, 100)
+        bar.setValue(pct)
+        bar.setFixedHeight(5)
+        bar.setTextVisible(False)
+        bar.setStyleSheet(f"""
+            QProgressBar {{
+                background: {COLORS.get('bg_secondary', '#2d333b')};
+                border-radius: 2px; border: none;
+            }}
+            QProgressBar::chunk {{
+                background: {COLORS['yellow']};
+                border-radius: 2px;
+            }}
+        """)
+        vlay.addWidget(bar)
+
+        return wrap
 
     # ── Actions Menu ──────────────────────────────────────────────
 

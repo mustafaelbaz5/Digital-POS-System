@@ -303,6 +303,15 @@ def initialize_database() -> None:
         except Exception as e:
             print(f"[DB] capital movements seed skipped: {e}")
 
+        # amount_paid column — non-destructive partial payment tracking
+        try:
+            conn.execute(
+                "ALTER TABLE transactions ADD COLUMN amount_paid REAL NOT NULL DEFAULT 0"
+            )
+            conn.commit()
+        except Exception:
+            pass  # column already exists
+
         # payments_history — audit trail for settle_customer_debt entries
         try:
             conn.executescript("""
