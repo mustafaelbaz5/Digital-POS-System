@@ -4,12 +4,11 @@ statement_screen.py — كشف حساب العميل (Ledger + Operations Dual-T
 
 import os
 
-from PyQt6.QtCore import QLocale, Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
-    QDoubleSpinBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -351,63 +350,6 @@ class CustomerStatementDialog(QDialog):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
         layout.addWidget(self.ledger_table)
-
-        # ── Inline settle form ────────────────────────────────────
-        self._settle_card = QFrame()
-        self._settle_card.setObjectName("card")
-        cl = QVBoxLayout(self._settle_card)
-        cl.setContentsMargins(18, 14, 18, 14)
-        cl.setSpacing(GAP_SM)
-
-        hdr = QHBoxLayout()
-        title_lbl = QLabel("💳  تسديد دفعة")
-        title_lbl.setStyleSheet(
-            f"font-size:{FONT['md']}; font-weight:bold; "
-            f"color:{COLORS['text_primary']}; background:transparent; border:none;"
-        )
-        hdr.addWidget(title_lbl)
-        hdr.addStretch()
-        self._settle_hint = QLabel()
-        self._settle_hint.setStyleSheet(
-            f"font-size:{FONT['sm']}; color:{COLORS['text_muted']}; "
-            f"background:transparent; border:none;"
-        )
-        hdr.addWidget(self._settle_hint)
-        cl.addLayout(hdr)
-
-        input_row = QHBoxLayout()
-        input_row.setSpacing(GAP_MD)
-
-        self._settle_spin = QDoubleSpinBox()
-        self._settle_spin.setLocale(QLocale(QLocale.Language.English))
-        self._settle_spin.setGroupSeparatorShown(True)
-        self._settle_spin.setRange(0.01, 9_999_999)
-        self._settle_spin.setDecimals(2)
-        self._settle_spin.setSuffix("  ج.م")
-        self._settle_spin.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
-        self._settle_spin.setMinimumHeight(44)
-        self._settle_spin.setStyleSheet(
-            f"font-size:{FONT['lg']}; font-weight:bold; color:{COLORS['accent']};"
-        )
-        input_row.addWidget(self._settle_spin, 1)
-
-        self._settle_btn = QPushButton("💚  تسديد الآن")
-        self._settle_btn.setObjectName("btn_success")
-        self._settle_btn.setFixedHeight(44)
-        self._settle_btn.setMinimumWidth(160)
-        self._settle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._settle_btn.clicked.connect(self._ledger_settle)
-        input_row.addWidget(self._settle_btn)
-
-        cl.addLayout(input_row)
-
-        self._settle_feedback = QLabel("")
-        self._settle_feedback.setStyleSheet(
-            f"font-size:{FONT['sm']}; background:transparent; border:none;"
-        )
-        cl.addWidget(self._settle_feedback)
-
-        layout.addWidget(self._settle_card)
         return widget
 
     def _fill_ledger(self):
@@ -446,30 +388,6 @@ class CustomerStatementDialog(QDialog):
             else:
                 bal_color, bal_text = COLORS["text_muted"], "—"
             self.ledger_table.set_cell(i, 4, bal_text, color=bal_color, bold=True)
-
-        # Update running-balance indicator label
-        if rows:
-            final = rows[-1]["balance"]
-            if final > 0.005:
-                self._ledger_bal_lbl.setText(f"الرصيد الحالي: {fmt_currency(final)}  (عليه)")
-                self._ledger_bal_lbl.setStyleSheet(
-                    f"color:{COLORS['red']}; font-size:{FONT['lg']}; "
-                    f"font-weight:bold; background:transparent; border:none;"
-                )
-            elif final < -0.005:
-                self._ledger_bal_lbl.setText(f"الرصيد الحالي: {fmt_currency(abs(final))}  (له)")
-                self._ledger_bal_lbl.setStyleSheet(
-                    f"color:{COLORS['green']}; font-size:{FONT['lg']}; "
-                    f"font-weight:bold; background:transparent; border:none;"
-                )
-            else:
-                self._ledger_bal_lbl.setText("الرصيد الحالي: متوازن ✓")
-                self._ledger_bal_lbl.setStyleSheet(
-                    f"color:{COLORS['text_muted']}; font-size:{FONT['lg']}; "
-                    f"font-weight:bold; background:transparent; border:none;"
-                )
-        else:
-            self._ledger_bal_lbl.setText("")
 
     # ══════════════════════════════════════════
     #  Tab 2 — المعاملات (Operations)
