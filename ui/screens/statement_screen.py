@@ -94,7 +94,12 @@ class CustomerStatementDialog(QDialog):
         self.customer_id = customer_id
         self.setLayoutDirection(RTL)
         self.setWindowTitle("كشف حساب العميل")
-        self.setMinimumSize(1300, 850)
+        
+        # Default opening size (wider and taller for better data visibility)
+        self.resize(1400, 900)
+        # Allow resizing down to a reasonable minimum
+        self.setMinimumSize(1100, 750)
+        
         self.setObjectName("dialog")
         self._load_data()
         self._build_ui()
@@ -269,32 +274,50 @@ class CustomerStatementDialog(QDialog):
 
     # ── Master Cards ──────────────────────────────────────────────
 
+    def _compute_summary(self) -> dict:
+        """Derive card values from loaded data — no status flag dependency."""
+        total_required = sum(
+            float(t.get("amount_required") or 0)
+            for t in self._data.get("transactions", [])
+            if t.get("operation_type") == "outbound"
+        )
+        total_payments = sum(
+            float(p.get("amount") or 0)
+            for p in self._data.get("payments", [])
+        )
+        txn_count = self._data.get("totals", {}).get("total_count", 0)
+        return {
+            "total_required": total_required,
+            "total_payments": total_payments,
+            "net":            total_required - total_payments,
+            "total_count":    txn_count,
+        }
+
     def _make_master_cards(self) -> QHBoxLayout:
         layout = QHBoxLayout()
         layout.setSpacing(GAP_MD)
 
-        t = self._data.get("totals", {})
-        net = (t.get("total_pending") or 0) - (t.get("total_due") or 0)
+        s = self._compute_summary()
 
         self.card_owed = SummaryCard(
-            "إجمالي المطلوب منه",
-            fmt_currency(t.get("total_pending", 0)),
+            "إجمالي المطلوب",
+            fmt_currency(s["total_required"]),
             COLORS["red"],
         )
         self.card_owned = SummaryCard(
-            "إجمالي مبالغ العميل",
-            fmt_currency(t.get("total_due", 0)),
+            "إجمالي المسدد",
+            fmt_currency(s["total_payments"]),
             COLORS["green"],
         )
         self.card_net = SummaryCard(
-            "الصافي النهائي (المطلوب)",
-            fmt_currency(net),
-            COLORS["clients"] if net >= 0 else COLORS["red"],
+            "الصافي النهائي",
+            fmt_currency(s["net"]),
+            COLORS["red"] if s["net"] > 0.005 else COLORS["green"],
         )
         self.card_net.set_featured(True)
 
         self.card_count = SummaryCard(
-            "عدد العمليات", str(t.get("total_count", 0)), COLORS["accent"]
+            "عدد العمليات", str(s["total_count"]), COLORS["accent"]
         )
 
         layout.addWidget(self.card_owed)
@@ -667,19 +690,18 @@ class CustomerStatementDialog(QDialog):
     # ── Refresh ───────────────────────────────────────────────────
 
     def _refresh_ui(self):
-        t   = self._data.get("totals", {})
-        net = (t.get("total_pending") or 0) - (t.get("total_due") or 0)
+        s = self._compute_summary()
 
-        self.settle_btn.setVisible((t.get("total_pending") or 0) > 0)
+        self.settle_btn.setVisible(s["net"] > 0.005)
 
-        self.card_owed.set_value(fmt_currency(t.get("total_pending", 0)))
-        self.card_owned.set_value(fmt_currency(t.get("total_due", 0)))
-        self.card_net.set_value(fmt_currency(net))
+        self.card_owed.set_value(fmt_currency(s["total_required"]))
+        self.card_owned.set_value(fmt_currency(s["total_payments"]))
+        self.card_net.set_value(fmt_currency(s["net"]))
         self.card_net.val_lbl.setStyleSheet(
-            f"color: {COLORS['accent'] if net >= 0 else COLORS['red']}; "
+            f"color: {COLORS['red'] if s['net'] > 0.005 else COLORS['green']}; "
             f"font-size: 32px; font-weight: 900; background:transparent; border:none;"
         )
-        self.card_count.set_value(str(t.get("total_count", 0)))
+        self.card_count.set_value(str(s["total_count"]))
 
         self._fill_ledger()
         self._fill_table()

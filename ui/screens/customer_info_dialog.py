@@ -206,26 +206,29 @@ class CustomerInfoDialog(BaseDialog):
         )
         hl.addWidget(code_lbl, 1)
 
-        edit_btn = QPushButton("✏️")
-        edit_btn.setFixedSize(28, 28)
-        edit_btn.setToolTip("تعديل")
+        edit_btn = QPushButton("تعديل")
+        edit_btn.setFixedSize(60, 26)
         edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        edit_btn.setStyleSheet(
-            f"background:{COLORS['bg_hover']}; color:{COLORS['blue']}; "
-            f"border:1px solid {COLORS['border']}; border-radius:6px; font-size:14px;"
-        )
+        edit_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {COLORS['accent_dim']}; color: {COLORS['accent']};
+                border: none; border-radius: 4px; font-weight: bold; font-size: 11px;
+            }}
+            QPushButton:hover {{ background: {COLORS['bg_hover']}; }}
+        """)
         edit_btn.clicked.connect(lambda _, c=code_dict: self._edit_code(c))
         hl.addWidget(edit_btn)
 
-        del_btn = QPushButton("🗑️")
-        del_btn.setIconSize(del_btn.sizeHint())
-        del_btn.setFixedSize(24, 24)
-        del_btn.setToolTip("حذف")
+        del_btn = QPushButton("إزالة")
+        del_btn.setFixedSize(60, 26)
         del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        del_btn.setStyleSheet(
-            f"background:{COLORS['delete']}; color:{COLORS['text_on_dark']}; "
-            "border:1px solid #8E0000; border-radius:6px; font-size:13px; padding:0;"
-        )
+        del_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {COLORS['red_bg']}; color: {COLORS['red']};
+                border: none; border-radius: 4px; font-weight: bold; font-size: 11px;
+            }}
+            QPushButton:hover {{ background: #fee2e2; }}
+        """)
         del_btn.clicked.connect(lambda _, c=code_dict: self._delete_code(c))
         hl.addWidget(del_btn)
 
