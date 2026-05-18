@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QComboBox,
+    QCompleter,
     QFormLayout,
     QFrame,
     QHBoxLayout,
@@ -755,10 +756,16 @@ class GroupDialog(BaseDialog):
         title = "تعديل مجموعة" if group else "➕ إضافة مجموعة جديدة"
         super().__init__(title, parent)
         self.group = group
-        self.setMinimumWidth(700)
+        self._members = []
+        self._all_customers = []
+        self._pending_adds = []
+        self._pending_removals = []
+        self.setMinimumWidth(750)
         self._build_form()
         if group:
             self._fill()
+        else:
+            self._render_members()
 
     def _build_form(self):
         form = QFormLayout()
@@ -770,9 +777,8 @@ class GroupDialog(BaseDialog):
 
         self.leader_combo = QComboBox()
         self.leader_combo.addItem("بدون قائد", None)
-        for c in db.get_all_customers():
-            self.leader_combo.addItem(c["name"], c["id"])
-
+        # Note: We'll populate this in _fill or after loading customers
+        
         self.notes_input = QTextEdit()
         self.notes_input.setMaximumHeight(80)
         self.notes_input.setPlaceholderText("ملاحظات (اختياري)")
@@ -783,19 +789,164 @@ class GroupDialog(BaseDialog):
 
         self.body.addLayout(form)
 
+        # ── Members Section ──────────────────────────────────
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet(f"background:{COLORS['border']}; margin: 15px 0 10px 0;")
+        self.body.addWidget(sep)
+
+        members_title = QLabel("👥  إدارة أعضاء المجموعة")
+        members_title.setStyleSheet(f"font-weight:bold; color:{COLORS['text_primary']}; font-size:{FONT['md']};")
+        self.body.addWidget(members_title)
+
+        # Search row
+        search_row = QHBoxLayout()
+        self.cust_search = QLineEdit()
+        self.cust_search.setPlaceholderText("🔍  ابحث عن عميل بالاسم أو التليفون لإضافته...")
+        self.cust_search.setFixedHeight(42)
+        self.cust_search.setStyleSheet(f"border: 2px solid {COLORS['border']}; border-radius: 8px; padding: 0 12px;")
+        search_row.addWidget(self.cust_search)
+        self.body.addLayout(search_row)
+
+        # Members List Scroll Area
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFixedHeight(220)
+        scroll.setStyleSheet(
+            f"QScrollArea {{ border: 1px solid {COLORS['border']}; border-radius: 8px; background: {COLORS['bg_hover']}; }}"
+            "QWidget { background: transparent; }"
+        )
+        
+        container = QWidget()
+        self.members_vbox = QVBoxLayout(container)
+        self.members_vbox.setContentsMargins(10, 10, 10, 10)
+        self.members_vbox.setSpacing(8)
+        self.members_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
+        scroll.setWidget(container)
+        self.body.addWidget(scroll)
+
         # Footer buttons
         self.add_stretch()
         self.add_button("إلغاء", self.reject, role="secondary")
         self.add_button("حفظ ✓", self._save, role="primary")
 
+        # Setup Search Completer
+        self._setup_search()
+
+    def _setup_search(self):
+        self._all_customers = db.get_all_customers()
+        
+        # Populate leader combo
+        current_lid = self.group.get("leader_id") if self.group else None
+        self.leader_combo.blockSignals(True)
+        self.leader_combo.clear()
+        self.leader_combo.addItem("بدون قائد", None)
+        for c in self._all_customers:
+            self.leader_combo.addItem(c["name"], c["id"])
+        if current_lid:
+            idx = self.leader_combo.findData(current_lid)
+            if idx >= 0: self.leader_combo.setCurrentIndex(idx)
+        self.leader_combo.blockSignals(False)
+
+        # Completer
+        names = [c["name"] for c in self._all_customers]
+        completer = QCompleter(names, self)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self.cust_search.setCompleter(completer)
+        completer.activated.connect(self._on_customer_selected)
+
+    def _on_customer_selected(self, name: str):
+        customer = next((c for c in self._all_customers if c["name"] == name), None)
+        if not customer:
+            return
+        
+        # Check if already in group
+        if any(m["id"] == customer["id"] for m in self._members):
+            QMessageBox.information(self, "تنبيه", "هذا العميل موجود بالفعل في المجموعة")
+            self.cust_search.clear()
+            return
+
+        # Confirmation if moving from another group
+        if customer.get("group_id") and (not self.group or customer["group_id"] != self.group["id"]):
+            old_group = customer.get("group_name") or "مجموعة أخرى"
+            if QMessageBox.question(self, "تأكيد النقل",
+                                    f"العميل [{customer['name']}] مسجل في [{old_group}]. هل تريد نقله لهذه المجموعة؟",
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.No:
+                self.cust_search.clear()
+                return
+
+        # Add to local list
+        self._members.append(customer)
+        if customer["id"] in self._pending_removals:
+            self._pending_removals.remove(customer["id"])
+        else:
+            self._pending_adds.append(customer["id"])
+        
+        self.cust_search.clear()
+        self._render_members()
+
+    def _render_members(self):
+        # Clear vbox
+        while self.members_vbox.count():
+            item = self.members_vbox.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        if not self._members:
+            empty = QLabel("لا يوجد أعضاء في هذه المجموعة حالياً")
+            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            empty.setStyleSheet(f"color: {COLORS['text_muted']}; padding: 40px; font-style: italic;")
+            self.members_vbox.addWidget(empty)
+            return
+
+        for m in self._members:
+            row_widget = QWidget()
+            row_widget.setFixedHeight(40)
+            row_widget.setStyleSheet(
+                f"background: white; border: 1px solid {COLORS['border']}; border-radius: 6px;"
+            )
+            row_layout = QHBoxLayout(row_widget)
+            row_layout.setContentsMargins(12, 0, 8, 0)
+            
+            lbl = QLabel(f"👤  {m['name']}")
+            lbl.setStyleSheet(f"font-weight: bold; color: {COLORS['text_primary']};")
+            row_layout.addWidget(lbl)
+            
+            if m.get("phone"):
+                phone = QLabel(m["phone"])
+                phone.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 12px;")
+                row_layout.addWidget(phone)
+            
+            row_layout.addStretch()
+            
+            del_btn = QPushButton("✕  إزالة")
+            del_btn.setFixedSize(70, 26)
+            del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            del_btn.setStyleSheet(
+                f"background: {COLORS['red_bg']}; color: {COLORS['red']}; "
+                "border: none; border-radius: 4px; font-size: 11px; font-weight: bold;"
+            )
+            del_btn.clicked.connect(lambda _, cid=m["id"]: self._remove_member(cid))
+            row_layout.addWidget(del_btn)
+            
+            self.members_vbox.addWidget(row_widget)
+
+    def _remove_member(self, cid: int):
+        self._members = [m for m in self._members if m["id"] != cid]
+        if cid in self._pending_adds:
+            self._pending_adds.remove(cid)
+        else:
+            self._pending_removals.append(cid)
+        self._render_members()
+
     def _fill(self):
         self.name_input.setText(self.group.get("name", ""))
         self.notes_input.setPlainText(self.group.get("notes", ""))
-        lid = self.group.get("leader_id")
-        if lid:
-            idx = self.leader_combo.findData(lid)
-            if idx >= 0:
-                self.leader_combo.setCurrentIndex(idx)
+        
+        # Load members
+        self._members = db.get_customers_by_group(self.group["id"])
+        self._render_members()
 
     def _save(self):
         name = self.name_input.text().strip()
@@ -805,10 +956,19 @@ class GroupDialog(BaseDialog):
         try:
             lid = self.leader_combo.currentData()
             notes = self.notes_input.toPlainText().strip()
+            
             if self.group:
                 db.update_group(self.group["id"], name, lid, notes)
+                gid = self.group["id"]
             else:
-                db.add_group(name, lid, notes)
+                gid = db.add_group(name, lid, notes)
+            
+            # Update members in DB
+            for cid in self._pending_adds:
+                db.assign_customer_to_group(cid, gid)
+            for cid in self._pending_removals:
+                db.assign_customer_to_group(cid, None)
+
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "خطأ", str(e))

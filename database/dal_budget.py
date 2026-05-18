@@ -145,6 +145,9 @@ def add_platform(name: str, platform_type: str, initial_balance: float = 0,
         else:
             monthly_limit = 0
 
+    if monthly_limit > 0 and initial_balance > monthly_limit:
+        raise ValueError(f"الرصيد الابتدائي ({initial_balance:,.2f}) لا يمكن أن يتجاوز الحد الشهري ({monthly_limit:,.2f})")
+
     with get_connection() as conn:
         # Check if active platform with same name already exists
         existing = conn.execute(
@@ -162,9 +165,13 @@ def add_platform(name: str, platform_type: str, initial_balance: float = 0,
                 # Deduct from main budget
                 conn.execute("UPDATE budget SET main_budget = main_budget - ? WHERE id = 1", (initial_balance,))
 
+            monthly_used = 0
+            if platform_type in ('wallet', 'instapay'):
+                monthly_used = initial_balance
+
             cursor = conn.execute(
-                "INSERT INTO platforms (name, type, balance, initial_balance, monthly_limit) VALUES (?, ?, ?, ?, ?)",
-                (name, platform_type, initial_balance, initial_balance, monthly_limit)
+                "INSERT INTO platforms (name, type, balance, initial_balance, monthly_limit, monthly_used) VALUES (?, ?, ?, ?, ?, ?)",
+                (name, platform_type, initial_balance, initial_balance, monthly_limit, monthly_used)
             )
             platform_id = cursor.lastrowid
 

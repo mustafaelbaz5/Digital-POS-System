@@ -237,6 +237,16 @@ def update_customer(customer_id: int, name: str, phone: str = "",
         conn.commit()
 
 
+def assign_customer_to_group(customer_id: int, group_id: int | None) -> None:
+    """تغيير المجموعة لعميل معين"""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE customers SET group_id = ? WHERE id = ?",
+            (group_id, customer_id)
+        )
+        conn.commit()
+
+
 def adjust_customer_debt(customer_id: int, delta: float, conn=None) -> None:
     """
     زيادة أو خصم من مديونية عميل

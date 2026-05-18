@@ -187,16 +187,6 @@ class CompactTransactionTab(QWidget):
         ex_row1.addWidget(self.ref_input)
         ex.addLayout(ex_row1)
 
-        # Row 2: Notes
-        ex_row2 = QHBoxLayout()
-        ln = QLabel("ملاحظات:")
-        ln.setStyleSheet(f"color:{COLORS['text_secondary']};")
-        ex_row2.addWidget(ln)
-        self.notes_input = QLineEdit()
-        self.notes_input.setPlaceholderText("ملاحظات إضافية...")
-        ex_row2.addWidget(self.notes_input)
-        ex.addLayout(ex_row2)
-
         root.addWidget(self.extras_panel)
 
         # ── 6. Date Display ────────────────────────────────────────
@@ -316,7 +306,6 @@ class CompactTransactionTab(QWidget):
         spent = self.amount_spent.value()
         req = self.amount_req.value()
         ref = self.ref_input.text().strip()
-        notes = self.notes_input.text().strip()
 
         if not cid or cid <= 0:
             QMessageBox.warning(self, "تنبيه", "يجب اختيار عميل من القائمة لإتمام العملية.")
@@ -346,7 +335,7 @@ class CompactTransactionTab(QWidget):
                     payment_status=status,
                     reference_no=ref,
                     is_card=False,
-                    notes=notes,
+                    notes="",
                     created_at=created_at,
                 )
             else:
@@ -358,7 +347,7 @@ class CompactTransactionTab(QWidget):
                     amount_received=req,
                     amount_delivered=spent,
                     reference_no=ref,
-                    notes=notes,
+                    notes="",
                     is_delivered=is_del,
                     created_at=created_at,
                 )
@@ -370,7 +359,6 @@ class CompactTransactionTab(QWidget):
             self.amount_spent.setValue(0)
             self.amount_req.setValue(0)
             self.ref_input.clear()
-            self.notes_input.clear()
             self.service_input.clear()
             self.customer_combo.setCurrentIndex(-1)
             self.customer_combo.setEditText("") 
@@ -583,15 +571,6 @@ class MachineTransactionTab(QWidget):
         ex_row1.addWidget(self.ref_input)
         ex.addLayout(ex_row1)
 
-        ex_row2 = QHBoxLayout()
-        ln2 = QLabel("ملاحظات:")
-        ln2.setStyleSheet(f"color:{COLORS['text_secondary']};")
-        ex_row2.addWidget(ln2)
-        self.notes_input = QLineEdit()
-        self.notes_input.setPlaceholderText("ملاحظات إضافية...")
-        ex_row2.addWidget(self.notes_input)
-        ex.addLayout(ex_row2)
-
         root.addWidget(self._extras)
 
         # ── 5. Add button ──────────────────────────────────────────
@@ -743,7 +722,6 @@ class MachineTransactionTab(QWidget):
         req = self.amount_req.value()
         status = self.payment_combo.currentData()
         ref = self.ref_input.text().strip()
-        notes = self.notes_input.text().strip()
 
         if not cid:
             msg = ("يجب إدخال كود شحن صحيح" if self._code_mode
@@ -767,7 +745,7 @@ class MachineTransactionTab(QWidget):
                 payment_status=status,
                 reference_no=ref,
                 is_card=False,
-                notes=notes,
+                notes="",
                 created_at=created_at,
             )
             self.transaction_added.emit()
@@ -790,7 +768,6 @@ class MachineTransactionTab(QWidget):
         self.amount_req.setValue(0)
         self.service_input.clear()
         self.ref_input.clear()
-        self.notes_input.clear()
         QTimer.singleShot(80, self._focus_primary)
 
     def _focus_primary(self):
