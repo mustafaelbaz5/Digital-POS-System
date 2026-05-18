@@ -85,11 +85,11 @@ class CompactTransactionTab(QWidget):
         if not self.is_inbound:
             lbl_a1_txt, lbl_a2_txt = "المصروف:", "المطلوب:"
         else:
-            lbl_a1_txt, lbl_a2_txt = "المستلم:", "المسلم:"
+            lbl_a1_txt, lbl_a2_txt = "المبلغ المستلم:", "المبلغ المسلم كاش:"
 
         # Amount 1
         lbl_a1 = QLabel(lbl_a1_txt)
-        lbl_a1.setStyleSheet(f"color:{COLORS['text_secondary']};")
+        lbl_a1.setStyleSheet(f"color:{COLORS['text_secondary']}; font-weight:bold;")
         amt_row.addWidget(lbl_a1)
         
         self.amount_spent = FocusSpinBox()
@@ -104,7 +104,7 @@ class CompactTransactionTab(QWidget):
 
         # Amount 2
         lbl_a2 = QLabel(lbl_a2_txt)
-        lbl_a2.setStyleSheet(f"color:{COLORS['text_secondary']};")
+        lbl_a2.setStyleSheet(f"color:{COLORS['text_secondary']}; font-weight:bold;")
         amt_row.addWidget(lbl_a2)
 
         self.amount_req = FocusSpinBox()
@@ -124,7 +124,7 @@ class CompactTransactionTab(QWidget):
         
         if not self.is_inbound:
             lp = QLabel("نوع الدفع:")
-            lp.setStyleSheet(f"color:{COLORS['text_secondary']};")
+            lp.setStyleSheet(f"color:{COLORS['text_secondary']}; font-weight:bold;")
             status_row.addWidget(lp)
 
             self.payment_combo = QComboBox()
@@ -133,12 +133,12 @@ class CompactTransactionTab(QWidget):
             status_row.addWidget(self.payment_combo)
         else:
             ld = QLabel("تسليم الكاش:")
-            ld.setStyleSheet(f"color:{COLORS['text_secondary']};")
+            ld.setStyleSheet(f"color:{COLORS['text_secondary']}; font-weight:bold;")
             status_row.addWidget(ld)
 
             self.delivery_combo = QComboBox()
-            self.delivery_combo.addItem("✓ تم التسليم", True)
             self.delivery_combo.addItem("⏳ لم يُسلَّم", False)
+            self.delivery_combo.addItem("✓ تم التسليم", True)
             status_row.addWidget(self.delivery_combo)
 
         status_row.addStretch()
@@ -233,9 +233,13 @@ class CompactTransactionTab(QWidget):
     def _update_profit(self):
         spent = self.amount_spent.value()
         req = self.amount_req.value()
-        # Inbound: req = received, spent = delivered
-        # Outbound: req = required, spent = spent
-        profit = req - spent
+        
+        if self.is_inbound:
+            # spent = المبلغ المستلم, req = المبلغ المسلم كاش
+            profit = spent - req
+        else:
+            # spent = المصروف, req = المطلوب
+            profit = req - spent
 
         color = COLORS["green"] if profit >= 0 else COLORS["red"]
         self.profit_lbl.setStyleSheet(
@@ -316,6 +320,12 @@ class CompactTransactionTab(QWidget):
             QMessageBox.warning(self, "تنبيه", "أدخل المبلغ")
             return
 
+        # Validation for Receive Operation: Received >= Delivered
+        if self.is_inbound and spent < req:
+            QMessageBox.warning(self, "تنبيه", "المبلغ المستلم يجب أن يكون أكبر من أو يساوي المبلغ المسلم كاش")
+            self.amount_spent.setFocus()
+            return
+
         pid = self.platform["id"]
         # Use selected date with current time
         from datetime import datetime
@@ -344,8 +354,8 @@ class CompactTransactionTab(QWidget):
                     wallet_id=pid,
                     customer_id=cid,
                     service_name=service,
-                    amount_received=req,
-                    amount_delivered=spent,
+                    amount_received=spent, # Fixed mapping
+                    amount_delivered=req, # Fixed mapping
                     reference_no=ref,
                     notes="",
                     is_delivered=is_del,
@@ -481,7 +491,7 @@ class MachineTransactionTab(QWidget):
 
         for attr, label in [("amount_spent", "المصروف:"), ("amount_req", "المطلوب:")]:
             lbl = QLabel(label)
-            lbl.setStyleSheet(f"color:{COLORS['text_secondary']};")
+            lbl.setStyleSheet(f"color:{COLORS['text_secondary']}; font-weight:bold;")
             amt_row.addWidget(lbl)
             sb = FocusSpinBox()
             sb.setLocale(loc)

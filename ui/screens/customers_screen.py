@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QFrame,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QMenu,
@@ -25,7 +26,7 @@ from PyQt6.QtWidgets import (
 
 import database as db
 from ui.components.cards import CardGroup
-from ui.components.widgets import BaseDialog, DataTable, ScreenShell
+from ui.components.widgets import BaseDialog, DataTable, ScreenShell, show_toast
 from ui.styles.theme import COLORS, FONT, GAP_MD, GAP_SM, GAP_XS
 from ui.utils.formatters import fmt_currency
 
@@ -518,12 +519,13 @@ class CustomerDialog(BaseDialog):
         self._existing_codes: list[dict] = []   # {"id", "code"} loaded from DB
         self._pending_new: list[str] = []        # codes to add on save
         self._pending_del: list[int] = []        # code IDs to delete on save
+        self._pending_updates: dict[int, str] = {} # {id: new_code}
         self._build_form()
         if customer:
             self._fill()
 
     def _build_form(self):
-        # ── Basic Info Form ─────────────────────────────────────
+        # ... basic info form remains same ...
         form = QFormLayout()
         form.setSpacing(GAP_SM)
         form.setLabelAlignment(ALeft)
@@ -570,7 +572,7 @@ class CustomerDialog(BaseDialog):
         # ── Codes ScrollArea ─────────────────────────────────────
         codes_scroll = QScrollArea()
         codes_scroll.setWidgetResizable(True)
-        codes_scroll.setFixedHeight(160)
+        codes_scroll.setFixedHeight(180)
         codes_scroll.setStyleSheet(
             f"QScrollArea {{ border: 1px solid {COLORS['border']}; "
             f"border-radius: 8px; background: transparent; }}"
@@ -578,8 +580,8 @@ class CustomerDialog(BaseDialog):
         codes_container = QWidget()
         codes_container.setStyleSheet("background: transparent;")
         self._codes_vbox = QVBoxLayout(codes_container)
-        self._codes_vbox.setSpacing(4)
-        self._codes_vbox.setContentsMargins(6, 6, 6, 6)
+        self._codes_vbox.setSpacing(6)
+        self._codes_vbox.setContentsMargins(8, 8, 8, 8)
         self._codes_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
         codes_scroll.setWidget(codes_container)
         self.body.addWidget(codes_scroll)
@@ -609,8 +611,6 @@ class CustomerDialog(BaseDialog):
 
         self._render_codes()
 
-    # ── code chip helpers ───────────────────────────────────────
-
     def _render_codes(self):
         while self._codes_vbox.count():
             item = self._codes_vbox.takeAt(0)
@@ -618,8 +618,15 @@ class CustomerDialog(BaseDialog):
                 item.widget().deleteLater()
 
         shown = [c for c in self._existing_codes if c["id"] not in self._pending_del]
-        all_items = [(c["code"], c["id"], False) for c in shown] + \
-                    [(code, None, True) for code in self._pending_new]
+        
+        # Merge memory updates for rendering
+        all_items = []
+        for c in shown:
+            txt = self._pending_updates.get(c["id"], c["code"])
+            all_items.append((txt, c["id"], False))
+            
+        for code in self._pending_new:
+            all_items.append((code, None, True))
 
         if not all_items:
             empty = QLabel("لا توجد كودات مضافة")
@@ -633,14 +640,14 @@ class CustomerDialog(BaseDialog):
 
     def _make_chip(self, code_text: str, code_id: int | None, is_new: bool) -> QWidget:
         chip = QWidget()
-        chip.setFixedHeight(32)
+        chip.setFixedHeight(38)
         chip.setStyleSheet(
-            f"background:{COLORS['bg_hover']}; border:1px solid {COLORS['border']};"
-            f"border-radius:6px;"
+            f"background: white; border: 1px solid {COLORS['border']};"
+            f"border-radius: 6px;"
         )
         row = QHBoxLayout(chip)
-        row.setContentsMargins(10, 0, 6, 0)
-        row.setSpacing(6)
+        row.setContentsMargins(12, 0, 8, 0)
+        row.setSpacing(8)
 
         icon_color = COLORS["yellow"] if is_new else COLORS["accent"]
         lbl = QLabel(f"🔑  {code_text}")
@@ -657,9 +664,31 @@ class CustomerDialog(BaseDialog):
 
         row.addStretch()
 
-        del_btn = QPushButton("✕")
-        del_btn.setObjectName("btn_danger")
-        del_btn.setFixedSize(24, 24)
+        # Edit Button
+        edit_btn = QPushButton("تعديل")
+        edit_btn.setFixedSize(60, 26)
+        edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        edit_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {COLORS['accent_dim']}; color: {COLORS['accent']};
+                border: none; border-radius: 4px; font-weight: bold; font-size: 11px;
+            }}
+            QPushButton:hover {{ background: {COLORS['bg_hover']}; }}
+        """)
+        edit_btn.clicked.connect(lambda _, ct=code_text, cid=code_id, n=is_new: self._edit_code(ct, cid, n))
+        row.addWidget(edit_btn)
+
+        # Remove Button
+        del_btn = QPushButton("إزالة")
+        del_btn.setFixedSize(60, 26)
+        del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        del_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {COLORS['red_bg']}; color: {COLORS['red']};
+                border: none; border-radius: 4px; font-weight: bold; font-size: 11px;
+            }}
+            QPushButton:hover {{ background: #fee2e2; }}
+        """)
         if is_new:
             del_btn.clicked.connect(lambda _, c=code_text: self._remove_pending(c))
         else:
@@ -667,15 +696,48 @@ class CustomerDialog(BaseDialog):
         row.addWidget(del_btn)
         return chip
 
+    def _edit_code(self, code_text: str, code_id: int | None, is_new: bool):
+        new_code, ok = QInputDialog.getText(self, "تعديل الكود", "أدخل الكود الجديد:", text=code_text)
+        if not ok or not new_code.strip():
+            return
+        new_code = new_code.strip()
+        
+        # Check uniqueness in current view
+        existing_codes = []
+        for c in self._existing_codes:
+            if c["id"] not in self._pending_del:
+                existing_codes.append(self._pending_updates.get(c["id"], c["code"]).lower())
+        for c in self._pending_new:
+            existing_codes.append(c.lower())
+
+        if new_code.lower() in existing_codes and new_code.lower() != code_text.lower():
+            QMessageBox.warning(self, "تنبيه", f"الكود '{new_code}' موجود بالفعل")
+            return
+
+        if is_new:
+            self._pending_new = [new_code if c == code_text else c for c in self._pending_new]
+        else:
+            self._pending_updates[code_id] = new_code
+            
+        self._render_codes()
+
     def _add_pending_code(self):
         code = self._new_code_input.text().strip()
         if not code:
             return
-        existing_codes = {c["code"].lower() for c in self._existing_codes
-                          if c["id"] not in self._pending_del}
-        if code.lower() in existing_codes or code.lower() in [c.lower() for c in self._pending_new]:
+        
+        # Check uniqueness
+        existing_codes = []
+        for c in self._existing_codes:
+            if c["id"] not in self._pending_del:
+                existing_codes.append(self._pending_updates.get(c["id"], c["code"]).lower())
+        for c in self._pending_new:
+            existing_codes.append(c.lower())
+
+        if code.lower() in existing_codes:
             QMessageBox.warning(self, "تنبيه", f"الكود '{code}' موجود بالفعل")
             return
+            
         self._pending_new.append(code)
         self._new_code_input.clear()
         self._render_codes()
@@ -718,12 +780,19 @@ class CustomerDialog(BaseDialog):
             else:
                 cid = db.add_customer(name, phone, gid, notes)
 
+            # 1. Delete marked
             for code_id in self._pending_del:
                 try:
                     db.delete_shipping_code(code_id)
                 except Exception:
                     pass
 
+            # 2. Update existing
+            for code_id, new_val in self._pending_updates.items():
+                if code_id not in self._pending_del:
+                    db.update_shipping_code(code_id, new_val)
+
+            # 3. Add new
             code_errors = []
             for code in self._pending_new:
                 try:
@@ -733,10 +802,11 @@ class CustomerDialog(BaseDialog):
 
             if code_errors:
                 QMessageBox.warning(self, "تعارض في الكودات", "\n".join(code_errors))
-                # Reload so user sees what actually got saved
+                # Reload for consistency
                 self._existing_codes = db.get_shipping_codes(cid)
                 self._pending_new = []
                 self._pending_del = []
+                self._pending_updates = {}
                 self._render_codes()
                 return
 
@@ -876,11 +946,18 @@ class GroupDialog(BaseDialog):
                 self.cust_search.clear()
                 return
 
-        # Add to local list
-        self._members.append(customer)
-        if customer["id"] in self._pending_removals:
-            self._pending_removals.remove(customer["id"])
+        # Assignment Logic
+        if self.group:
+            try:
+                db.assign_customer_to_group(customer["id"], self.group["id"])
+                # Refresh from DB to be sure
+                self._members = db.get_customers_by_group(self.group["id"])
+                show_toast(self, f"تمت إضافة {customer['name']} للمجموعة", type="success")
+            except Exception as e:
+                QMessageBox.critical(self, "خطأ", f"فشل إضافة العميل: {e}")
         else:
+            # New group: keep as pending
+            self._members.append(customer)
             self._pending_adds.append(customer["id"])
         
         self.cust_search.clear()
@@ -933,11 +1010,19 @@ class GroupDialog(BaseDialog):
             self.members_vbox.addWidget(row_widget)
 
     def _remove_member(self, cid: int):
-        self._members = [m for m in self._members if m["id"] != cid]
-        if cid in self._pending_adds:
-            self._pending_adds.remove(cid)
+        if self.group:
+            try:
+                db.assign_customer_to_group(cid, None)
+                self._members = db.get_customers_by_group(self.group["id"])
+                show_toast(self, "تمت إزالة العميل من المجموعة", type="info")
+            except Exception as e:
+                QMessageBox.critical(self, "خطأ", f"فشل إزالة العميل: {e}")
         else:
-            self._pending_removals.append(cid)
+            self._members = [m for m in self._members if m["id"] != cid]
+            if cid in self._pending_adds:
+                self._pending_adds.remove(cid)
+            else:
+                self._pending_removals.append(cid)
         self._render_members()
 
     def _fill(self):

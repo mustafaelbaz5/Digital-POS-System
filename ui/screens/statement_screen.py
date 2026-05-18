@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QDialog,
     QFrame,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QMenu,
     QMessageBox,
@@ -386,16 +387,15 @@ class CustomerStatementDialog(QDialog):
         layout.addLayout(toolbar)
 
         cols = [
-            ("التاريخ",    130),
-            ("النوع",      100),
-            ("الخدمة",      -1),
-            ("المنصة",     110),
-            ("المرجع",     100),
-            ("المصروف",    110),
-            ("المطلوب",    110),
-            ("المسدد",     110),
-            ("الربح",       90),
-            ("الحالة",     220),
+            ("التاريخ",    150),
+            ("النوع",      150),
+            ("الخدمة",      120),
+            ("المنصة",      120),
+            ("المصروف",    130),
+            ("المطلوب",    130),
+            ("المسدد",     130),
+            ("الربح",       100),
+            ("الحالة",     400),
             ("الإجراءات",  140),
         ]
         self.table = DataTable(cols)
@@ -403,6 +403,22 @@ class CustomerStatementDialog(QDialog):
         self.table.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
+        header = self.table.horizontalHeader()
+        fixed_columns = {
+            0: 150,
+            1: 150,
+            4: 130,
+            5: 130,
+            6: 130,
+            7: 100,
+            8: 400,
+            9: 140,
+        }
+        for col, width in fixed_columns.items():
+            self.table.setColumnWidth(col, width)
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
         return widget
 
@@ -445,60 +461,56 @@ class CustomerStatementDialog(QDialog):
                 color=COLORS["text_secondary"], bg_color=bg,
             )
 
-            # Reference
-            ref = "🃏 كارت" if t.get("is_card") else (t.get("reference_no") or "—")
-            self.table.set_cell(row, 4, ref, color=COLORS["text_muted"], bg_color=bg)
-
             # Spent
             self.table.set_cell(
-                row, 5, fmt_currency(t.get("amount_spent", 0)),
+                row, 4, fmt_currency(t.get("amount_spent", 0)),
                 color=COLORS["text_secondary"], bg_color=bg,
             )
 
             # Required — display-only, NEVER overwritten
             self.table.set_cell(
-                row, 6, fmt_currency(t.get("amount_required", 0)),
+                row, 5, fmt_currency(t.get("amount_required", 0)),
                 bold=True, bg_color=bg,
             )
 
-            # Amount paid (col 7)
+            # Amount paid (col 6)
             amount_paid = float(t.get("amount_paid") or 0)
             if is_out and amount_paid > 0:
                 self.table.set_cell(
-                    row, 7, fmt_currency(amount_paid),
+                    row, 6, fmt_currency(amount_paid),
                     color=COLORS["green"], bold=True, bg_color=bg,
                 )
             else:
-                self.table.set_cell(row, 7, "—", color=COLORS["text_muted"], bg_color=bg)
+                self.table.set_cell(row, 6, "—", color=COLORS["text_muted"], bg_color=bg)
 
-            # Profit (col 8)
+            # Profit (col 7)
             profit = t.get("profit", 0)
             self.table.set_cell(
-                row, 8,
+                row, 7,
                 fmt_currency(profit) if not is_manual else "—",
                 color=COLORS["cyan"] if (not is_manual and profit >= 0) else COLORS["red"]
                       if (not is_manual and profit < 0) else COLORS["text_secondary"],
                 bg_color=bg,
             )
 
-            # Status + progress widget (col 9)
+            # Status + progress widget (col 8)
             if is_out:
                 required = float(t.get("amount_required") or 0)
                 status   = t.get("payment_status", "pending")
                 if status == "paid":
-                    self.table.set_cell(row, 9, "مسدد ✓", color=COLORS["green"], bold=True, bg_color=bg)
+                    self.table.set_cell(row, 8, "مسدد ✓", color=COLORS["green"], bold=True, bg_color=bg)
                 elif amount_paid > 0.005:
-                    self.table.setCellWidget(row, 9, self._make_progress_widget(amount_paid, required, bg))
+                    self.table.setCellWidget(row, 8, self._make_progress_widget(amount_paid, required, bg))
                 else:
-                    self.table.set_cell(row, 9, "مؤجل ⏳", color=COLORS["yellow"], bold=True, bg_color=bg)
+                    self.table.set_cell(row, 8, "مؤجل ⏳", color=COLORS["yellow"], bold=True, bg_color=bg)
             else:
                 is_del  = bool(t.get("is_delivered", 0))
                 st_text = "تم التسليم ✓" if is_del else "لم يسلم ⏳"
                 st_color = COLORS["green"] if is_del else COLORS["yellow"]
-                self.table.set_cell(row, 9, st_text, color=st_color, bold=True, bg_color=bg)
+                self.table.set_cell(row, 8, st_text, color=st_color, bold=True, bg_color=bg)
 
-            # Actions (col 10)
-            self._add_actions_button(row, 10, t)
+            # Actions (col 9)
+            self._add_actions_button(row, 9, t)
 
     # ── Payment Progress Widget ───────────────────────────────────
 

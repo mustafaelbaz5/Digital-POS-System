@@ -1100,37 +1100,44 @@ def get_pending_cash_liability() -> float:
 def calculate_wallet_capacity(wallet_id: int) -> dict:
     """
     حساب السعة المتبقية للاستقبال (نموذج الطاقة الاستيعابية الواردة):
-      المستخدم  = رصيد أول الشهر + إجمالي الواردات الشهرية
+      المستخدم  = إجمالي الواردات الشهرية + الإيداعات الشهرية
       المتبقي   = الحد الشهري - المستخدم
-    الصادر لا يؤثر على الحساب.
     """
     from datetime import date as _date
-    month_start = _date.today().replace(day=1).isoformat()
+    current_month = _date.today().strftime("%Y-%m")
 
     with get_connection() as conn:
         cap_row = conn.execute(
             "SELECT monthly_limit FROM platforms WHERE id = ?", (wallet_id,)
         ).fetchone()
         if not cap_row:
-            return {"total_limit": 0, "opening_balance": 0, "monthly_inward": 0, "used": 0, "remaining": 0}
+            return {"total_limit": 0, "monthly_inward": 0, "monthly_deposits": 0, "used": 0, "remaining": 0}
 
         total_limit = cap_row["monthly_limit"] or 0
 
+        # 1. إجمالي العمليات الواردة في الشهر الحالي
         monthly_inward = conn.execute("""
             SELECT COALESCE(SUM(amount_required), 0) AS total
             FROM transactions
             WHERE platform_id = ? AND operation_type = 'inbound'
-              AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now', 'localtime')
-        """, (wallet_id,)).fetchone()["total"]
+              AND strftime('%Y-%m', created_at) = ?
+        """, (wallet_id, current_month)).fetchone()["total"]
 
-    opening_balance = get_opening_balance(wallet_id, month_start)
-    used = opening_balance + monthly_inward
+        # 2. إجمالي الإيداعات في الشهر الحالي (بما في ذلك الرصيد الابتدائي إذا كان في نفس الشهر)
+        monthly_deposits = conn.execute("""
+            SELECT COALESCE(SUM(amount), 0) AS total
+            FROM machine_deposits
+            WHERE platform_id = ?
+              AND strftime('%Y-%m', created_at) = ?
+        """, (wallet_id, current_month)).fetchone()["total"]
+
+    used = monthly_inward + monthly_deposits
     remaining = total_limit - used
 
     return {
         "total_limit": total_limit,
-        "opening_balance": opening_balance,
         "monthly_inward": monthly_inward,
+        "monthly_deposits": monthly_deposits,
         "used": used,
         "remaining": remaining,
     }

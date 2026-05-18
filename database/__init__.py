@@ -12,7 +12,7 @@ from .dal_budget import (
 from .dal_customers import (
     get_all_groups, add_group, update_group, delete_group,
     get_all_customers, get_customers_by_group, get_customer_by_id,
-    add_customer, update_customer, adjust_customer_debt,
+    add_customer, update_customer, adjust_customer_debt, assign_customer_to_group,
     delete_customer, search_customers, get_export_data,
     get_group_summary,
     get_shipping_codes, get_all_shipping_codes, get_customer_by_shipping_code,
