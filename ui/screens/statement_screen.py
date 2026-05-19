@@ -412,7 +412,7 @@ class CustomerStatementDialog(QDialog):
         cols = [
             ("التاريخ",    150),
             ("النوع",      150),
-            ("الخدمة",      120),
+            ("الخدمة",      100),
             ("المنصة",      120),
             ("المصروف",    130),
             ("المطلوب",    130),
@@ -434,12 +434,12 @@ class CustomerStatementDialog(QDialog):
             5: 130,
             6: 130,
             7: 100,
-            8: 400,
+            8: -1,
             9: 140,
         }
         for col, width in fixed_columns.items():
             self.table.setColumnWidth(col, width)
-            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
