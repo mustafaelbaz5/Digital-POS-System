@@ -1080,6 +1080,117 @@ def settle_customer_debt(customer_id: int, payment_amount: float) -> dict:
             raise
 
 
+def deliver_and_settle(transaction_id: int) -> dict:
+    """
+    مقاصة ذرية: تحديد عملية الاستلام كـ'تم التسليم' ثم خصم مبلغها (amount_spent)
+    من مديونية شحن العميل بنظام FIFO — بدون تغيير في الخزينة (لا يُسلَّم كاش).
+    """
+    with get_connection() as conn:
+        try:
+            txn = conn.execute(
+                "SELECT id, customer_id, amount_spent, is_delivered FROM transactions "
+                "WHERE id = ? AND operation_type = 'inbound'",
+                (transaction_id,),
+            ).fetchone()
+            if not txn:
+                raise ValueError("لم يتم العثور على عملية الاستلام")
+            if txn["is_delivered"]:
+                raise ValueError("هذه العملية تم تسليمها بالفعل")
+
+            customer_id   = txn["customer_id"]
+            settle_amount = float(txn["amount_spent"] or 0)
+            if settle_amount <= 0:
+                raise ValueError("لا يوجد مبلغ للمقاصة")
+
+            # Mark inbound as delivered (no cash_vault change — netting, not cash payout)
+            conn.execute(
+                "UPDATE transactions SET is_delivered = 1 WHERE id = ?",
+                (transaction_id,),
+            )
+
+            # FIFO loop — reduce shipping debt oldest-first
+            pending = conn.execute(
+                """
+                SELECT id, amount_required, amount_paid
+                FROM transactions
+                WHERE customer_id = ?
+                  AND operation_type = 'outbound'
+                  AND payment_status = 'pending'
+                ORDER BY datetime(created_at) ASC, id ASC
+                """,
+                (customer_id,),
+            ).fetchall()
+
+            remaining       = settle_amount
+            settled_count   = 0
+            partial_settled = False
+            total_settled   = 0.0
+
+            for pt in pending:
+                if remaining <= 0:
+                    break
+                still_owed = float(pt["amount_required"]) - float(pt["amount_paid"] or 0)
+                if still_owed <= 0:
+                    continue
+                if remaining >= still_owed:
+                    conn.execute(
+                        "UPDATE transactions SET amount_paid = amount_required, "
+                        "payment_status = 'paid' WHERE id = ?",
+                        (pt["id"],),
+                    )
+                    conn.execute(
+                        "UPDATE customers SET total_debt = total_debt - ? WHERE id = ?",
+                        (still_owed, customer_id),
+                    )
+                    remaining     -= still_owed
+                    total_settled += still_owed
+                    settled_count += 1
+                else:
+                    conn.execute(
+                        "UPDATE transactions SET amount_paid = amount_paid + ? WHERE id = ?",
+                        (remaining, pt["id"]),
+                    )
+                    conn.execute(
+                        "UPDATE customers SET total_debt = total_debt - ? WHERE id = ?",
+                        (remaining, customer_id),
+                    )
+                    total_settled  += remaining
+                    remaining       = 0
+                    partial_settled = True
+
+            if total_settled > 0:
+                conn.execute(
+                    "INSERT INTO payments_history (customer_id, amount) VALUES (?, ?)",
+                    (customer_id, total_settled),
+                )
+
+            conn.commit()
+            return {
+                "settled_count":   settled_count,
+                "partial_settled": partial_settled,
+                "total_settled":   total_settled,
+            }
+        except Exception:
+            conn.rollback()
+            raise
+
+
+def get_customer_net_pending_total(customer_id: int) -> float:
+    """إجمالي الصافي المتبقي = SUM(amount_required − amount_paid) للعمليات الصادرة المعلقة.
+    يستخدم كقيمة افتراضية لحقل الإدخال في التسديد السريع."""
+    with get_connection() as conn:
+        row = conn.execute("""
+            SELECT COALESCE(
+                SUM(amount_required - COALESCE(amount_paid, 0)), 0
+            ) AS net_total
+            FROM transactions
+            WHERE customer_id = ?
+              AND operation_type = 'outbound'
+              AND payment_status = 'pending'
+        """, (customer_id,)).fetchone()
+        return float(row["net_total"] if row else 0)
+
+
 def get_pending_cash_liability() -> float:
     """
     احسب إجمالي الكاش المطلوب تسليمه للعملاء

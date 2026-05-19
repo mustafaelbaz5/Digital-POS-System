@@ -316,8 +316,8 @@ class CustomerStatementDialog(QDialog):
         self.settle_btn.clicked.connect(self._quick_settle)
         layout.addWidget(self.settle_btn)
 
-        t = self._data.get("totals", {})
-        self.settle_btn.setVisible((t.get("total_pending") or 0) > 0)
+        s = self._compute_summary()
+        self.settle_btn.setEnabled(s["net"] > 0.005)
 
         layout.addStretch()
 
@@ -359,6 +359,7 @@ class CustomerStatementDialog(QDialog):
             float(t.get("amount_required") or 0)
             for t in self._data.get("transactions", [])
             if t.get("operation_type") == "inbound"
+            and not t.get("is_delivered", 0)
         )
         return {
             "total_required": total_required,
@@ -366,6 +367,15 @@ class CustomerStatementDialog(QDialog):
             "total_received": total_received,
             "net":            total_required - total_payments,
         }
+
+    def _net_display(self, net: float) -> tuple[str, str]:
+        """Return (display_text, color) for the net balance card."""
+        if net > 0.005:
+            return fmt_currency(net), COLORS["red"]
+        elif net < -0.005:
+            return f"{fmt_currency(abs(net))} — له", COLORS["green"]
+        else:
+            return "—", COLORS["text_muted"]
 
     def _make_master_cards(self) -> QHBoxLayout:
         layout = QHBoxLayout()
@@ -388,12 +398,13 @@ class CustomerStatementDialog(QDialog):
             fmt_currency(s["total_received"]),
             COLORS["purple"],
         )
-        self.card_net = SummaryCard(
-            "الصافي النهائي",
-            fmt_currency(s["net"]),
-            COLORS["red"] if s["net"] > 0.005 else COLORS["green"],
-        )
+        net_text, net_color = self._net_display(s["net"])
+        self.card_net = SummaryCard("الصافي النهائي", net_text, net_color)
         self.card_net.set_featured(True)
+        self.card_net.val_lbl.setStyleSheet(
+            f"color: {net_color}; font-size: 32px; font-weight: 900; "
+            f"background:transparent; border:none;"
+        )
 
         layout.addWidget(self.card_owed)
         layout.addWidget(self.card_owned)
@@ -429,6 +440,7 @@ class CustomerStatementDialog(QDialog):
 
     def _fill_ledger(self):
         rows = self._compute_ledger()
+        self.ledger_table.setSortingEnabled(False)
         self.ledger_table.clear_rows()
         self.ledger_table.setRowCount(len(rows))
 
@@ -466,6 +478,8 @@ class CustomerStatementDialog(QDialog):
             else:
                 bal_color, bal_text = COLORS["text_muted"], "—"
             self.ledger_table.set_cell(i, 4, bal_text, color=bal_color, bold=True, bg_color=bg)
+
+        self.ledger_table.setSortingEnabled(True)
 
     # ══════════════════════════════════════════
     #  Tab 2 — المعاملات (Operations)
@@ -516,6 +530,7 @@ class CustomerStatementDialog(QDialog):
 
     def _fill_table(self):
         txns, _, _ = self._get_period_data()
+        self.table.setSortingEnabled(False)
         self.table.clear_rows()
         self.table.setRowCount(len(txns))
 
@@ -603,6 +618,8 @@ class CustomerStatementDialog(QDialog):
             # Actions (col 9)
             self._add_actions_button(row, 9, t)
 
+        self.table.setSortingEnabled(True)
+
     # ── Payment Progress Widget ───────────────────────────────────
 
     def _make_progress_widget(self, paid: float, required: float, bg: str | None) -> QWidget:
@@ -661,15 +678,16 @@ class CustomerStatementDialog(QDialog):
 
         def show_menu():
             menu = QMenu(self)
-            if t["operation_type"] != "outbound":
-                if not t.get("is_delivered", 0):
-                    a = QAction("🤝 تحديد كتم التسليم", self)
-                    a.triggered.connect(lambda: self._update_status(t["id"], 1))
-                    menu.addAction(a)
-                else:
-                    a = QAction("⏳ تحديد كـ لم يُسلّم", self)
-                    a.triggered.connect(lambda: self._update_status(t["id"], 0))
-                    menu.addAction(a)
+            if t["operation_type"] == "inbound" and not t.get("is_delivered", 0):
+                tid = t["id"]
+                a_net = QAction("💳 عمل مقاصة / خصم من المديونية", self)
+                a_net.triggered.connect(lambda checked=False, _tid=tid: self._deliver_and_settle(_tid))
+                menu.addAction(a_net)
+
+                a_cash = QAction("💵 تأكيد تسليم المبلغ كاش للعميل", self)
+                a_cash.triggered.connect(lambda checked=False, _tid=tid: self._deliver_cash(_tid))
+                menu.addAction(a_cash)
+
                 menu.addSeparator()
             a_del = QAction("🗑️ حذف العملية", self)
             a_del.triggered.connect(lambda: self._delete_txn(t["id"]))
@@ -681,13 +699,38 @@ class CustomerStatementDialog(QDialog):
 
     # ── Mutating Actions ──────────────────────────────────────────
 
-    def _update_status(self, tid: int, val):
+    def _deliver_and_settle(self, tid: int):
         try:
-            db.update_transaction_status(tid, val)
+            result = db.deliver_and_settle(tid)
+            total = result["total_settled"]
+            count = result["settled_count"]
+            lines = [f"تمت المقاصة — تم خصم {fmt_currency(total)} من مديونية الشحن"]
+            if count > 0:
+                lines.append(f"(تسديد {count} عملية بالكامل)")
+            if result.get("partial_settled"):
+                lines.append("مع تسديد جزئي للعملية الأخيرة.")
+            QMessageBox.information(self, "تمت المقاصة ✓", "\n".join(lines))
             self._load_data()
             self._refresh_ui()
         except Exception as e:
             QMessageBox.critical(self, "خطأ", str(e))
+
+    def _deliver_cash(self, tid: int):
+        if (
+            QMessageBox.question(
+                self,
+                "تأكيد تسليم كاش",
+                "هل تأكدت من تسليم المبلغ كاشاً للعميل؟\nسيتم خصمه من الخزينة.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            == QMessageBox.StandardButton.Yes
+        ):
+            try:
+                db.mark_as_delivered(tid)
+                self._load_data()
+                self._refresh_ui()
+            except Exception as e:
+                QMessageBox.critical(self, "خطأ", str(e))
 
     def _delete_txn(self, tid: int):
         if (
@@ -755,15 +798,17 @@ class CustomerStatementDialog(QDialog):
     def _refresh_ui(self):
         s = self._compute_summary()
 
-        self.settle_btn.setVisible(s["net"] > 0.005)
+        self.settle_btn.setEnabled(s["net"] > 0.005)
 
         self.card_owed.set_value(fmt_currency(s["total_required"]))
         self.card_owned.set_value(fmt_currency(s["total_payments"]))
         self.card_received.set_value(fmt_currency(s["total_received"]))
-        self.card_net.set_value(fmt_currency(s["net"]))
+
+        net_text, net_color = self._net_display(s["net"])
+        self.card_net.set_value(net_text)
         self.card_net.val_lbl.setStyleSheet(
-            f"color: {COLORS['red'] if s['net'] > 0.005 else COLORS['green']}; "
-            f"font-size: 32px; font-weight: 900; background:transparent; border:none;"
+            f"color: {net_color}; font-size: 32px; font-weight: 900; "
+            f"background:transparent; border:none;"
         )
 
         self._fill_ledger()

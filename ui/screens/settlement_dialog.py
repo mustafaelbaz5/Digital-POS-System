@@ -44,14 +44,8 @@ class QuickSettleDialog(BaseDialog):
     # ── helpers ────────────────────────────────────────────────────────
 
     def _load_pending_total(self) -> float:
-        txns = db.get_transactions(
-            customer_id=self.customer["id"], payment_status="pending"
-        )
-        return sum(
-            float(t["amount_required"])
-            for t in txns
-            if t["operation_type"] == "outbound"
-        )
+        """الصافي المتبقي الفعلي = SUM(amount_required − amount_paid) للعمليات المعلقة."""
+        return db.get_customer_net_pending_total(self.customer["id"])
 
     # ── UI build ───────────────────────────────────────────────────────
 
@@ -92,8 +86,8 @@ class QuickSettleDialog(BaseDialog):
             row.addWidget(val)
             cl.addLayout(row)
 
-        _stat("إجمالي المستحق (Pending):", fmt_currency(self._pending_total), COLORS["red"])
-        _stat("الرصيد الكلي:",             fmt_currency(float(self.customer.get("total_debt") or 0)), COLORS["yellow"])
+        _stat("الصافي النهائي المطلوب:", fmt_currency(self._pending_total), COLORS["red"])
+        _stat("الرصيد الكلي:",           fmt_currency(float(self.customer.get("total_debt") or 0)), COLORS["yellow"])
 
         self.body.addWidget(card)
 
@@ -141,8 +135,8 @@ class QuickSettleDialog(BaseDialog):
 
         # Quick-fill hint
         hint = QLabel(
-            f"أقصى قيمة: {fmt_currency(self._pending_total)}  "
-            f"(حد العمليات المعلقة)"
+            f"الصافي المتبقي الفعلي: {fmt_currency(self._pending_total)}  "
+            f"(بعد خصم المبالغ المسددة جزئياً)"
         )
         hint.setStyleSheet(
             f"color:{COLORS['text_muted']}; font-size:{FONT['xs']}; "
