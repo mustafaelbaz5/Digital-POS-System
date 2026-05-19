@@ -908,14 +908,17 @@ class CustomerStatementDialog(QDialog):
 
     def _deliver_and_settle(self, tid: int):
         try:
-            result = db.deliver_and_settle(tid)
-            total = result["total_settled"]
-            count = result["settled_count"]
+            result  = db.deliver_and_settle(tid)
+            total   = result["total_settled"]
+            count   = result["settled_count"]
+            surplus = result.get("surplus", 0.0)
             lines = [f"تمت المقاصة — تم خصم {fmt_currency(total)} من مديونية الشحن"]
             if count > 0:
                 lines.append(f"(تسديد {count} عملية بالكامل)")
             if result.get("partial_settled"):
                 lines.append("مع تسديد جزئي للعملية الأخيرة.")
+            if surplus > 0:
+                lines.append(f"الفائض {fmt_currency(surplus)} — رصيد دائن للعميل (له)")
             QMessageBox.information(self, "تمت المقاصة ✓", "\n".join(lines))
             self._load_data()
             self._refresh_ui()

@@ -1182,11 +1182,22 @@ def deliver_and_settle(transaction_id: int) -> dict:
                     remaining       = 0
                     partial_settled = True
 
-            if total_settled > 0:
+            # Always record the full inbound amount as a payments_history credit.
+            # settle_amount = the full cash received; total_settled = portion applied to
+            # pending outbounds. Any surplus (remaining > 0) means the customer is now
+            # in credit — push total_debt negative so net_balance shows "له".
+            conn.execute(
+                "INSERT INTO payments_history (customer_id, amount, notes) VALUES (?, ?, ?)",
+                (customer_id, settle_amount,
+                 f"مقاصة تلقائية — دفعة واردة #{transaction_id}"),
+            )
+
+            surplus = max(0.0, remaining)
+            if surplus > 0:
+                # Debt already reduced to 0 by FIFO loop; push it negative by surplus.
                 conn.execute(
-                    "INSERT INTO payments_history (customer_id, amount, notes) VALUES (?, ?, ?)",
-                    (customer_id, total_settled,
-                     f"مقاصة تلقائية — دفعة واردة #{transaction_id}"),
+                    "UPDATE customers SET total_debt = total_debt - ? WHERE id = ?",
+                    (surplus, customer_id),
                 )
 
             conn.commit()
@@ -1194,6 +1205,7 @@ def deliver_and_settle(transaction_id: int) -> dict:
                 "settled_count":   settled_count,
                 "partial_settled": partial_settled,
                 "total_settled":   total_settled,
+                "surplus":         surplus,
             }
         except Exception:
             conn.rollback()
