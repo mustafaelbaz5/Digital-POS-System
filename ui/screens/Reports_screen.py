@@ -2,10 +2,9 @@
 Reports_screen.py — شاشة التقارير والجرد (Pro Dark Edition)
 """
 
-from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QComboBox,
-    QDateEdit,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -498,183 +497,6 @@ class TransactionsLogTab(QWidget):
                 QMessageBox.critical(self, "خطأ", str(e))
 
 
-class CleanupByDateDialog(BaseDialog):
-    def __init__(self, parent=None):
-        super().__init__("تنظيف حسب التاريخ", parent)
-        self.setFixedWidth(400)
-        self.selected_date = None
-        self._build_content()
-
-    def _build_content(self):
-        self.body.setSpacing(16)
-
-        warning_lbl = QLabel(
-            "سيتم حذف جميع العمليات المنتهية حتى هذا التاريخ. لا يمكن التراجع عن هذه الخطوة."
-        )
-        warning_lbl.setStyleSheet(
-            f"color: {COLORS['red']}; font-size: {FONT['md']}; font-weight: bold;"
-        )
-        warning_lbl.setWordWrap(True)
-        self.body.addWidget(warning_lbl)
-
-        date_layout = QHBoxLayout()
-        date_lbl = QLabel("تاريخ النهاية:")
-        date_lbl.setStyleSheet(f"color: {COLORS['text_primary']}; font-weight: bold;")
-        date_layout.addWidget(date_lbl)
-
-        self.date_edit = QDateEdit()
-        self.date_edit.setCalendarPopup(True)
-        self.date_edit.setDate(QDate.currentDate())
-        date_layout.addWidget(self.date_edit)
-
-        self.body.addLayout(date_layout)
-
-        self.add_stretch()
-        self.add_button("إلغاء", self.reject, role="secondary")
-        self.add_button("تأكيد الحذف", self._confirm, role="danger")
-
-    def _confirm(self):
-        self.selected_date = self.date_edit.date().toString("yyyy-MM-dd")
-        self.accept()
-
-
-class CleanupTab(QWidget):
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        self._build_ui()
-
-    def _build_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 16, 0, 0)
-        layout.setSpacing(16)
-
-        # ── Stats
-        stat_frame = QFrame()
-        stat_frame.setObjectName("card")
-        stat_layout = QHBoxLayout(stat_frame)
-        stat_layout.setContentsMargins(20, 14, 20, 14)
-
-        self.stat_label = QLabel("عدد العمليات المسددة القابلة للحذف: —")
-        self.stat_label.setStyleSheet(
-            f"color: {COLORS['text_primary']}; font-weight: bold;"
-        )
-        stat_layout.addWidget(self.stat_label)
-        stat_layout.addStretch()
-
-        refresh_btn = QPushButton("🔄  تحديث")
-        refresh_btn.setObjectName("btn_secondary")
-        refresh_btn.setFixedWidth(100)
-        refresh_btn.clicked.connect(self._refresh_stat)
-        stat_layout.addWidget(refresh_btn)
-        layout.addWidget(stat_frame)
-
-        # ── Cleanup
-        clean_frame = QFrame()
-        clean_frame.setObjectName("card")
-        cl = QVBoxLayout(clean_frame)
-        cl.setContentsMargins(24, 20, 24, 20)
-        cl.setSpacing(16)
-
-        title = QLabel("🧹  تنظيف البيانات المسددة")
-        title.setStyleSheet(
-            f"color: {COLORS['text_primary']}; font-size: {FONT['lg']}; font-weight: bold;"
-        )
-        cl.addWidget(title)
-
-        desc = QLabel(
-            "سيتم حذف العمليات التي تم تسديدها (paid) فقط لتخفيف حجم قاعدة البيانات."
-        )
-        desc.setStyleSheet(f"color: {COLORS['text_secondary']};")
-        cl.addWidget(desc)
-
-        btn_row = QHBoxLayout()
-        self.customer_combo = QComboBox()
-        self.customer_combo.setMinimumWidth(200)
-        btn_row.addWidget(self.customer_combo)
-
-        clean_btn = QPushButton("حذف مسدد العميل")
-        clean_btn.setObjectName("btn_secondary")
-        clean_btn.clicked.connect(self._cleanup_single)
-        btn_row.addWidget(clean_btn)
-
-        clean_date_btn = QPushButton("📅  تنظيف حسب التاريخ")
-        clean_date_btn.setObjectName("btn_secondary")
-        clean_date_btn.clicked.connect(self._cleanup_by_date)
-        btn_row.addWidget(clean_date_btn)
-
-        btn_row.addStretch()
-
-        clean_all_btn = QPushButton("🗑️  تنظيف الكل")
-        clean_all_btn.setObjectName("btn_danger")
-        clean_all_btn.setFixedWidth(150)
-        clean_all_btn.clicked.connect(self._cleanup_all)
-        btn_row.addWidget(clean_all_btn)
-
-        cl.addLayout(btn_row)
-        layout.addWidget(clean_frame)
-        layout.addStretch()
-
-    def load_data(self):
-        self.customer_combo.clear()
-        self.customer_combo.addItem("اختر عميلاً...", None)
-        for c in db.get_all_customers():
-            self.customer_combo.addItem(c["name"], c["id"])
-
-    def _refresh_stat(self):
-        count = db.count_finished_transactions()
-        self.stat_label.setText(f"عدد العمليات المنتهية القابلة للحذف: {count} عملية")
-
-    def _cleanup_single(self):
-        cid = self.customer_combo.currentData()
-        if not cid:
-            return
-        if (
-            QMessageBox.question(
-                self,
-                "تأكيد",
-                "حذف العمليات المسددة لهذا العميل؟",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            == QMessageBox.StandardButton.Yes
-        ):
-            db.cleanup_paid_transactions(cid)
-            self._refresh_stat()
-
-    def _cleanup_by_date(self):
-        dialog = CleanupByDateDialog(self)
-        if dialog.exec() and dialog.selected_date:
-            if (
-                QMessageBox.warning(
-                    self,
-                    "تأكيد نهائي",
-                    "هل أنت متأكد من حذف العمليات المنتهية حتى هذا التاريخ؟ لا يمكن التراجع!",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                )
-                == QMessageBox.StandardButton.Yes
-            ):
-                count = db.cleanup_transactions_before(dialog.selected_date)
-                self._refresh_stat()
-                Toast(
-                    self.window(), f"تم تنظيف {count} عملية قديمة بنجاح", type="success"
-                ).show()
-
-    def _cleanup_all(self):
-        if (
-            QMessageBox.warning(
-                self,
-                "تحذير",
-                "حذف جميع العمليات المسددة؟ لا يمكن التراجع!",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            == QMessageBox.StandardButton.Yes
-        ):
-            count = db.cleanup_paid_transactions()
-            self._refresh_stat()
-            Toast(self.window(), f"تم تنظيف {count} عملية بنجاح", type="success").show()
-
-
 # ══════════════════════════════════════════
 #  Reports Screen (main)
 # ══════════════════════════════════════════
@@ -684,7 +506,7 @@ class ReportsScreen(ScreenShell):
 
     def __init__(self, parent=None):
         super().__init__(
-            "التقارير والجرد", "إدارة العمليات، الجرد المالي، وتنظيف البيانات"
+            "التقارير والجرد", "إدارة العمليات والجرد المالي"
         )
         self._build_content()
 
@@ -703,9 +525,6 @@ class ReportsScreen(ScreenShell):
         self.log_tab = TransactionsLogTab()
         self.tabs.addTab(self.log_tab, "  سجل العمليات")
 
-        self.cleanup_tab = CleanupTab()
-        self.tabs.addTab(self.cleanup_tab, "🗑️  تنظيف البيانات")
-
         self.tabs.currentChanged.connect(self._on_tab_changed)
         c.addWidget(self.tabs)
 
@@ -718,5 +537,3 @@ class ReportsScreen(ScreenShell):
         elif index == 1:
             self.log_tab.load_platforms_filter()
             self.log_tab.load_data()
-        elif index == 2:
-            self.cleanup_tab.load_data()

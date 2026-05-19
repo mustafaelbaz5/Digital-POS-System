@@ -3,11 +3,13 @@ statement_screen.py — كشف حساب العميل (Ledger + Operations Dual-T
 """
 
 import os
+from datetime import date as _date, timedelta
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QApplication,
+    QComboBox,
     QDialog,
     QFrame,
     QHBoxLayout,
@@ -108,14 +110,58 @@ class CustomerStatementDialog(QDialog):
 
     def _load_data(self):
         self._data = db.get_customer_statement(self.customer_id)
-        self._ledger_rows = self._compute_ledger()
+
+    def _get_filter_dates(self) -> tuple[str | None, str | None]:
+        """Return (date_from, date_to) as 'YYYY-MM-DD' strings, or (None, None) for all time."""
+        if not hasattr(self, "period_combo"):
+            return None, None
+        idx = self.period_combo.currentIndex()
+        today = _date.today()
+        if idx == 0:
+            return (today - timedelta(days=30)).isoformat(), today.isoformat()
+        if idx == 1:
+            return today.replace(day=1).isoformat(), today.isoformat()
+        return None, None
+
+    def _get_period_data(self) -> tuple[list, list, float]:
+        """Return (filtered_txns, filtered_pmts, opening_balance) for the active period."""
+        date_from, date_to = self._get_filter_dates()
+        all_txns = self._data.get("transactions", [])
+        all_pmts = self._data.get("payments", [])
+
+        if date_from:
+            opening_balance = (
+                sum(float(t.get("amount_required") or 0)
+                    for t in all_txns
+                    if t.get("operation_type") == "outbound"
+                    and (t.get("created_at") or "")[:10] < date_from)
+                - sum(float(t.get("amount_spent") or 0)
+                      for t in all_txns
+                      if t.get("operation_type") == "inbound"
+                      and (t.get("created_at") or "")[:10] < date_from)
+                - sum(float(p.get("amount") or 0)
+                      for p in all_pmts
+                      if (p.get("created_at") or "")[:10] < date_from)
+            )
+            txns = [t for t in all_txns
+                    if date_from <= (t.get("created_at") or "")[:10] <= date_to]
+            pmts = [p for p in all_pmts
+                    if date_from <= (p.get("created_at") or "")[:10] <= date_to]
+        else:
+            opening_balance = 0.0
+            txns = all_txns
+            pmts = all_pmts
+
+        return txns, pmts, opening_balance
 
     def _compute_ledger(self) -> list[dict]:
-        """Merge outbound ops, inbound ops, and quick-pay settlements into a
-        unified running-balance ledger sorted newest-first for display."""
-        all_entries: list[dict] = []
+        """Build running-balance ledger for the selected period with a rollover
+        opening balance row when a date filter is active. Returned newest-first."""
+        txns, pmts, opening_balance = self._get_period_data()
+        date_from, _ = self._get_filter_dates()
 
-        for t in self._data.get("transactions", []):
+        all_entries: list[dict] = []
+        for t in txns:
             op = t.get("operation_type", "")
             if op == "outbound":
                 all_entries.append({
@@ -131,8 +177,7 @@ class CustomerStatementDialog(QDialog):
                     "debit":       0.0,
                     "credit":      float(t.get("amount_spent") or 0),
                 })
-
-        for p in self._data.get("payments", []):
+        for p in pmts:
             all_entries.append({
                 "created_at":  p.get("created_at", ""),
                 "description": "💳  تسديد سريع",
@@ -140,11 +185,10 @@ class CustomerStatementDialog(QDialog):
                 "credit":      float(p.get("amount") or 0),
             })
 
-        # Compute running balance ascending, then reverse for newest-first display
         all_entries.sort(key=lambda e: e["created_at"])
 
         rows: list[dict] = []
-        balance = 0.0
+        balance = opening_balance
         for e in all_entries:
             balance += e["debit"] - e["credit"]
             rows.append({
@@ -153,6 +197,18 @@ class CustomerStatementDialog(QDialog):
                 "debit":       e["debit"],
                 "credit":      e["credit"],
                 "balance":     balance,
+                "is_rollover": False,
+            })
+
+        # Rollover row goes at the end so it appears at the bottom after reversal
+        if date_from and abs(opening_balance) > 0.005:
+            rows.append({
+                "date":        date_from,
+                "description": "رصيد سابق منقول من فترات سابقة",
+                "debit":       opening_balance if opening_balance > 0 else 0.0,
+                "credit":      abs(opening_balance) if opening_balance < 0 else 0.0,
+                "balance":     opening_balance,
+                "is_rollover": True,
             })
 
         rows.reverse()
@@ -265,6 +321,20 @@ class CustomerStatementDialog(QDialog):
 
         layout.addStretch()
 
+        period_lbl = QLabel("الفترة الزمنية:")
+        period_lbl.setStyleSheet(
+            f"color: {COLORS['text_secondary']}; background: transparent; border: none;"
+        )
+        layout.addWidget(period_lbl)
+
+        self.period_combo = QComboBox()
+        self.period_combo.setLayoutDirection(RTL)
+        self.period_combo.setFixedHeight(40)
+        self.period_combo.setMinimumWidth(160)
+        self.period_combo.addItems(["آخر 30 يوم", "الشهر الحالي", "كل الفترات"])
+        self.period_combo.currentIndexChanged.connect(self._on_period_changed)
+        layout.addWidget(self.period_combo)
+
         self.print_status_lbl = QLabel("")
         self.print_status_lbl.setObjectName("statement_print_status")
         self.print_status_lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter)
@@ -285,12 +355,16 @@ class CustomerStatementDialog(QDialog):
             float(p.get("amount") or 0)
             for p in self._data.get("payments", [])
         )
-        txn_count = self._data.get("totals", {}).get("total_count", 0)
+        total_received = sum(
+            float(t.get("amount_required") or 0)
+            for t in self._data.get("transactions", [])
+            if t.get("operation_type") == "inbound"
+        )
         return {
             "total_required": total_required,
             "total_payments": total_payments,
+            "total_received": total_received,
             "net":            total_required - total_payments,
-            "total_count":    txn_count,
         }
 
     def _make_master_cards(self) -> QHBoxLayout:
@@ -309,6 +383,11 @@ class CustomerStatementDialog(QDialog):
             fmt_currency(s["total_payments"]),
             COLORS["green"],
         )
+        self.card_received = SummaryCard(
+            "مبالغ الاستلام",
+            fmt_currency(s["total_received"]),
+            COLORS["purple"],
+        )
         self.card_net = SummaryCard(
             "الصافي النهائي",
             fmt_currency(s["net"]),
@@ -316,14 +395,10 @@ class CustomerStatementDialog(QDialog):
         )
         self.card_net.set_featured(True)
 
-        self.card_count = SummaryCard(
-            "عدد العمليات", str(s["total_count"]), COLORS["accent"]
-        )
-
         layout.addWidget(self.card_owed)
         layout.addWidget(self.card_owned)
+        layout.addWidget(self.card_received)
         layout.addWidget(self.card_net)
-        layout.addWidget(self.card_count)
         return layout
 
     # ══════════════════════════════════════════
@@ -353,33 +428,36 @@ class CustomerStatementDialog(QDialog):
         return widget
 
     def _fill_ledger(self):
-        rows = self._ledger_rows
+        rows = self._compute_ledger()
         self.ledger_table.clear_rows()
         self.ledger_table.setRowCount(len(rows))
 
         for i, r in enumerate(rows):
-            is_debit = r["debit"] > 0
+            is_rollover = r.get("is_rollover", False)
+            is_debit    = r["debit"] > 0
+            bg = COLORS.get("bg_hover") if is_rollover else None
 
-            # Date
             self.ledger_table.set_cell(
-                i, 0, r["date"], color=COLORS["text_secondary"]
+                i, 0, r["date"], color=COLORS["text_secondary"], bg_color=bg
             )
-            # Description — bold for operations (debt rows)
-            self.ledger_table.set_cell(i, 1, r["description"], bold=is_debit)
+            desc = f"⟵  {r['description']}" if is_rollover else r["description"]
+            self.ledger_table.set_cell(
+                i, 1, desc,
+                color=COLORS["accent"] if is_rollover else COLORS["text_primary"],
+                bold=True, bg_color=bg,
+            )
 
-            # عليه / له — mutually exclusive per row
             if is_debit:
                 self.ledger_table.set_cell(
-                    i, 2, fmt_currency(r["debit"]), color=COLORS["red"], bold=True
+                    i, 2, fmt_currency(r["debit"]), color=COLORS["red"], bold=True, bg_color=bg
                 )
-                self.ledger_table.set_cell(i, 3, "—", color=COLORS["text_muted"])
+                self.ledger_table.set_cell(i, 3, "—", color=COLORS["text_muted"], bg_color=bg)
             else:
-                self.ledger_table.set_cell(i, 2, "—", color=COLORS["text_muted"])
+                self.ledger_table.set_cell(i, 2, "—", color=COLORS["text_muted"], bg_color=bg)
                 self.ledger_table.set_cell(
-                    i, 3, fmt_currency(r["credit"]), color=COLORS["green"], bold=True
+                    i, 3, fmt_currency(r["credit"]), color=COLORS["green"], bold=True, bg_color=bg
                 )
 
-            # Running balance — red = customer owes, green = credit
             bal = r["balance"]
             if bal > 0.005:
                 bal_color, bal_text = COLORS["red"], fmt_currency(bal)
@@ -387,7 +465,7 @@ class CustomerStatementDialog(QDialog):
                 bal_color, bal_text = COLORS["green"], fmt_currency(abs(bal))
             else:
                 bal_color, bal_text = COLORS["text_muted"], "—"
-            self.ledger_table.set_cell(i, 4, bal_text, color=bal_color, bold=True)
+            self.ledger_table.set_cell(i, 4, bal_text, color=bal_color, bold=True, bg_color=bg)
 
     # ══════════════════════════════════════════
     #  Tab 2 — المعاملات (Operations)
@@ -399,15 +477,6 @@ class CustomerStatementDialog(QDialog):
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(0, GAP_MD, 0, 0)
         layout.setSpacing(GAP_SM)
-
-        toolbar = QHBoxLayout()
-        toolbar.addStretch()
-        cleanup_btn = QPushButton("🗑️  تنظيف المسدد")
-        cleanup_btn.setObjectName("btn_danger")
-        cleanup_btn.setFixedHeight(32)
-        cleanup_btn.clicked.connect(self._cleanup)
-        toolbar.addWidget(cleanup_btn)
-        layout.addLayout(toolbar)
 
         cols = [
             ("التاريخ",    150),
@@ -446,7 +515,7 @@ class CustomerStatementDialog(QDialog):
         return widget
 
     def _fill_table(self):
-        txns = self._data.get("transactions", [])
+        txns, _, _ = self._get_period_data()
         self.table.clear_rows()
         self.table.setRowCount(len(txns))
 
@@ -516,11 +585,10 @@ class CustomerStatementDialog(QDialog):
                 bg_color=bg,
             )
 
-            # Status + progress widget (col 8)
+            # Status + progress widget (col 8) — derived purely from numeric values
             if is_out:
                 required = float(t.get("amount_required") or 0)
-                status   = t.get("payment_status", "pending")
-                if status == "paid":
+                if required > 0 and amount_paid >= required - 0.005:
                     self.table.set_cell(row, 8, "مسدد ✓", color=COLORS["green"], bold=True, bg_color=bg)
                 elif amount_paid > 0.005:
                     self.table.setCellWidget(row, 8, self._make_progress_widget(amount_paid, required, bg))
@@ -593,16 +661,7 @@ class CustomerStatementDialog(QDialog):
 
         def show_menu():
             menu = QMenu(self)
-            if t["operation_type"] == "outbound":
-                if t["payment_status"] == "pending":
-                    a = QAction("✓ تحديد كمسدد", self)
-                    a.triggered.connect(lambda: self._update_status(t["id"], "paid"))
-                    menu.addAction(a)
-                else:
-                    a = QAction("⏳ تحديد كمؤجل", self)
-                    a.triggered.connect(lambda: self._update_status(t["id"], "pending"))
-                    menu.addAction(a)
-            else:
+            if t["operation_type"] != "outbound":
                 if not t.get("is_delivered", 0):
                     a = QAction("🤝 تحديد كتم التسليم", self)
                     a.triggered.connect(lambda: self._update_status(t["id"], 1))
@@ -611,7 +670,7 @@ class CustomerStatementDialog(QDialog):
                     a = QAction("⏳ تحديد كـ لم يُسلّم", self)
                     a.triggered.connect(lambda: self._update_status(t["id"], 0))
                     menu.addAction(a)
-            menu.addSeparator()
+                menu.addSeparator()
             a_del = QAction("🗑️ حذف العملية", self)
             a_del.triggered.connect(lambda: self._delete_txn(t["id"]))
             menu.addAction(a_del)
@@ -642,22 +701,14 @@ class CustomerStatementDialog(QDialog):
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
-    def _cleanup(self):
-        if (
-            QMessageBox.question(
-                self, "تنظيف", "هل تريد حذف جميع العمليات المسددة والمسلمة؟"
-            )
-            == QMessageBox.StandardButton.Yes
-        ):
-            db.cleanup_paid_transactions(self.customer_id)
-            self._load_data()
-            self._refresh_ui()
-
     def _quick_settle(self):
         dlg = QuickSettleDialog(self._data["customer"], self)
         if dlg.exec():
             self._load_data()
             self._refresh_ui()
+
+    def _on_period_changed(self):
+        self._refresh_ui()
 
     def _print_report(self):
         self.print_btn.setEnabled(False)
@@ -668,7 +719,19 @@ class CustomerStatementDialog(QDialog):
         QApplication.processEvents()
         try:
             from ui.utils.pdf_generator import PDFGenerator
-            path = PDFGenerator(self._data).generate()
+            pdf_txns, pdf_pmts, opening_balance = self._get_period_data()
+            pdf_data = {
+                "customer":     self._data["customer"],
+                "transactions": pdf_txns,
+                "payments":     pdf_pmts,
+                "totals":       self._data.get("totals", {}),
+            }
+            period_label = self.period_combo.currentText()
+            path = PDFGenerator(
+                pdf_data,
+                opening_balance=opening_balance,
+                period_label=period_label,
+            ).generate()
             path = os.path.abspath(os.path.normpath(path))
             if not os.path.exists(path):
                 raise FileNotFoundError(path)
@@ -696,12 +759,12 @@ class CustomerStatementDialog(QDialog):
 
         self.card_owed.set_value(fmt_currency(s["total_required"]))
         self.card_owned.set_value(fmt_currency(s["total_payments"]))
+        self.card_received.set_value(fmt_currency(s["total_received"]))
         self.card_net.set_value(fmt_currency(s["net"]))
         self.card_net.val_lbl.setStyleSheet(
             f"color: {COLORS['red'] if s['net'] > 0.005 else COLORS['green']}; "
             f"font-size: 32px; font-weight: 900; background:transparent; border:none;"
         )
-        self.card_count.set_value(str(s["total_count"]))
 
         self._fill_ledger()
         self._fill_table()

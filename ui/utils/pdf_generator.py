@@ -65,7 +65,12 @@ def _balance_box_props(balance: float) -> tuple[str, str, str, str, str]:
 
 
 class PDFGenerator:
-    def __init__(self, customer_data: dict):
+    def __init__(
+        self,
+        customer_data: dict,
+        opening_balance: float = 0.0,
+        period_label: str = None,
+    ):
         self.customer = customer_data.get("customer", {})
         self.transactions = sorted(
             customer_data.get("transactions", []),
@@ -76,6 +81,8 @@ class PDFGenerator:
             key=lambda p: p.get("created_at", ""),
         )
         self.totals = customer_data.get("totals", {})
+        self.opening_balance = float(opening_balance)
+        self.period_label = period_label
 
     # ── public entry point ─────────────────────────────────────────
 
@@ -104,6 +111,7 @@ class PDFGenerator:
                     "details":    details,
                     "debit":      float(t.get("amount_required") or 0),
                     "credit":     0.0,
+                    "is_rollover": False,
                 })
             else:
                 all_entries.append({
@@ -112,6 +120,7 @@ class PDFGenerator:
                     "details":    "دفعة من العميل",
                     "debit":      0.0,
                     "credit":     float(t.get("amount_spent") or 0),
+                    "is_rollover": False,
                 })
 
         for p in self.payments:
@@ -121,21 +130,36 @@ class PDFGenerator:
                 "details":    "تسديد سريع",
                 "debit":      0.0,
                 "credit":     float(p.get("amount") or 0),
+                "is_rollover": False,
             })
 
         all_entries.sort(key=lambda e: e["created_at"])
 
         rows: list[dict] = []
-        balance = 0.0
+        balance = self.opening_balance
         for e in all_entries:
             balance += e["debit"] - e["credit"]
             rows.append({
-                "date":    e["date"],
-                "details": e["details"],
-                "debit":   e["debit"],
-                "credit":  e["credit"],
-                "balance": balance,
+                "date":        e["date"],
+                "details":     e["details"],
+                "debit":       e["debit"],
+                "credit":      e["credit"],
+                "balance":     balance,
+                "is_rollover": False,
             })
+
+        # Insert rollover row at the top (chronologically first) when a period filter is active
+        if abs(self.opening_balance) > 0.005:
+            first_date = all_entries[0]["date"] if all_entries else datetime.now().strftime("%Y-%m-%d")
+            rows.insert(0, {
+                "date":        first_date,
+                "details":     "رصيد سابق منقول من فترات سابقة",
+                "debit":       self.opening_balance if self.opening_balance > 0 else 0.0,
+                "credit":      abs(self.opening_balance) if self.opening_balance < 0 else 0.0,
+                "balance":     self.opening_balance,
+                "is_rollover": True,
+            })
+
         return rows, balance
 
     def _temp_path(self, ext: str = "pdf") -> str:
@@ -158,8 +182,10 @@ class PDFGenerator:
         phone = self.customer.get("phone") or "—"
         group = self.customer.get("group_name") or "بدون مجموعة"
         now = datetime.now().strftime("%Y-%m-%d  %H:%M")
-        total_debit = sum(r["debit"] for r in rows)
-        total_credit = sum(r["credit"] for r in rows)
+        period_str = f" — الفترة: {self.period_label}" if self.period_label else ""
+        non_rollover = [r for r in rows if not r.get("is_rollover")]
+        total_debit  = sum(r["debit"]  for r in non_rollover)
+        total_credit = sum(r["credit"] for r in non_rollover)
         rows_html = self._html_rows(rows)
         box_label, box_bg, box_color, box_border, box_value = _balance_box_props(final_balance)
 
@@ -167,7 +193,7 @@ class PDFGenerator:
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<title>كشف حساب — {name}</title>
+<title>كشف حساب — {name}{period_str}</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
 
@@ -264,7 +290,7 @@ td.amount {{ font-family: 'Courier New', monospace; font-size: 9.5pt; }}
 </div>
 
 <div class="report-title">كشف حساب: {name}</div>
-<div class="report-sub">تاريخ التقرير: {now}</div>
+<div class="report-sub">تاريخ التقرير: {now}{period_str}</div>
 
 <div class="info-bar">
   <span class="info-item"><strong>المجموعة:</strong> {group}</span>
@@ -313,6 +339,7 @@ td.amount {{ font-family: 'Courier New', monospace; font-size: 9.5pt; }}
             )
         html = ""
         for r in rows:
+            is_rollover = r.get("is_rollover", False)
             d = _fmt(r["debit"]) if r["debit"] else "—"
             c = _fmt(r["credit"]) if r["credit"] else "—"
             b = r["balance"]
@@ -322,10 +349,16 @@ td.amount {{ font-family: 'Courier New', monospace; font-size: 9.5pt; }}
                 b_class, b_str = "bal-credit", f"({_fmt(abs(b))})"
             else:
                 b_class, b_str = "", "0.00"
+            if is_rollover:
+                row_style = ' style="background:#fff3cd;font-weight:bold;border-top:2px solid #f0ad4e;"'
+                details_str = f"⟵ {r['details']}"
+            else:
+                row_style = ""
+                details_str = r["details"]
             html += f"""
-    <tr>
+    <tr{row_style}>
       <td>{r['date']}</td>
-      <td class="details-cell">{r['details']}</td>
+      <td class="details-cell">{details_str}</td>
       <td class="amount">{d}</td>
       <td class="amount">{c}</td>
       <td class="amount {b_class}">{b_str}</td>
@@ -344,8 +377,10 @@ td.amount {{ font-family: 'Courier New', monospace; font-size: 9.5pt; }}
         phone = self.customer.get("phone") or "—"
         group = self.customer.get("group_name") or "بدون مجموعة"
         now = datetime.now().strftime("%Y-%m-%d  %H:%M")
-        total_debit = sum(r["debit"] for r in rows)
-        total_credit = sum(r["credit"] for r in rows)
+        period_str = f" — {self.period_label}" if self.period_label else ""
+        non_rollover = [r for r in rows if not r.get("is_rollover")]
+        total_debit  = sum(r["debit"]  for r in non_rollover)
+        total_credit = sum(r["credit"] for r in non_rollover)
         box_label, box_bg_hex, box_color_hex, _, box_value = _balance_box_props(final_balance)
 
         # ── Parse CSS hex colours to RGB tuples ──
@@ -409,7 +444,7 @@ td.amount {{ font-family: 'Courier New', monospace; font-size: 9.5pt; }}
 
         pdf.set_font("Tahoma", "", 8)
         pdf.set_text_color(120, 120, 120)
-        pdf.cell(180, 5, _ar(f"تاريخ التقرير: {now}"), align="C", ln=1)
+        pdf.cell(180, 5, _ar(f"تاريخ التقرير: {now}{period_str}"), align="C", ln=1)
         pdf.set_text_color(0, 0, 0)
 
         # ── Customer info bar ───────────────────────────────────
@@ -455,8 +490,14 @@ td.amount {{ font-family: 'Courier New', monospace; font-size: 9.5pt; }}
                 draw_table_header()
                 pdf.set_font("Tahoma", "", 9)
 
-            pdf.set_fill_color(249, 249, 249) if fill else pdf.set_fill_color(255, 255, 255)
-            fill = not fill
+            is_rollover = r.get("is_rollover", False)
+            if is_rollover:
+                pdf.set_fill_color(255, 243, 205)  # amber tint
+                pdf.set_font("Tahoma", "B", 9)
+            else:
+                pdf.set_fill_color(249, 249, 249) if fill else pdf.set_fill_color(255, 255, 255)
+                fill = not fill
+                pdf.set_font("Tahoma", "", 9)
 
             d = _fmt(r["debit"]) if r["debit"] else "—"
             c = _fmt(r["credit"]) if r["credit"] else "—"
@@ -471,13 +512,16 @@ td.amount {{ font-family: 'Courier New', monospace; font-size: 9.5pt; }}
                 b_str = "0.00"
                 pdf.set_text_color(80, 80, 80)
 
+            details_text = f"<< {r['details']}" if is_rollover else r["details"]
             pdf.cell(CW["balance"], ROW_H, b_str, border=1, align="C", fill=True)
             pdf.set_text_color(0, 0, 0)
             pdf.cell(CW["credit"],  ROW_H, c,    border=1, align="C", fill=True)
             pdf.cell(CW["debit"],   ROW_H, d,    border=1, align="C", fill=True)
-            pdf.cell(CW["details"], ROW_H, _ar(r["details"]), border=1, align="R", fill=True)
-            pdf.cell(CW["date"],    ROW_H, r["date"],         border=1, align="C", fill=True)
+            pdf.cell(CW["details"], ROW_H, _ar(details_text), border=1, align="R", fill=True)
+            pdf.cell(CW["date"],    ROW_H, r["date"],          border=1, align="C", fill=True)
             pdf.ln()
+            if is_rollover:
+                pdf.set_font("Tahoma", "", 9)
 
         # ── Totals row ──────────────────────────────────────────
         pdf.set_fill_color(234, 240, 251)
