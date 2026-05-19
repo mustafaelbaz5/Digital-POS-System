@@ -616,24 +616,27 @@ td.amount {{ font-family: 'Courier New', monospace; font-size: 9.5pt; }}
         pdf.set_text_color(0, 0, 0)
 
         # ── Final balance box ────────────────────────────────────
-        box_y = pdf.get_y() + 5
-        if box_y > pdf.h - 35:
+        _BOX_H = 18  # box height in mm — must stay in sync with text centering below
+        box_y = pdf.get_y() + 8
+        if box_y > pdf.h - 40:
             pdf.add_page()
             box_y = 15
 
         pdf.set_fill_color(*box_bg_rgb)
         pdf.set_draw_color(*box_txt_rgb)
-        pdf.rect(15, box_y, 180, 16, style="FD")
+        pdf.rect(15, box_y, 180, _BOX_H, style="FD")
 
         pdf.set_text_color(*box_txt_rgb)
         pdf.set_font("Tahoma", "B", 11)
-        pdf.set_xy(15, box_y + 3)
+        pdf.set_xy(15, box_y + 4)          # (18 - 10) / 2 = 4 mm top pad
         pdf.cell(90, 10, _ar(box_label), align="R")
 
         pdf.set_font("Tahoma", "B", 13)
-        pdf.set_xy(105, box_y + 3)
-        pdf.cell(90, 10, box_value, align="L")
+        pdf.set_xy(105, box_y + 4)
+        pdf.cell(90, 10, _ar(box_value), align="L")
 
+        # Advance Y past the box before drawing anything else
+        pdf.set_y(box_y + _BOX_H + 10)
         pdf.set_draw_color(0, 0, 0)
         pdf.set_text_color(0, 0, 0)
 
@@ -643,13 +646,13 @@ td.amount {{ font-family: 'Courier New', monospace; font-size: 9.5pt; }}
 
         pdf.set_draw_color(203, 213, 224)
         pdf.set_line_width(0.3)
-        y_divider = pdf.get_y() + 5
+        y_divider = pdf.get_y()
         pdf.line(15, y_divider, 195, y_divider)
-        pdf.set_xy(15, y_divider + 6)
+        pdf.set_xy(15, y_divider + 10)
 
         pdf.set_font("Tahoma", "B", 10)
         pdf.cell(180, 7, _ar("سجل عمليات الاستلام المنفصلة (خارج المديونية)"), align="C", ln=1)
-        pdf.ln(2)
+        pdf.ln(4)
 
         # Header for isolated receipts table
         pdf.set_fill_color(44, 62, 80)
@@ -1071,21 +1074,24 @@ td.type-zero  {{ color: #888; }}
         pdf.set_text_color(0, 0, 0)
 
         # ── Final balance box ──
-        box_y = pdf.get_y() + 5
-        if box_y > pdf.h - 35:
+        _BOX_H = 18
+        box_y = pdf.get_y() + 8
+        if box_y > pdf.h - 40:
             pdf.add_page()
             box_y = 15
 
         pdf.set_fill_color(*box_bg_rgb)
         pdf.set_draw_color(*box_txt_rgb)
-        pdf.rect(15, box_y, 180, 16, style="FD")
+        pdf.rect(15, box_y, 180, _BOX_H, style="FD")
         pdf.set_text_color(*box_txt_rgb)
         pdf.set_font("Tahoma", "B", 11)
-        pdf.set_xy(15, box_y + 3)
+        pdf.set_xy(15, box_y + 4)
         pdf.cell(90, 10, _ar(box_label), align="R")
         pdf.set_font("Tahoma", "B", 13)
-        pdf.set_xy(105, box_y + 3)
-        pdf.cell(90, 10, box_value, align="L")
+        pdf.set_xy(105, box_y + 4)
+        pdf.cell(90, 10, _ar(box_value), align="L")
+        # Advance Y past the box before anything else can overwrite it
+        pdf.set_y(box_y + _BOX_H + 6)
         pdf.set_draw_color(0, 0, 0)
         pdf.set_text_color(0, 0, 0)
 
