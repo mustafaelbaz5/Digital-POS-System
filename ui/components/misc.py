@@ -221,7 +221,7 @@ def show_toast(parent, message: str, type: str = "success"):
 # ══════════════════════════════════════════
 
 
-def make_txn_actions(t: dict, on_status_change, on_delete) -> QWidget:
+def make_txn_actions(t: dict, on_delete) -> QWidget:
     """يرجع QWidget فيه زرار إجراءات يفتح _ActionDialog."""
     btn = QPushButton("⋮ إجراءات")
     btn.setObjectName("btn_ghost")
@@ -231,7 +231,7 @@ def make_txn_actions(t: dict, on_status_change, on_delete) -> QWidget:
 
     def _open():
         parent_widget = btn.window()
-        dlg = _ActionDialog(t, on_status_change, on_delete, parent_widget)
+        dlg = _ActionDialog(t, on_delete, parent_widget)
         dlg.exec()
 
     btn.clicked.connect(_open)
@@ -247,19 +247,17 @@ def make_txn_actions(t: dict, on_status_change, on_delete) -> QWidget:
 
 
 class _ActionDialog(BaseDialog):
-    """حوار صغير يعرض خيارات تعديل أو حذف العملية."""
+    """حوار صغير يعرض تفاصيل العملية مع خيار الحذف فقط."""
 
-    def __init__(self, t: dict, on_status_change, on_delete, parent=None):
+    def __init__(self, t: dict, on_delete, parent=None):
         super().__init__("إجراءات العملية", parent)
         self._t = t
-        self._on_status_change = on_status_change
         self._on_delete = on_delete
         self.setMinimumWidth(380)
         self._build_content()
 
     def _build_content(self):
         t = self._t
-        op_type = t.get("operation_type", "outbound")
 
         card = QFrame()
         card.setObjectName("card")
@@ -281,36 +279,9 @@ class _ActionDialog(BaseDialog):
         self.body.addWidget(card)
         self.body.addSpacing(GAP_SM)
 
-        if op_type == "outbound":
-            curr_status = t.get("payment_status", "pending")
-            btn_text = " تحديد كمسدد" if curr_status == "pending" else "⏳ تحديد كمؤجل"
-            new_status = "paid" if curr_status == "pending" else "pending"
-            role = "primary" if curr_status == "pending" else "secondary"
-
-            s_btn = QPushButton(btn_text)
-            s_btn.setObjectName(f"btn_{role}")
-            s_btn.setFixedHeight(44)
-            s_btn.clicked.connect(lambda: self._do_status(new_status))
-            self.body.addWidget(s_btn)
-        else:
-            is_del = t.get("is_delivered", 0)
-            btn_text = "🤝 تحديد كتم التسليم" if not is_del else "⏳ تحديد كـ لم يُسلّم"
-            new_val = 1 if not is_del else 0
-            role = "primary" if not is_del else "secondary"
-
-            d_btn = QPushButton(btn_text)
-            d_btn.setObjectName(f"btn_{role}")
-            d_btn.setFixedHeight(44)
-            d_btn.clicked.connect(lambda: self._do_status(new_val))
-            self.body.addWidget(d_btn)
-
         self.add_stretch()
         self.add_button("🗑️ حذف العملية", self._do_delete, role="danger")
         self.add_button("إغلاق", self.reject, role="secondary")
-
-    def _do_status(self, val):
-        self.accept()
-        self._on_status_change(self._t["id"], val)
 
     def _do_delete(self):
         if (

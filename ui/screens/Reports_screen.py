@@ -364,6 +364,7 @@ class TransactionsLogTab(QWidget):
             ("إجراءات", 150),
         ]
         self.table = DataTable(columns)
+        self.table.set_section_color(COLORS["blue"])
         table_group.add_widget(self.table)
 
         self.summary_lbl = QLabel("")
@@ -462,7 +463,7 @@ class TransactionsLogTab(QWidget):
                 is_delivered=t.get("is_delivered", 0),
             )
 
-            actions = make_txn_actions(t, self._on_status_change, self._on_delete)
+            actions = make_txn_actions(t, self._on_delete)
             self.table.setCellWidget(row, 9, actions)
 
             total_profit += profit
@@ -471,13 +472,6 @@ class TransactionsLogTab(QWidget):
         self.summary_lbl.setText(
             f"العمليات: {len(transactions)}  ·  إجمالي المطلوب: {fmt_currency(total_required)}  ·  إجمالي الربح: {fmt_currency(total_profit)}"
         )
-
-    def _on_status_change(self, tid: int, new_status: str):
-        try:
-            db.update_transaction_status(tid, new_status)
-            self.load_data()
-        except Exception as e:
-            QMessageBox.critical(self, "خطأ", str(e))
 
     def _on_delete(self, tid: int):
         if (
