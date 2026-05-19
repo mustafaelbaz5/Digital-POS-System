@@ -57,11 +57,15 @@ def delete_group(group_id: int) -> None:
 # ══════════════════════════════════════════
 
 def get_all_customers(include_inactive: bool = False) -> list[dict]:
-    """جلب كل العملاء مع اسم المجموعة"""
+    """جلب كل العملاء مع اسم المجموعة وصافي الرصيد حسب كشف الحساب"""
     with get_connection() as conn:
         where = "" if include_inactive else "WHERE c.is_active = 1"
         rows = conn.execute(f"""
             SELECT c.id, c.name, c.phone, c.total_debt,
+                   COALESCE((SELECT SUM(amount_required) FROM transactions
+                             WHERE customer_id = c.id AND operation_type = 'outbound'), 0)
+                   - COALESCE((SELECT SUM(amount) FROM payments_history
+                               WHERE customer_id = c.id), 0) AS net_balance,
                    c.notes, c.is_active, c.created_at,
                    g.name AS group_name, c.group_id
             FROM customers c
@@ -76,10 +80,15 @@ def get_customers_by_group(group_id: int) -> list[dict]:
     """جلب عملاء مجموعة معينة"""
     with get_connection() as conn:
         rows = conn.execute("""
-            SELECT id, name, phone, total_debt, notes, created_at
-            FROM customers
-            WHERE group_id = ? AND is_active = 1
-            ORDER BY name
+            SELECT c.id, c.name, c.phone, c.total_debt,
+                   COALESCE((SELECT SUM(amount_required) FROM transactions
+                             WHERE customer_id = c.id AND operation_type = 'outbound'), 0)
+                   - COALESCE((SELECT SUM(amount) FROM payments_history
+                               WHERE customer_id = c.id), 0) AS net_balance,
+                   c.notes, c.created_at
+            FROM customers c
+            WHERE c.group_id = ? AND c.is_active = 1
+            ORDER BY c.name
         """, (group_id,)).fetchall()
         return [dict(r) for r in rows]
 
@@ -280,7 +289,12 @@ def search_customers(query: str) -> list[dict]:
     with get_connection() as conn:
         pattern = f"%{query}%"
         rows = conn.execute("""
-            SELECT c.id, c.name, c.phone, c.total_debt, g.name AS group_name
+            SELECT c.id, c.name, c.phone, c.total_debt,
+                   COALESCE((SELECT SUM(amount_required) FROM transactions
+                             WHERE customer_id = c.id AND operation_type = 'outbound'), 0)
+                   - COALESCE((SELECT SUM(amount) FROM payments_history
+                               WHERE customer_id = c.id), 0) AS net_balance,
+                   g.name AS group_name
             FROM customers c
             LEFT JOIN groups g ON g.id = c.group_id
             WHERE c.is_active = 1

@@ -199,7 +199,7 @@ class CustomersTab(QWidget):
         else:
             customers = db.get_all_customers()
 
-        customers = sorted(customers, key=lambda c: -(c.get("total_debt") or 0))
+        customers = sorted(customers, key=lambda c: -(c.get("net_balance") or 0))
         self._customers = customers
         self.table.clear_rows()
         self.table.setRowCount(len(customers))
@@ -213,19 +213,19 @@ class CustomersTab(QWidget):
                 row, 2, c.get("group_name") or "—", COLORS["text_muted"]
             )
 
-            debt = c.get("total_debt") or 0
-            if debt > 0:
+            net = c.get("net_balance") or 0
+            if net > 0:
                 self.table.set_cell(
-                    row, 3, fmt_currency(debt), COLORS["red"], bold=True
+                    row, 3, fmt_currency(net), COLORS["red"], bold=True
                 )
                 self.table.set_cell(row, 4, "—", COLORS["text_muted"])
-                total_owed += debt
-            elif debt < 0:
+                total_owed += net
+            elif net < 0:
                 self.table.set_cell(row, 3, "—", COLORS["text_muted"])
                 self.table.set_cell(
-                    row, 4, fmt_currency(abs(debt)), COLORS["green"], bold=True
+                    row, 4, fmt_currency(abs(net)), COLORS["green"], bold=True
                 )
-                total_due += abs(debt)
+                total_due += abs(net)
             else:
                 self.table.set_cell(row, 3, "—", COLORS["text_muted"])
                 self.table.set_cell(row, 4, "—", COLORS["text_muted"])
@@ -264,7 +264,10 @@ class CustomersTab(QWidget):
 
     def _open_statement(self, cid: int):
         from ui.screens.statement_screen import CustomerStatementDialog
-        CustomerStatementDialog(cid, self).exec()
+        dlg = CustomerStatementDialog(cid, self)
+        dlg.statement_changed.connect(self._load_table)
+        dlg.exec()
+        self._load_table()
 
     def _open_more(self, cid: int):
         from ui.screens.customer_info_dialog import CustomerInfoDialog

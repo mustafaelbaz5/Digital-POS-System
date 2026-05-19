@@ -177,12 +177,12 @@ class InventoryTab(QWidget):
         period_txns = db.get_transactions(
             date_from=date_from, date_to=date_to, limit=5000
         )
-        # احسب الربح من العمليات الفعلية فقط (استثني manual_commission و inbound)
+        # احسب الربح من العمليات الفعلية فقط (استثني manual_commission فقط)
         period_profit = sum(
             t.get("profit", 0) or 0
             for t in period_txns
             if t.get("payment_status") != "cash"
-            and t.get("operation_type") not in ("manual_commission", "inbound")
+            and t.get("operation_type") != "manual_commission"
         )
 
         self.card_cash.set_value(fmt_currency(stats["cash_vault"]))
@@ -418,7 +418,7 @@ class TransactionsLogTab(QWidget):
 
         for row, t in enumerate(transactions):
             op = t.get("operation_type")
-            is_manual = op in ("manual_commission", "inbound")
+            is_manual = op == "manual_commission"
             bg = COLORS["bg_hover"] if is_manual else None
 
             dt = (t.get("created_at") or "")[:16].replace("T", " ")

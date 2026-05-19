@@ -5,7 +5,7 @@ statement_screen.py — كشف حساب العميل (Ledger + Operations Dual-T
 import os
 from datetime import date as _date, timedelta
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QApplication,
@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QTabWidget,
     QVBoxLayout,
@@ -85,67 +86,107 @@ class SummaryCard(QFrame):
 
 
 # ══════════════════════════════════════════
-#  Ledger Row Components
+#  Ledger Flex-Grid Components
 # ══════════════════════════════════════════
+
+# Single source of truth for column proportions.
+# Applied identically to LedgerHeaderBar and LedgerTile.
+# (flex × 2 → integer stretch to satisfy QHBoxLayout)
+_COL_FLEX   = (4, 4, 3, 3, 3, 6)        # date, type, effect, amount, balance, description
+_COL_TITLES = ("التاريخ", "النوع", "التأثير", "القيمة", "الرصيد", "البيان")
 
 
 def _entry_style(entry_type: str) -> dict:
-    """Resolve visual style for a ledger entry type from current COLORS (theme-safe)."""
+    """Resolve visual style from current COLORS at call time (theme-safe)."""
     if entry_type == "debit":
-        return dict(
-            icon="↗", label="شحن صادر",
-            bg=COLORS["red_bg"], border=COLORS["red"],
-            type_color=COLORS["red"], effect="عليه ▲",
-            effect_color=COLORS["red"], amount_color=COLORS["red"],
-        )
+        return dict(icon="↗", label="شحن صادر",
+                    bg=COLORS["red_bg"], border=COLORS["red"],
+                    type_color=COLORS["red"], effect="عليه ▲",
+                    effect_color=COLORS["red"], amount_color=COLORS["red"])
     if entry_type == "credit_inbound":
-        return dict(
-            icon="💰", label="دفعة واردة",
-            bg=COLORS["green_bg"], border=COLORS["green"],
-            type_color=COLORS["green"], effect="له ▼",
-            effect_color=COLORS["green"], amount_color=COLORS["green"],
-        )
+        return dict(icon="💰", label="دفعة واردة",
+                    bg=COLORS["green_bg"], border=COLORS["green"],
+                    type_color=COLORS["green"], effect="له ▼",
+                    effect_color=COLORS["green"], amount_color=COLORS["green"])
     if entry_type == "credit_payment":
-        return dict(
-            icon="💳", label="تسديد سريع",
-            bg=COLORS["green_bg"], border=COLORS["green"],
-            type_color=COLORS["green"], effect="له ▼",
-            effect_color=COLORS["green"], amount_color=COLORS["green"],
-        )
+        return dict(icon="💳", label="تسديد سريع",
+                    bg=COLORS["green_bg"], border=COLORS["green"],
+                    type_color=COLORS["green"], effect="له ▼",
+                    effect_color=COLORS["green"], amount_color=COLORS["green"])
     if entry_type == "credit_netting":
-        return dict(
-            icon="⚡", label="مقاصة",
-            bg=COLORS["blue_bg"], border=COLORS["accent"],
-            type_color=COLORS["accent"], effect="له ▼",
-            effect_color=COLORS["green"], amount_color=COLORS["green"],
-        )
-    # rollover
-    return dict(
-        icon="⟵", label="رصيد سابق",
-        bg=COLORS["yellow_bg"], border=COLORS["yellow"],
-        type_color=COLORS["yellow"], effect="—",
-        effect_color=COLORS["text_muted"], amount_color=COLORS["yellow"],
-    )
+        return dict(icon="⚡", label="مقاصة",
+                    bg=COLORS["blue_bg"], border=COLORS["accent"],
+                    type_color=COLORS["accent"], effect="له ▼",
+                    effect_color=COLORS["green"], amount_color=COLORS["green"])
+    return dict(icon="⟵", label="رصيد سابق",           # rollover
+                bg=COLORS["yellow_bg"], border=COLORS["yellow"],
+                type_color=COLORS["yellow"], effect="—",
+                effect_color=COLORS["text_muted"], amount_color=COLORS["yellow"])
+
+
+def _vsep_widget() -> QFrame:
+    """1 px vertical separator used by both header and tile rows."""
+    s = QFrame()
+    s.setFrameShape(QFrame.Shape.VLine)
+    s.setFixedWidth(1)
+    s.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+    return s
+
+
+class LedgerHeaderBar(QFrame):
+    """
+    Header row for the ledger.  Uses the exact same _COL_FLEX stretch factors
+    as LedgerTile, so columns always align regardless of window width.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setLayoutDirection(RTL)
+        self.setFixedHeight(42)
+        self.setObjectName("ledger_hdr")
+        self.setStyleSheet(f"""
+            QFrame#ledger_hdr {{
+                background: {COLORS['clients']};
+                border-bottom: 2px solid rgba(0,0,0,0.15);
+            }}
+        """)
+
+        root = QHBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        for i, (title, flex) in enumerate(zip(_COL_TITLES, _COL_FLEX)):
+            cell = QWidget()
+            cell.setStyleSheet("background:transparent;")
+            cl = QHBoxLayout(cell)
+            cl.setContentsMargins(10, 0, 10, 0)
+            lbl = QLabel(title)
+            lbl.setStyleSheet(
+                f"color:{COLORS['text_on_dark']}; font-size:{FONT['sm']};"
+                f"font-weight:bold; background:transparent;"
+            )
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+            cl.addWidget(lbl)
+            root.addWidget(cell, flex)
+
+            if i < len(_COL_TITLES) - 1:
+                sep = _vsep_widget()
+                sep.setStyleSheet("background:rgba(255,255,255,0.25); border:none;")
+                root.addWidget(sep)
 
 
 class LedgerTile(QFrame):
     """
-    Full-row widget placed inside a row-spanning cell of the ledger DataTable.
-    Internal column widths mirror the header column widths so the sub-columns
-    visually align with the header labels.
+    Single ledger row widget.  Layout is driven by _COL_FLEX stretch factors —
+    the exact same constants used by LedgerHeaderBar — guaranteeing pixel-perfect
+    column alignment at every window width.
     """
-
-    _W_DATE   = 160
-    _W_TYPE   = 180
-    _W_EFFECT = 110
-    _W_AMOUNT = 140
-    _W_BAL    = 140
 
     def __init__(self, row: dict, parent=None):
         super().__init__(parent)
         self.setLayoutDirection(RTL)
-        st = _entry_style(row.get("entry_type", "debit"))
-        is_sys = row.get("is_system", False)
+        st       = _entry_style(row.get("entry_type", "debit"))
+        is_sys   = row.get("is_system", False)
 
         self.setObjectName("ledger_tile")
         self.setStyleSheet(f"""
@@ -155,9 +196,7 @@ class LedgerTile(QFrame):
                 border-bottom: 1px solid {COLORS['border']};
                 border-right: 3px solid {st['border']};
             }}
-            QFrame#ledger_tile:hover {{
-                background: {COLORS['bg_hover']};
-            }}
+            QFrame#ledger_tile:hover {{ background: {COLORS['bg_hover']}; }}
         """)
         self.setMinimumHeight(52)
 
@@ -165,48 +204,52 @@ class LedgerTile(QFrame):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        def _vsep():
-            s = QFrame()
-            s.setFrameShape(QFrame.Shape.VLine)
-            s.setFixedWidth(1)
-            s.setStyleSheet(f"background:{COLORS['border']}; border:none;")
-            root.addWidget(s)
+        # ── helpers ────────────────────────────────────────────────
+        def _sep():
+            root.addWidget(_vsep_widget())
 
         def _lbl(text, color=None, bold=False, fs=None,
                  align=Qt.AlignmentFlag.AlignCenter):
             l = QLabel(text)
-            parts = [
-                f"color:{color or COLORS['text_primary']}",
-                f"font-size:{fs or FONT['sm']}",
-                "background:transparent",
-            ]
-            if bold:
-                parts.append("font-weight:bold")
-            l.setStyleSheet("; ".join(parts) + ";")
+            l.setStyleSheet(
+                f"color:{color or COLORS['text_primary']};"
+                f"font-size:{fs or FONT['sm']};"
+                + ("font-weight:bold;" if bold else "")
+                + "background:transparent;"
+            )
             l.setAlignment(align | Qt.AlignmentFlag.AlignVCenter)
             return l
 
-        def _cell(w: int):
+        def _hcell(flex: int):
+            """Horizontal cell added with its flex stretch factor."""
             c = QWidget()
             c.setStyleSheet("background:transparent;")
             h = QHBoxLayout(c)
             h.setContentsMargins(10, 6, 10, 6)
             h.setSpacing(6)
-            c.setFixedWidth(w)
-            return c, h
+            root.addWidget(c, flex)
+            return h
 
-        # ── [1] Date ────────────────────────────────────────────────
-        c1, h1 = _cell(self._W_DATE)
-        h1.addWidget(_lbl(row.get("date", ""), color=COLORS["text_secondary"]))
-        root.addWidget(c1)
-        _vsep()
+        def _vcell(flex: int):
+            """Vertical cell (for description column) added with its flex stretch factor."""
+            c = QWidget()
+            c.setStyleSheet("background:transparent;")
+            v = QVBoxLayout(c)
+            v.setContentsMargins(14, 6, 14, 6)
+            v.setSpacing(2)
+            v.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+            root.addWidget(c, flex)
+            return v
 
-        # ── [2] Operation type ──────────────────────────────────────
-        c2, h2 = _cell(self._W_TYPE)
-        h2.addWidget(_lbl(
-            f"{st['icon']}  {st['label']}",
-            color=st["type_color"], bold=True,
-        ))
+        # ── [col 0] Date — flex 4 ───────────────────────────────────
+        h0 = _hcell(_COL_FLEX[0])
+        h0.addWidget(_lbl(row.get("date", ""), color=COLORS["text_secondary"]))
+        _sep()
+
+        # ── [col 1] Operation type — flex 4 ────────────────────────
+        h1 = _hcell(_COL_FLEX[1])
+        h1.addWidget(_lbl(f"{st['icon']}  {st['label']}",
+                          color=st["type_color"], bold=True))
         if is_sys:
             tag = QLabel("تلقائي")
             tag.setStyleSheet(
@@ -214,28 +257,23 @@ class LedgerTile(QFrame):
                 f"background:{COLORS['bg_alt_row']}; border-radius:3px;"
                 f"padding:1px 6px; border:1px solid {COLORS['border']};"
             )
-            h2.addWidget(tag)
-        h2.addStretch()
-        root.addWidget(c2)
-        _vsep()
+            h1.addWidget(tag)
+        h1.addStretch()
+        _sep()
 
-        # ── [3] Effect (عليه / له) ─────────────────────────────────
-        c3, h3 = _cell(self._W_EFFECT)
-        h3.addWidget(_lbl(st["effect"], color=st["effect_color"], bold=True))
-        root.addWidget(c3)
-        _vsep()
+        # ── [col 2] Effect (عليه / له) — flex 3 ─────────────────────
+        h2 = _hcell(_COL_FLEX[2])
+        h2.addWidget(_lbl(st["effect"], color=st["effect_color"], bold=True))
+        _sep()
 
-        # ── [4] Amount ──────────────────────────────────────────────
+        # ── [col 3] Amount — flex 3 ─────────────────────────────────
         amount = row.get("debit", 0) or row.get("credit", 0)
-        c4, h4 = _cell(self._W_AMOUNT)
-        h4.addWidget(_lbl(
-            fmt_currency(amount),
-            color=st["amount_color"], bold=True, fs=FONT["md"],
-        ))
-        root.addWidget(c4)
-        _vsep()
+        h3 = _hcell(_COL_FLEX[3])
+        h3.addWidget(_lbl(fmt_currency(amount),
+                          color=st["amount_color"], bold=True, fs=FONT["md"]))
+        _sep()
 
-        # ── [5] Running balance ─────────────────────────────────────
+        # ── [col 4] Running balance — flex 3 ───────────────────────
         bal = row.get("balance", 0)
         if bal > 0.005:
             bal_color, bal_text = COLORS["red"], fmt_currency(bal)
@@ -243,35 +281,26 @@ class LedgerTile(QFrame):
             bal_color, bal_text = COLORS["green"], f"{fmt_currency(abs(bal))} — له"
         else:
             bal_color, bal_text = COLORS["text_muted"], "—"
-        c5, h5 = _cell(self._W_BAL)
-        h5.addWidget(_lbl(bal_text, color=bal_color, bold=True, fs=FONT["md"]))
-        root.addWidget(c5)
-        _vsep()
+        h4 = _hcell(_COL_FLEX[4])
+        h4.addWidget(_lbl(bal_text, color=bal_color, bold=True, fs=FONT["md"]))
+        _sep()
 
-        # ── [6] Description + detail (stretch, leftmost in RTL) ────
-        c6 = QWidget()
-        c6.setStyleSheet("background:transparent;")
-        v6 = QVBoxLayout(c6)
-        v6.setContentsMargins(14, 6, 14, 6)
-        v6.setSpacing(2)
-        v6.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-
-        desc = QLabel(row.get("description", ""))
-        desc.setStyleSheet(
+        # ── [col 5] Description + detail — flex 6 ──────────────────
+        v5 = _vcell(_COL_FLEX[5])
+        desc_lbl = QLabel(row.get("description", ""))
+        desc_lbl.setStyleSheet(
             f"color:{COLORS['text_primary']}; font-size:{FONT['sm']}; background:transparent;"
         )
-        desc.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        v6.addWidget(desc)
+        desc_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        v5.addWidget(desc_lbl)
 
         if row.get("detail"):
-            det = QLabel(row["detail"])
-            det.setStyleSheet(
+            det_lbl = QLabel(row["detail"])
+            det_lbl.setStyleSheet(
                 f"color:{COLORS['text_muted']}; font-size:{FONT['xs']}; background:transparent;"
             )
-            det.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            v6.addWidget(det)
-
-        root.addWidget(c6, 1)
+            det_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            v5.addWidget(det_lbl)
 
 
 # ══════════════════════════════════════════
@@ -280,6 +309,7 @@ class LedgerTile(QFrame):
 
 
 class CustomerStatementDialog(QDialog):
+    statement_changed = pyqtSignal()
 
     def __init__(self, customer_id: int, parent=None):
         super().__init__(parent)
@@ -620,42 +650,53 @@ class CustomerStatementDialog(QDialog):
     # ══════════════════════════════════════════
 
     def _make_ledger_tab(self) -> QWidget:
-        widget = QWidget()
-        widget.setLayoutDirection(RTL)
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(0, GAP_MD, 0, 0)
-        layout.setSpacing(0)
+        outer = QWidget()
+        outer.setLayoutDirection(RTL)
+        outer_layout = QVBoxLayout(outer)
+        outer_layout.setContentsMargins(0, GAP_MD, 0, 0)
+        outer_layout.setSpacing(0)
 
-        cols = [
-            ("التاريخ",   LedgerTile._W_DATE),
-            ("النوع",     LedgerTile._W_TYPE),
-            ("التأثير",   LedgerTile._W_EFFECT),
-            ("القيمة",    LedgerTile._W_AMOUNT),
-            ("الرصيد",    LedgerTile._W_BAL),
-            ("البيان",    -1),
-        ]
-        self.ledger_table = DataTable(cols)
-        self.ledger_table.set_section_color(COLORS["clients"])
-        self.ledger_table.setShowGrid(False)
-        self.ledger_table.setSortingEnabled(False)
-        self.ledger_table.horizontalHeader().setSectionsClickable(False)
-        self.ledger_table.verticalHeader().hide()
-        self.ledger_table.verticalHeader().setDefaultSectionSize(52)
-        self.ledger_table.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
-        )
-        layout.addWidget(self.ledger_table)
-        return widget
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+
+        # Single container holds the header + all tile rows.
+        # Because they share the same parent width, _COL_FLEX stretch factors
+        # produce identical column widths in both the header and every tile row.
+        self._ledger_container = QWidget()
+        self._ledger_container.setLayoutDirection(RTL)
+        self._ledger_layout = QVBoxLayout(self._ledger_container)
+        self._ledger_layout.setContentsMargins(0, 0, 0, 0)
+        self._ledger_layout.setSpacing(0)
+        self._ledger_layout.addWidget(LedgerHeaderBar())  # index 0 — never removed
+
+        scroll.setWidget(self._ledger_container)
+        outer_layout.addWidget(scroll)
+        return outer
 
     def _fill_ledger(self):
         rows = self._compute_ledger()
-        self.ledger_table.clear_rows()
-        self.ledger_table.setRowCount(len(rows))
 
-        for i, r in enumerate(rows):
-            self.ledger_table.setSpan(i, 0, 1, 6)
-            self.ledger_table.setCellWidget(i, 0, LedgerTile(r))
-            self.ledger_table.setRowHeight(i, 52)
+        # Keep the header bar at index 0; drop all previous tile rows and spacers.
+        while self._ledger_layout.count() > 1:
+            item = self._ledger_layout.takeAt(1)
+            if item.widget():
+                item.widget().deleteLater()
+
+        if rows:
+            for r in rows:
+                self._ledger_layout.addWidget(LedgerTile(r))
+        else:
+            placeholder = QLabel("لا توجد بيانات للفترة المحددة")
+            placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            placeholder.setStyleSheet(
+                f"color:{COLORS['text_muted']}; font-size:{FONT['md']}; padding:48px;"
+            )
+            self._ledger_layout.addWidget(placeholder)
+
+        self._ledger_layout.addStretch()
 
     # ══════════════════════════════════════════
     #  Tab 2 — المعاملات (Operations)
@@ -712,7 +753,7 @@ class CustomerStatementDialog(QDialog):
 
         for row, t in enumerate(txns):
             op = t.get("operation_type", "")
-            is_manual = op in ("manual_commission", "inbound")
+            is_manual = op == "manual_commission"
             bg = COLORS["bg_hover"] if is_manual else None
 
             # Date
@@ -888,6 +929,7 @@ class CustomerStatementDialog(QDialog):
             QMessageBox.information(self, "تمت المقاصة ✓", "\n".join(lines))
             self._load_data()
             self._refresh_ui()
+            self.statement_changed.emit()
         except Exception as e:
             QMessageBox.critical(self, "خطأ", str(e))
 
@@ -905,6 +947,7 @@ class CustomerStatementDialog(QDialog):
                 db.mark_as_delivered(tid)
                 self._load_data()
                 self._refresh_ui()
+                self.statement_changed.emit()
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
@@ -917,6 +960,7 @@ class CustomerStatementDialog(QDialog):
                 db.delete_transaction(tid)
                 self._load_data()
                 self._refresh_ui()
+                self.statement_changed.emit()
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", str(e))
 
@@ -925,6 +969,7 @@ class CustomerStatementDialog(QDialog):
         if dlg.exec():
             self._load_data()
             self._refresh_ui()
+            self.statement_changed.emit()
 
     def _on_period_changed(self):
         self._refresh_ui()
