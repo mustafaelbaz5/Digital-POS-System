@@ -877,7 +877,16 @@ def get_dashboard_stats() -> dict:
             "SELECT COALESCE(SUM(balance),0) AS total FROM platforms WHERE type='instapay' AND is_active=1"
         ).fetchone()
         debts = conn.execute(
-            "SELECT COALESCE(SUM(total_debt),0) AS total FROM customers WHERE is_active=1"
+            """
+            SELECT COALESCE(SUM(
+                COALESCE((SELECT SUM(amount_required) FROM transactions
+                          WHERE customer_id = c.id AND operation_type = 'outbound'), 0)
+                - COALESCE((SELECT SUM(amount) FROM payments_history
+                            WHERE customer_id = c.id), 0)
+            ), 0) AS total
+            FROM customers c
+            WHERE c.is_active = 1
+            """
         ).fetchone()
         # احسب أرباح اليوم: استثني manual_commission التي ليست عمليات بيع
         today_p = conn.execute("""

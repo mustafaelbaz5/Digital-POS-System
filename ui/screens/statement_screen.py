@@ -359,6 +359,7 @@ class CustomerStatementDialog(QDialog):
                       for t in all_txns
                       if t.get("operation_type") == "inbound"
                       and not t.get("is_netted", 0)
+                      and t.get("is_delivered", 0)
                       and (t.get("created_at") or "")[:10] < date_from)
                 - sum(float(p.get("amount") or 0)
                       for p in all_pmts
@@ -395,14 +396,16 @@ class CustomerStatementDialog(QDialog):
                     "is_system":  False,
                 })
             elif op == "inbound" and not t.get("is_netted", 0):
+                is_pending = not bool(t.get("is_delivered", 0))
                 all_entries.append({
                     "created_at": t.get("created_at", ""),
                     "entry_type": "credit_inbound",
                     "description": "دفعة واردة من العميل",
-                    "detail":     None,
+                    "detail":     "معلقة - لا تؤثر على الرصيد حتى التسليم" if is_pending else None,
                     "debit":      0.0,
                     "credit":     float(t.get("amount_spent") or 0),
                     "is_system":  False,
+                    "skip_balance": is_pending,
                 })
 
         for p in pmts:
@@ -423,7 +426,8 @@ class CustomerStatementDialog(QDialog):
         rows: list[dict] = []
         balance = opening_balance
         for e in all_entries:
-            balance += e["debit"] - e["credit"]
+            if not e.get("skip_balance", False):
+                balance += e["debit"] - e["credit"]
             rows.append({
                 **e,
                 "date":        e["created_at"][:16].replace("T", " "),
@@ -1054,18 +1058,18 @@ class GroupReportDialog(BaseDialog):
     def _build_content(self):
         from ui.utils.formatters import fmt_currency as _fc
         customers = db.get_customers_by_group(self.group_id)
-        total_debt = sum(c.get("total_debt", 0) or 0 for c in customers)
+        total_balance = sum(c.get("net_balance", 0) or 0 for c in customers)
 
         columns = [
             ("الاسم",      220),
             ("التليفون",   160),
-            ("المديونية",  150),
+            ("الرصيد الصافي", 150),
             ("ملاحظات",     -1),
         ]
         self.table = DataTable(columns)
         self.table.setRowCount(len(customers))
         for row, c in enumerate(customers):
-            debt = c.get("total_debt", 0) or 0
+            debt = c.get("net_balance", 0) or 0
             self.table.set_cell(row, 0, c["name"], bold=True)
             self.table.set_cell(row, 1, c.get("phone") or "—", color=COLORS["text_secondary"])
             self.table.set_cell(
@@ -1085,9 +1089,9 @@ class GroupReportDialog(BaseDialog):
         total_frame.setObjectName("card_highlight")
         tl = QHBoxLayout(total_frame)
         tl.setContentsMargins(16, 12, 16, 12)
-        total_lbl = QLabel(f"إجمالي المجموعة: {_fc(total_debt)}")
+        total_lbl = QLabel(f"إجمالي المجموعة: {_fc(total_balance)}")
         total_lbl.setStyleSheet(
-            f"color:{COLORS['red'] if total_debt > 0 else COLORS['green']};"
+            f"color:{COLORS['red'] if total_balance > 0 else COLORS['green']};"
             f"font-size:18px;font-weight:bold;"
         )
         tl.addStretch()

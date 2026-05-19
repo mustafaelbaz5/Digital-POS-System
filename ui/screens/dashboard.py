@@ -253,9 +253,9 @@ class DashboardScreen(ScreenShell):
                 phone_lbl.setStyleSheet(f"color:{COLORS['text_muted']}; font-size:{FONT['sm']};")
                 rl.addWidget(phone_lbl)
 
-            debt = cust.get("total_debt", 0) or 0
-            if debt > 0:
-                debt_lbl = QLabel(fmt_currency(debt))
+            net = cust.get("net_balance", 0) or 0
+            if net > 0:
+                debt_lbl = QLabel(fmt_currency(net))
                 debt_lbl.setStyleSheet(
                     f"color:{COLORS['red']}; font-weight:bold; font-size:{FONT['sm']};"
                     f"background:{COLORS['red_bg']}; border-radius:4px; padding:2px 8px;"
@@ -275,6 +275,7 @@ class DashboardScreen(ScreenShell):
     def _open_statement(self, customer_id: int):
         from ui.screens.statement_screen import CustomerStatementDialog
         dlg = CustomerStatementDialog(customer_id, self)
+        dlg.statement_changed.connect(self.refresh)
         dlg.exec()
 
     # ── Actions Panel ──────────────────────────────────────────────────────
@@ -316,10 +317,10 @@ class DashboardScreen(ScreenShell):
         try:
             customers = db.get_all_customers()
             debtors = sorted(
-                [c for c in customers if (c.get("total_debt") or 0) > 0],
-                key=lambda c: c.get("total_debt", 0),
+                [c for c in customers if (c.get("net_balance") or 0) > 0],
+                key=lambda c: c.get("net_balance", 0),
                 reverse=True,
-            )[:6]
+            )[:5]
 
             if not debtors:
                 no_debt = QLabel("لا توجد مديونيات حالية")
@@ -334,7 +335,7 @@ class DashboardScreen(ScreenShell):
                 cid = cust["id"]
                 row = _DebtorRow(
                     cust["name"],
-                    cust.get("total_debt", 0),
+                    cust.get("net_balance", 0),
                     i + 1,
                     on_click=lambda c=cid: self._open_statement(c),
                 )

@@ -188,20 +188,24 @@ def get_group_summary(group_id: int) -> dict:
         """, (group_id,)).fetchone()
 
         members = conn.execute("""
-            SELECT c.id, c.name, c.phone, c.total_debt,
+            SELECT c.id, c.name, c.phone,
+                   COALESCE((SELECT SUM(amount_required) FROM transactions
+                             WHERE customer_id = c.id AND operation_type = 'outbound'), 0)
+                   - COALESCE((SELECT SUM(amount) FROM payments_history
+                               WHERE customer_id = c.id), 0) AS net_balance,
                    strftime('%Y-%m-%d', MAX(t.created_at)) AS last_activity
             FROM customers c
             LEFT JOIN transactions t ON t.customer_id = c.id
             WHERE c.group_id = ? AND c.is_active = 1
             GROUP BY c.id
-            ORDER BY ABS(c.total_debt) DESC
+            ORDER BY ABS(net_balance) DESC
         """, (group_id,)).fetchall()
 
     if not group:
         return {}
 
     members_list = [dict(m) for m in members]
-    total = sum(float(m["total_debt"] or 0) for m in members_list)
+    total = sum(float(m["net_balance"] or 0) for m in members_list)
 
     return {
         "group": dict(group),

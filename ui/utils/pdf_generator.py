@@ -757,7 +757,7 @@ td.type-zero  {{ color: #888; }}
             )
         html = ""
         for m in self.members:
-            debt = float(m.get("total_debt") or 0)
+            debt = float(m.get("net_balance") if m.get("net_balance") is not None else m.get("total_debt", 0) or 0)
             balance_str = f"{_fmt(abs(debt))} ج"
             last = m.get("last_activity") or "—"
 
@@ -888,7 +888,7 @@ td.type-zero  {{ color: #888; }}
             pdf.set_fill_color(248, 249, 250) if fill else pdf.set_fill_color(255, 255, 255)
             fill = not fill
 
-            debt = float(m.get("total_debt") or 0)
+            debt = float(m.get("net_balance") if m.get("net_balance") is not None else m.get("total_debt", 0) or 0)
             last = m.get("last_activity") or "—"
             name_str = m.get("name", "—")
 
