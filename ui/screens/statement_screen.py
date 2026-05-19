@@ -355,12 +355,6 @@ class CustomerStatementDialog(QDialog):
                     for t in all_txns
                     if t.get("operation_type") == "outbound"
                     and (t.get("created_at") or "")[:10] < date_from)
-                - sum(float(t.get("amount_spent") or 0)
-                      for t in all_txns
-                      if t.get("operation_type") == "inbound"
-                      and not t.get("is_netted", 0)
-                      and t.get("is_delivered", 0)
-                      and (t.get("created_at") or "")[:10] < date_from)
                 - sum(float(p.get("amount") or 0)
                       for p in all_pmts
                       if (p.get("created_at") or "")[:10] < date_from)
@@ -395,18 +389,8 @@ class CustomerStatementDialog(QDialog):
                     "credit":     0.0,
                     "is_system":  False,
                 })
-            elif op == "inbound" and not t.get("is_netted", 0):
-                is_pending = not bool(t.get("is_delivered", 0))
-                all_entries.append({
-                    "created_at": t.get("created_at", ""),
-                    "entry_type": "credit_inbound",
-                    "description": "دفعة واردة من العميل",
-                    "detail":     "معلقة - لا تؤثر على الرصيد حتى التسليم" if is_pending else None,
-                    "debit":      0.0,
-                    "credit":     float(t.get("amount_spent") or 0),
-                    "is_system":  False,
-                    "skip_balance": is_pending,
-                })
+            # Inbound transactions (all states) are quarantined to the isolated section.
+            # Only مقاصة creates a payments_history entry that appears here as credit.
 
         for p in pmts:
             notes = (p.get("notes") or "").strip()
@@ -426,8 +410,7 @@ class CustomerStatementDialog(QDialog):
         rows: list[dict] = []
         balance = opening_balance
         for e in all_entries:
-            if not e.get("skip_balance", False):
-                balance += e["debit"] - e["credit"]
+            balance += e["debit"] - e["credit"]
             rows.append({
                 **e,
                 "date":        e["created_at"][:16].replace("T", " "),
@@ -714,15 +697,15 @@ class CustomerStatementDialog(QDialog):
         layout.setSpacing(GAP_SM)
 
         cols = [
-            ("التاريخ",    150),
-            ("النوع",      150),
+            ("التاريخ",    140),
+            ("النوع",      140),
             ("الخدمة",      100),
             ("المنصة",      120),
-            ("المصروف",    130),
-            ("المطلوب",    130),
-            ("المسدد",     130),
+            ("المصروف",    120),
+            ("المطلوب",    120),
+            ("المسدد",     120),
             ("الربح",       100),
-            ("الحالة",     400),
+            ("الحالة",     300),
             ("الإجراءات",  140),
         ]
         self.table = DataTable(cols)
@@ -731,21 +714,24 @@ class CustomerStatementDialog(QDialog):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
         header = self.table.horizontalHeader()
-        fixed_columns = {
-            0: 150,
-            1: 150,
-            4: 130,
-            5: 130,
-            6: 130,
-            7: 100,
-            8: -1,
-            9: 140,
-        }
-        for col, width in fixed_columns.items():
+        if header is None:
+            return widget
+        # Fixed-width columns — ResizeMode.Fixed lets setColumnWidth actually take effect
+        for col, width in {
+            0: 140,   # التاريخ
+            1: 130,   # النوع
+            4: 120,   # المصروف
+            5: 120,   # المطلوب
+            6: 120,   # المسدد
+            7: 100,   # الربح
+            8: 300,   # الحالة
+            9: 140,   # الإجراءات
+        }.items():
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
             self.table.setColumnWidth(col, width)
+        # Stretch columns fill the remaining space
+        for col in ( 3, ):   # الخدمة، المنصة، الحالة
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
         return widget
 
@@ -989,10 +975,11 @@ class CustomerStatementDialog(QDialog):
             from ui.utils.pdf_generator import PDFGenerator
             pdf_txns, pdf_pmts, opening_balance = self._get_period_data()
             pdf_data = {
-                "customer":     self._data["customer"],
-                "transactions": pdf_txns,
-                "payments":     pdf_pmts,
-                "totals":       self._data.get("totals", {}),
+                "customer":              self._data["customer"],
+                "transactions":          pdf_txns,
+                "isolated_transactions": self._data.get("isolated_transactions", []),
+                "payments":              pdf_pmts,
+                "totals":                self._data.get("totals", {}),
             }
             period_label = self.period_combo.currentText()
             path = PDFGenerator(

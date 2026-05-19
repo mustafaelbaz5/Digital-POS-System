@@ -582,11 +582,25 @@ def get_customer_statement(customer_id: int) -> dict:
             (customer_id,),
         ).fetchone()
 
+        isolated = conn.execute(
+            """
+            SELECT t.*, p.name AS platform_name
+            FROM transactions t
+            JOIN platforms p ON p.id = t.platform_id
+            WHERE t.customer_id = ?
+              AND t.operation_type = 'inbound'
+              AND t.is_netted = 0
+            ORDER BY t.created_at ASC
+            """,
+            (customer_id,),
+        ).fetchall()
+
         return {
-            "customer":     dict(customer),
-            "transactions": [dict(t) for t in transactions],
-            "totals":       dict(totals),
-            "payments":     [dict(p) for p in payments],
+            "customer":              dict(customer),
+            "transactions":          [dict(t) for t in transactions],
+            "isolated_transactions": [dict(t) for t in isolated],
+            "totals":                dict(totals),
+            "payments":              [dict(p) for p in payments],
         }
 
 

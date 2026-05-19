@@ -76,6 +76,13 @@ class PDFGenerator:
             customer_data.get("transactions", []),
             key=lambda t: t.get("created_at", ""),
         )
+        # Pre-filtered list from DAL (all non-netted inbounds).
+        # Falls back to self-computing from transactions if not supplied.
+        self._isolated_provided = "isolated_transactions" in customer_data
+        self.isolated_transactions = sorted(
+            customer_data.get("isolated_transactions", []),
+            key=lambda t: t.get("created_at", ""),
+        )
         self.payments = sorted(
             customer_data.get("payments", []),
             key=lambda p: p.get("created_at", ""),
@@ -95,54 +102,54 @@ class PDFGenerator:
 
     # ── shared ledger computation ──────────────────────────────────
 
-    def _is_unlinked_receiving(self, txn: dict) -> bool:
-        return (
-            txn.get("operation_type") == "inbound"
-            and not bool(txn.get("is_delivered", 0))
-            and not bool(txn.get("is_netted", 0))
-        )
-
     def _compute_isolated_receiving_rows(self) -> list[dict]:
+        """
+        Returns all non-netted inbound transactions for the isolated archive table.
+        Uses the pre-filtered list supplied by the DAL when available; otherwise
+        falls back to scanning self.transactions for backward compatibility.
+        """
+        source = (
+            self.isolated_transactions
+            if self._isolated_provided
+            else [
+                t for t in self.transactions
+                if t.get("operation_type") == "inbound"
+                and not bool(t.get("is_netted", 0))
+            ]
+        )
         rows: list[dict] = []
-        for t in self.transactions:
-            if not self._is_unlinked_receiving(t):
-                continue
+        for t in source:
+            delivered = bool(t.get("is_delivered", 0))
             rows.append({
                 "date":   (t.get("created_at") or "")[:10],
-                "type":   "استلام منفصل",
+                "type":   "تم التسليم كاش" if delivered else "استلام معلق",
                 "amount": float(t.get("amount_spent") or 0),
                 "notes":  t.get("notes") or "—",
             })
         return rows
 
     def _compute_ledger_rows(self) -> tuple[list[dict], float]:
+        """
+        Main financial ledger: outbound debits + payments_history credits only.
+        All inbound transactions are quarantined to the isolated section regardless
+        of delivery or netting state — مقاصة is already represented by its
+        payments_history entry, so no inbound row must ever enter this loop.
+        """
         all_entries: list[dict] = []
         for t in self.transactions:
             op = t.get("operation_type", "")
-            if op not in ("outbound", "inbound"):
-                continue
-            if op == "inbound" and self._is_unlinked_receiving(t):
-                continue
+            if op != "outbound":
+                continue  # inbounds excluded from main ledger unconditionally
 
             service  = t.get("service_name") or "—"
             platform = t.get("platform_name") or ""
-            if op == "outbound":
-                details = f"{service} ({platform})" if platform else service
-                all_entries.append({
+            details  = f"{service} ({platform})" if platform else service
+            all_entries.append({
                     "created_at": t.get("created_at", ""),
                     "date":       (t.get("created_at") or "")[:10],
                     "details":    details,
                     "debit":      float(t.get("amount_required") or 0),
                     "credit":     0.0,
-                    "is_rollover": False,
-                })
-            else:
-                all_entries.append({
-                    "created_at": t.get("created_at", ""),
-                    "date":       (t.get("created_at") or "")[:10],
-                    "details":    "دفعة واردة من العميل",
-                    "debit":      0.0,
-                    "credit":     float(t.get("amount_spent") or 0),
                     "is_rollover": False,
                 })
 
@@ -358,8 +365,13 @@ td.amount {{ font-family: 'Courier New', monospace; font-size: 9.5pt; }}
   </tbody>
 </table>
 
+<div class="balance-box">
+  <span class="balance-label">{box_label}</span>
+  <span class="balance-value">{box_value}</span>
+</div>
+
 <div class="section-divider"></div>
-<div class="section-title">عمليات استلام منفصلة (خارج المديونية)</div>
+<div class="section-title">سجل عمليات الاستلام المنفصلة (خارج المديونية)</div>
 <table class="isolated-table">
   <thead>
     <tr>
@@ -373,11 +385,6 @@ td.amount {{ font-family: 'Courier New', monospace; font-size: 9.5pt; }}
     {isolated_html}
   </tbody>
 </table>
-
-<div class="balance-box">
-  <span class="balance-label">{box_label}</span>
-  <span class="balance-value">{box_value}</span>
-</div>
 
 <div class="footer-note">
   تم إنشاء هذا التقرير بواسطة نظام إدارة المدفوعات — {OWNER_NAME} — {OWNER_ADDRESS}
@@ -608,30 +615,59 @@ td.amount {{ font-family: 'Courier New', monospace; font-size: 9.5pt; }}
         pdf.ln()
         pdf.set_text_color(0, 0, 0)
 
+        # ── Final balance box ────────────────────────────────────
+        box_y = pdf.get_y() + 5
+        if box_y > pdf.h - 35:
+            pdf.add_page()
+            box_y = 15
+
+        pdf.set_fill_color(*box_bg_rgb)
+        pdf.set_draw_color(*box_txt_rgb)
+        pdf.rect(15, box_y, 180, 16, style="FD")
+
+        pdf.set_text_color(*box_txt_rgb)
+        pdf.set_font("Tahoma", "B", 11)
+        pdf.set_xy(15, box_y + 3)
+        pdf.cell(90, 10, _ar(box_label), align="R")
+
+        pdf.set_font("Tahoma", "B", 13)
+        pdf.set_xy(105, box_y + 3)
+        pdf.cell(90, 10, box_value, align="L")
+
+        pdf.set_draw_color(0, 0, 0)
+        pdf.set_text_color(0, 0, 0)
+
+        if pdf.get_y() > pdf.h - 65:
+            pdf.add_page()
+            pdf.set_xy(15, 15)
+
+        pdf.set_draw_color(203, 213, 224)
+        pdf.set_line_width(0.3)
+        y_divider = pdf.get_y() + 5
+        pdf.line(15, y_divider, 195, y_divider)
+        pdf.set_xy(15, y_divider + 6)
+
+        pdf.set_font("Tahoma", "B", 10)
+        pdf.cell(180, 7, _ar("سجل عمليات الاستلام المنفصلة (خارج المديونية)"), align="C", ln=1)
+        pdf.ln(2)
+
+        # Header for isolated receipts table
+        pdf.set_fill_color(44, 62, 80)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Tahoma", "B", 9.5)
+        iso_widths = {"date": 28, "type": 40, "amount": 30, "notes": 82}
+        for key, label in [
+            ("notes", "البيان"),
+            ("amount", "القيمة"),
+            ("type", "النوع"),
+            ("date", "التاريخ"),
+        ]:
+            pdf.cell(iso_widths[key], 8, _ar(label), border=1, align="C", fill=True)
+        pdf.ln()
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Tahoma", "", 9)
+
         if isolated_rows:
-            if pdf.get_y() > pdf.h - 70:
-                pdf.add_page()
-                pdf.set_xy(15, 15)
-            pdf.set_font("Tahoma", "B", 10)
-            pdf.cell(180, 7, _ar("عمليات استلام منفصلة (خارج المديونية)"), align="C", ln=1)
-            pdf.ln(2)
-
-            # Header for isolated receipts table
-            pdf.set_fill_color(44, 62, 80)
-            pdf.set_text_color(255, 255, 255)
-            pdf.set_font("Tahoma", "B", 9.5)
-            iso_widths = {"date": 28, "type": 40, "amount": 30, "notes": 82}
-            for key, label in [
-                ("notes", "البيان"),
-                ("amount", "القيمة"),
-                ("type", "النوع"),
-                ("date", "التاريخ"),
-            ]:
-                pdf.cell(iso_widths[key], 8, _ar(label), border=1, align="C", fill=True)
-            pdf.ln()
-            pdf.set_text_color(0, 0, 0)
-            pdf.set_font("Tahoma", "", 9)
-
             for row in isolated_rows:
                 if pdf.get_y() > pdf.h - 35:
                     pdf.add_page()
@@ -655,29 +691,11 @@ td.amount {{ font-family: 'Courier New', monospace; font-size: 9.5pt; }}
                 pdf.cell(iso_widths["type"],    ROW_H, _ar(row["type"]),   border=1, align="C")
                 pdf.cell(iso_widths["date"],    ROW_H, row["date"],        border=1, align="C")
                 pdf.ln()
-            pdf.ln(3)
+        else:
+            pdf.cell(sum(iso_widths.values()), ROW_H, _ar("لا توجد عمليات استلام منفصلة"), border=1, align="C")
+            pdf.ln()
 
-        # ── Final balance box ────────────────────────────────────
-        box_y = pdf.get_y() + 5
-        if box_y > pdf.h - 35:
-            pdf.add_page()
-            box_y = 15
-
-        pdf.set_fill_color(*box_bg_rgb)
-        pdf.set_draw_color(*box_txt_rgb)
-        pdf.rect(15, box_y, 180, 16, style="FD")
-
-        pdf.set_text_color(*box_txt_rgb)
-        pdf.set_font("Tahoma", "B", 11)
-        pdf.set_xy(15, box_y + 3)
-        pdf.cell(90, 10, _ar(box_label), align="R")
-
-        pdf.set_font("Tahoma", "B", 13)
-        pdf.set_xy(105, box_y + 3)
-        pdf.cell(90, 10, box_value, align="L")
-
-        pdf.set_draw_color(0, 0, 0)
-        pdf.set_text_color(0, 0, 0)
+        pdf.ln(3)
 
         # ── Save ─────────────────────────────────────────────────
         path = output_path or self._temp_path()
