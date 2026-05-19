@@ -85,6 +85,196 @@ class SummaryCard(QFrame):
 
 
 # ══════════════════════════════════════════
+#  Ledger Row Components
+# ══════════════════════════════════════════
+
+
+def _entry_style(entry_type: str) -> dict:
+    """Resolve visual style for a ledger entry type from current COLORS (theme-safe)."""
+    if entry_type == "debit":
+        return dict(
+            icon="↗", label="شحن صادر",
+            bg=COLORS["red_bg"], border=COLORS["red"],
+            type_color=COLORS["red"], effect="عليه ▲",
+            effect_color=COLORS["red"], amount_color=COLORS["red"],
+        )
+    if entry_type == "credit_inbound":
+        return dict(
+            icon="💰", label="دفعة واردة",
+            bg=COLORS["green_bg"], border=COLORS["green"],
+            type_color=COLORS["green"], effect="له ▼",
+            effect_color=COLORS["green"], amount_color=COLORS["green"],
+        )
+    if entry_type == "credit_payment":
+        return dict(
+            icon="💳", label="تسديد سريع",
+            bg=COLORS["green_bg"], border=COLORS["green"],
+            type_color=COLORS["green"], effect="له ▼",
+            effect_color=COLORS["green"], amount_color=COLORS["green"],
+        )
+    if entry_type == "credit_netting":
+        return dict(
+            icon="⚡", label="مقاصة",
+            bg=COLORS["blue_bg"], border=COLORS["accent"],
+            type_color=COLORS["accent"], effect="له ▼",
+            effect_color=COLORS["green"], amount_color=COLORS["green"],
+        )
+    # rollover
+    return dict(
+        icon="⟵", label="رصيد سابق",
+        bg=COLORS["yellow_bg"], border=COLORS["yellow"],
+        type_color=COLORS["yellow"], effect="—",
+        effect_color=COLORS["text_muted"], amount_color=COLORS["yellow"],
+    )
+
+
+class LedgerTile(QFrame):
+    """
+    Full-row widget placed inside a row-spanning cell of the ledger DataTable.
+    Internal column widths mirror the header column widths so the sub-columns
+    visually align with the header labels.
+    """
+
+    _W_DATE   = 160
+    _W_TYPE   = 180
+    _W_EFFECT = 110
+    _W_AMOUNT = 140
+    _W_BAL    = 140
+
+    def __init__(self, row: dict, parent=None):
+        super().__init__(parent)
+        self.setLayoutDirection(RTL)
+        st = _entry_style(row.get("entry_type", "debit"))
+        is_sys = row.get("is_system", False)
+
+        self.setObjectName("ledger_tile")
+        self.setStyleSheet(f"""
+            QFrame#ledger_tile {{
+                background: {st['bg']};
+                border: none;
+                border-bottom: 1px solid {COLORS['border']};
+                border-right: 3px solid {st['border']};
+            }}
+            QFrame#ledger_tile:hover {{
+                background: {COLORS['bg_hover']};
+            }}
+        """)
+        self.setMinimumHeight(52)
+
+        root = QHBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        def _vsep():
+            s = QFrame()
+            s.setFrameShape(QFrame.Shape.VLine)
+            s.setFixedWidth(1)
+            s.setStyleSheet(f"background:{COLORS['border']}; border:none;")
+            root.addWidget(s)
+
+        def _lbl(text, color=None, bold=False, fs=None,
+                 align=Qt.AlignmentFlag.AlignCenter):
+            l = QLabel(text)
+            parts = [
+                f"color:{color or COLORS['text_primary']}",
+                f"font-size:{fs or FONT['sm']}",
+                "background:transparent",
+            ]
+            if bold:
+                parts.append("font-weight:bold")
+            l.setStyleSheet("; ".join(parts) + ";")
+            l.setAlignment(align | Qt.AlignmentFlag.AlignVCenter)
+            return l
+
+        def _cell(w: int):
+            c = QWidget()
+            c.setStyleSheet("background:transparent;")
+            h = QHBoxLayout(c)
+            h.setContentsMargins(10, 6, 10, 6)
+            h.setSpacing(6)
+            c.setFixedWidth(w)
+            return c, h
+
+        # ── [1] Date ────────────────────────────────────────────────
+        c1, h1 = _cell(self._W_DATE)
+        h1.addWidget(_lbl(row.get("date", ""), color=COLORS["text_secondary"]))
+        root.addWidget(c1)
+        _vsep()
+
+        # ── [2] Operation type ──────────────────────────────────────
+        c2, h2 = _cell(self._W_TYPE)
+        h2.addWidget(_lbl(
+            f"{st['icon']}  {st['label']}",
+            color=st["type_color"], bold=True,
+        ))
+        if is_sys:
+            tag = QLabel("تلقائي")
+            tag.setStyleSheet(
+                f"color:{COLORS['text_muted']}; font-size:{FONT['xs']};"
+                f"background:{COLORS['bg_alt_row']}; border-radius:3px;"
+                f"padding:1px 6px; border:1px solid {COLORS['border']};"
+            )
+            h2.addWidget(tag)
+        h2.addStretch()
+        root.addWidget(c2)
+        _vsep()
+
+        # ── [3] Effect (عليه / له) ─────────────────────────────────
+        c3, h3 = _cell(self._W_EFFECT)
+        h3.addWidget(_lbl(st["effect"], color=st["effect_color"], bold=True))
+        root.addWidget(c3)
+        _vsep()
+
+        # ── [4] Amount ──────────────────────────────────────────────
+        amount = row.get("debit", 0) or row.get("credit", 0)
+        c4, h4 = _cell(self._W_AMOUNT)
+        h4.addWidget(_lbl(
+            fmt_currency(amount),
+            color=st["amount_color"], bold=True, fs=FONT["md"],
+        ))
+        root.addWidget(c4)
+        _vsep()
+
+        # ── [5] Running balance ─────────────────────────────────────
+        bal = row.get("balance", 0)
+        if bal > 0.005:
+            bal_color, bal_text = COLORS["red"], fmt_currency(bal)
+        elif bal < -0.005:
+            bal_color, bal_text = COLORS["green"], f"{fmt_currency(abs(bal))} — له"
+        else:
+            bal_color, bal_text = COLORS["text_muted"], "—"
+        c5, h5 = _cell(self._W_BAL)
+        h5.addWidget(_lbl(bal_text, color=bal_color, bold=True, fs=FONT["md"]))
+        root.addWidget(c5)
+        _vsep()
+
+        # ── [6] Description + detail (stretch, leftmost in RTL) ────
+        c6 = QWidget()
+        c6.setStyleSheet("background:transparent;")
+        v6 = QVBoxLayout(c6)
+        v6.setContentsMargins(14, 6, 14, 6)
+        v6.setSpacing(2)
+        v6.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+
+        desc = QLabel(row.get("description", ""))
+        desc.setStyleSheet(
+            f"color:{COLORS['text_primary']}; font-size:{FONT['sm']}; background:transparent;"
+        )
+        desc.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        v6.addWidget(desc)
+
+        if row.get("detail"):
+            det = QLabel(row["detail"])
+            det.setStyleSheet(
+                f"color:{COLORS['text_muted']}; font-size:{FONT['xs']}; background:transparent;"
+            )
+            det.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            v6.addWidget(det)
+
+        root.addWidget(c6, 1)
+
+
+# ══════════════════════════════════════════
 #  كشف حساب العميل — Dual-Tab Ledger View
 # ══════════════════════════════════════════
 
@@ -138,6 +328,7 @@ class CustomerStatementDialog(QDialog):
                 - sum(float(t.get("amount_spent") or 0)
                       for t in all_txns
                       if t.get("operation_type") == "inbound"
+                      and not t.get("is_netted", 0)
                       and (t.get("created_at") or "")[:10] < date_from)
                 - sum(float(p.get("amount") or 0)
                       for p in all_pmts
@@ -155,34 +346,46 @@ class CustomerStatementDialog(QDialog):
         return txns, pmts, opening_balance
 
     def _compute_ledger(self) -> list[dict]:
-        """Build running-balance ledger for the selected period with a rollover
-        opening balance row when a date filter is active. Returned newest-first."""
+        """Build enriched running-balance ledger rows. Returned newest-first."""
         txns, pmts, opening_balance = self._get_period_data()
         date_from, _ = self._get_filter_dates()
 
         all_entries: list[dict] = []
+
         for t in txns:
             op = t.get("operation_type", "")
             if op == "outbound":
                 all_entries.append({
-                    "created_at":  t.get("created_at", ""),
+                    "created_at": t.get("created_at", ""),
+                    "entry_type": "debit",
                     "description": t.get("service_name") or "عملية شحن",
-                    "debit":       float(t.get("amount_required") or 0),
-                    "credit":      0.0,
+                    "detail":     None,
+                    "debit":      float(t.get("amount_required") or 0),
+                    "credit":     0.0,
+                    "is_system":  False,
                 })
-            elif op == "inbound":
+            elif op == "inbound" and not t.get("is_netted", 0):
                 all_entries.append({
-                    "created_at":  t.get("created_at", ""),
-                    "description": "💰  دفعة من العميل",
-                    "debit":       0.0,
-                    "credit":      float(t.get("amount_spent") or 0),
+                    "created_at": t.get("created_at", ""),
+                    "entry_type": "credit_inbound",
+                    "description": "دفعة واردة من العميل",
+                    "detail":     None,
+                    "debit":      0.0,
+                    "credit":     float(t.get("amount_spent") or 0),
+                    "is_system":  False,
                 })
+
         for p in pmts:
+            notes = (p.get("notes") or "").strip()
+            is_net = "مقاصة" in notes
             all_entries.append({
-                "created_at":  p.get("created_at", ""),
-                "description": "💳  تسديد سريع",
-                "debit":       0.0,
-                "credit":      float(p.get("amount") or 0),
+                "created_at": p.get("created_at", ""),
+                "entry_type": "credit_netting" if is_net else "credit_payment",
+                "description": notes if notes else "تسديد سريع",
+                "detail":     None,
+                "debit":      0.0,
+                "credit":     float(p.get("amount") or 0),
+                "is_system":  is_net,
             })
 
         all_entries.sort(key=lambda e: e["created_at"])
@@ -192,23 +395,23 @@ class CustomerStatementDialog(QDialog):
         for e in all_entries:
             balance += e["debit"] - e["credit"]
             rows.append({
+                **e,
                 "date":        e["created_at"][:16].replace("T", " "),
-                "description": e["description"],
-                "debit":       e["debit"],
-                "credit":      e["credit"],
                 "balance":     balance,
                 "is_rollover": False,
             })
 
-        # Rollover row goes at the end so it appears at the bottom after reversal
         if date_from and abs(opening_balance) > 0.005:
             rows.append({
                 "date":        date_from,
+                "entry_type":  "rollover",
                 "description": "رصيد سابق منقول من فترات سابقة",
+                "detail":      None,
                 "debit":       opening_balance if opening_balance > 0 else 0.0,
                 "credit":      abs(opening_balance) if opening_balance < 0 else 0.0,
                 "balance":     opening_balance,
                 "is_rollover": True,
+                "is_system":   True,
             })
 
         rows.reverse()
@@ -421,17 +624,23 @@ class CustomerStatementDialog(QDialog):
         widget.setLayoutDirection(RTL)
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(0, GAP_MD, 0, 0)
-        layout.setSpacing(GAP_SM)
+        layout.setSpacing(0)
 
         cols = [
-            ("التاريخ",      150),
-            ("البيان",        -1),
-            ("عليه (مدين)",  150),
-            ("له (دائن)",    150),
-            ("الرصيد",       150),
+            ("التاريخ",   LedgerTile._W_DATE),
+            ("النوع",     LedgerTile._W_TYPE),
+            ("التأثير",   LedgerTile._W_EFFECT),
+            ("القيمة",    LedgerTile._W_AMOUNT),
+            ("الرصيد",    LedgerTile._W_BAL),
+            ("البيان",    -1),
         ]
         self.ledger_table = DataTable(cols)
         self.ledger_table.set_section_color(COLORS["clients"])
+        self.ledger_table.setShowGrid(False)
+        self.ledger_table.setSortingEnabled(False)
+        self.ledger_table.horizontalHeader().setSectionsClickable(False)
+        self.ledger_table.verticalHeader().hide()
+        self.ledger_table.verticalHeader().setDefaultSectionSize(52)
         self.ledger_table.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
@@ -440,46 +649,13 @@ class CustomerStatementDialog(QDialog):
 
     def _fill_ledger(self):
         rows = self._compute_ledger()
-        self.ledger_table.setSortingEnabled(False)
         self.ledger_table.clear_rows()
         self.ledger_table.setRowCount(len(rows))
 
         for i, r in enumerate(rows):
-            is_rollover = r.get("is_rollover", False)
-            is_debit    = r["debit"] > 0
-            bg = COLORS.get("bg_hover") if is_rollover else None
-
-            self.ledger_table.set_cell(
-                i, 0, r["date"], color=COLORS["text_secondary"], bg_color=bg
-            )
-            desc = f"⟵  {r['description']}" if is_rollover else r["description"]
-            self.ledger_table.set_cell(
-                i, 1, desc,
-                color=COLORS["accent"] if is_rollover else COLORS["text_primary"],
-                bold=True, bg_color=bg,
-            )
-
-            if is_debit:
-                self.ledger_table.set_cell(
-                    i, 2, fmt_currency(r["debit"]), color=COLORS["red"], bold=True, bg_color=bg
-                )
-                self.ledger_table.set_cell(i, 3, "—", color=COLORS["text_muted"], bg_color=bg)
-            else:
-                self.ledger_table.set_cell(i, 2, "—", color=COLORS["text_muted"], bg_color=bg)
-                self.ledger_table.set_cell(
-                    i, 3, fmt_currency(r["credit"]), color=COLORS["green"], bold=True, bg_color=bg
-                )
-
-            bal = r["balance"]
-            if bal > 0.005:
-                bal_color, bal_text = COLORS["red"], fmt_currency(bal)
-            elif bal < -0.005:
-                bal_color, bal_text = COLORS["green"], fmt_currency(abs(bal))
-            else:
-                bal_color, bal_text = COLORS["text_muted"], "—"
-            self.ledger_table.set_cell(i, 4, bal_text, color=bal_color, bold=True, bg_color=bg)
-
-        self.ledger_table.setSortingEnabled(True)
+            self.ledger_table.setSpan(i, 0, 1, 6)
+            self.ledger_table.setCellWidget(i, 0, LedgerTile(r))
+            self.ledger_table.setRowHeight(i, 52)
 
     # ══════════════════════════════════════════
     #  Tab 2 — المعاملات (Operations)

@@ -312,6 +312,16 @@ def initialize_database() -> None:
         except Exception:
             pass  # column already exists
 
+        # is_netted — marks inbound transactions that were settled via مقاصة (FIFO netting)
+        # instead of cash delivery; prevents double-counting in the ledger.
+        try:
+            conn.execute(
+                "ALTER TABLE transactions ADD COLUMN is_netted INTEGER NOT NULL DEFAULT 0"
+            )
+            conn.commit()
+        except Exception:
+            pass  # column already exists
+
         # payments_history — audit trail for settle_customer_debt entries
         try:
             conn.executescript("""

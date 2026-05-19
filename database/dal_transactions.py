@@ -561,7 +561,7 @@ def get_customer_statement(customer_id: int) -> dict:
 
         payments = conn.execute(
             """
-            SELECT id, amount, created_at
+            SELECT id, amount, created_at, notes
             FROM payments_history
             WHERE customer_id = ?
             ORDER BY created_at DESC
@@ -1102,9 +1102,10 @@ def deliver_and_settle(transaction_id: int) -> dict:
             if settle_amount <= 0:
                 raise ValueError("لا يوجد مبلغ للمقاصة")
 
-            # Mark inbound as delivered (no cash_vault change — netting, not cash payout)
+            # Mark as delivered AND flag as netted so the ledger knows to skip the
+            # inbound credit (payments_history entry is the single canonical record).
             conn.execute(
-                "UPDATE transactions SET is_delivered = 1 WHERE id = ?",
+                "UPDATE transactions SET is_delivered = 1, is_netted = 1 WHERE id = ?",
                 (transaction_id,),
             )
 
@@ -1160,8 +1161,9 @@ def deliver_and_settle(transaction_id: int) -> dict:
 
             if total_settled > 0:
                 conn.execute(
-                    "INSERT INTO payments_history (customer_id, amount) VALUES (?, ?)",
-                    (customer_id, total_settled),
+                    "INSERT INTO payments_history (customer_id, amount, notes) VALUES (?, ?, ?)",
+                    (customer_id, total_settled,
+                     f"مقاصة تلقائية — دفعة واردة #{transaction_id}"),
                 )
 
             conn.commit()
