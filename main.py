@@ -33,3 +33,6 @@ def main():
 if __name__ == "__main__":
     main()
 # C:\Users\Mustafa\POSSystem
+# rmdir /s /q build
+# rmdir /s /q dist
+# del *.spec
